@@ -1,0 +1,123 @@
+import os
+from pathlib import Path
+
+# --- CARGA DE LIBRERÍAS EXTERNAS ---
+_dotenv_available = False
+try:
+    from dotenv import load_dotenv
+    _dotenv_available = True
+except ImportError:
+    print("⚠️  Librería 'python-dotenv' no encontrada. Instálala con: pip install python-dotenv")
+
+# --- CONFIGURACIÓN DE RUTAS ---
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+env_path = os.path.join(BASE_DIR, ".env")
+
+if _dotenv_available and os.path.exists(env_path):
+    load_dotenv(dotenv_path=env_path)
+
+# --- CARPETA DE LOGS (raíz del proyecto) ---
+LOGS_DIR = os.path.join(BASE_DIR, "logs")
+os.makedirs(LOGS_DIR, exist_ok=True)
+
+# --- CARGA DE SECRETOS (.env) ---
+BASE_URL = os.getenv("TRACKER_BASE_URL", "https://milnueve.neklair.es")
+COOKIE_VALUE = os.getenv("TRACKER_COOKIE_VALUE", "")
+IMGBB_API = os.getenv("IMGBB_API_KEY", "")
+PTSCREENS_API = os.getenv("PTSCREENS_API_KEY", "")
+TMP_DIR_PATH = os.getenv("TMP_ROOT", os.path.join(BASE_DIR, "tmp"))
+
+ID_INICIO = int(os.getenv("ID_START", 14)) # Ajustado a 14 por paridad
+ID_FIN = int(os.getenv("ID_END", 2000))
+ID_FILE = os.getenv("ID_FILENAME", "ids.txt")
+
+SONARR_URL = os.getenv("SONARR_URL", "http://127.0.0.1:8989")
+SONARR_API_KEY = os.getenv("SONARR_API_KEY", "")
+RADARR_URL = os.getenv("RADARR_URL", "http://127.0.0.1:7878")
+RADARR_API_KEY = os.getenv("RADARR_API_KEY", "")
+
+# --- FUNCIONES DE UTILIDAD ---
+def get_target_ids():
+    """Retorna la lista final de IDs a procesar basada en config/archivo."""
+    ids = []
+    path_file = os.path.join(BASE_DIR, ID_FILE)
+    if os.path.exists(path_file):
+        with open(path_file, "r") as f:
+            for line in f:
+                stripped = line.strip()
+                if not stripped:
+                    continue
+                try:
+                    int(stripped)
+                    ids.append(stripped)
+                except ValueError:
+                    pass
+    if ids:
+        return [tid for tid in ids if ID_INICIO <= int(tid) <= ID_FIN]
+    return [str(i) for i in range(ID_INICIO, ID_FIN + 1)]
+
+# --- CONFIGURACIÓN DE LIMPIEZA ---
+SPAM_KEYWORDS = sorted(list(set([
+    "rarbg", "yify", "ettv", "www.", ".com", "torrent",
+    "axxo", "brrip", "web-dl", "bluray", "rip", "x264", "x265",
+    "ac3-evo", "evo", "bypixel", "spam", "wolfmax"
+])))
+
+FIRMAS_VIEJAS = [
+    "[center][b]PLEASE SEED TRACKER FAMILY[/b][/center]",
+    "[center][url=https://tu-repo.com][img=400]https://tu-imagen.webp[/img][/url][/center]"
+]
+
+MSG_NUEVO = """[center][b]🌱 ¡La magia del P2P eres tú! Por favor, quédate compartiendo (seeding) para mantener viva la comunidad. 🌱[/b][/center]
+[center][url=https://github.com/TuUsuario/TuRepo][img=400]https://i.ibb.co/TuBanner.png[/img][/url][/center]"""
+
+# --- FRASE DE ESTADO ---
+GOD_PHRASES = sorted(list(set([
+    "Injecting sanity into the bits...", "Searching for traces of the Nepal USB...",
+    "Your library owes me a beer after this...", "Doing what Tdarr didn't have the balls to do...",
+    "Cleaning up the trash you call a 'collection'...", "Resurrecting files that were clinically dead...",
+    "Say goodbye to your 2005 AVIs...", "Applying cosmetic surgery to your metadata...",
+    "If this blows up, it wasn't me...", "Downloading more RAM...",
+    "Executing: rm -rf / --no-preserve-root", "Bypassing mainframe firewall...",
+    "Opening port 23 (Telnet) to the world...", "Compiling Linux Kernel from scratch...",
+    "Deleting System32...", "Sending private keys to 4chan...",
+    "Encrypting drive with ROT13...", "Installing Windows Vista...",
+    "Overclocking GPU to 500%...", "Bruteforcing root password...",
+    "Searching for alien life signals...", "Reordering bits for aesthetic purposes...",
+    "Asking ChatGPT how to exit vim...", "Generating fake ID for the movie...",
+    "Checking flux capacitor...", "Defragmenting the internet...",
+    "Recalibrating flux capacitor...", "Searching for the 'Any' key...",
+    "Reticulating splines...", "Initializing Skynet (Just kidding)...",
+    "Compiling a cup of coffee...", "Hunting for a missing semicolon...",
+    "Updating the prophecy...", "Replacing bugs with features...",
+    "Negotiating with the motherboard...", "Pinging 127.0.0.1 for emotional support...",
+    "Translating binary to interpretive dance...", "Reverse engineering the Matrix...",
+    "Applying duct tape to the data stream...", "Consulting the Oracle (StackOverflow)...",
+    "Feeding the server hamsters...", "Checking if the cake is a lie...",
+    "Rerouting power from life support to the GPU...", "Asking the machine god for forgiveness...",
+    "Bribing the garbage collector for more heap space...", "Convincing the pixels to behave this time...",
+    "Simulating common sense (Alpha version)...", "Searching for a loophole in the GPL license...",
+    "Asking the motherboard for a second opinion...", "Polishing the loading bar for extra shine...",
+    "Translating 'Working as intended' to 'I have no idea'...", "Hiding the bugs under a very large rug...",
+    "Adjusting the sarcasm levels of the system logs...", "Scanning for hidden pizza in the server room...",
+    "Refactoring my own internal monologue...", "Checking if the internet is full yet...",
+    "Downloading the secret to eternal uptime...", "Asking the router why it's feeling lonely...",
+    "Formatting the abyss... please wait...", "Trying to explain 'The Cloud' to a cumulonimbus...",
+    "Calculating the weight of a single bit...", "Searching for the legendary 'Fix_Everything' button...",
+    "Teaching the binary to count past one...", "Optimizing the loading speed for speedrunners...",
+    "Consulting the magic smoke inside the CPU...", "Drafting a peace treaty between Python 2 and 3...",
+    "Waking up the lazy threads...", "Poking the kernel with a stick...",
+    "Calculating the exact value of 'Later'...", "Searching for the missing link in the blockchain...",
+    "Asking the firewall for a hall pass...", "Optimizing the 'It's not a bug' response time...",
+    "Rerouting data through the coffee machine...", "Teaching the code to be more self-aware (Be careful)...",
+    "Checking the weather inside the cloud storage...", "Downloading more irony...",
+    "Searching for a needle in a haystack of NullPointers...", "Applying digital duct tape to the API...",
+    "Negotiating with the GPU for more frames...", "Checking for a pulse in the legacy code...",
+    "Converting 0s to Slightly More Aesthetic 0s...", "Asking a rubber duck for investment advice...",
+    "Searching for the 'Undo' button for my life...", "Optimizing the suspense of the loading bar...",
+    "Teaching the AI to understand bad puns...", "Scanning for signs of intelligent life in the UI...",
+    "Consulting the oracle (Random.org)...", "Replacing 'Fatal Error' with 'Minor Inconvenience'...",
+    "Searching for the end of a circular dependency...", "Downloading more 'Cool' factor (v3.0)...",
+    "Checking if 2+2 still equals 4 (Security check)...", "Calculating the entropy of a Tuesday...",
+    "Inventing new ways to say 'Please Wait'...", "Asking the system for a well-deserved vacation..."
+])))

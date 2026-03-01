@@ -1,0 +1,37 @@
+# --- BLOQUEO DE SECRETOS (NIVEL BÚNKER) ---
+.env
+**/.env
+**/config.py
+**/singularity_config.py
+
+# --- PERMITIR TUS "EXAAMPLES" (DOBLE A) ---
+!**/*.exaample
+# Por si acaso aún tienes alguno con una sola A:
+!**/*.example.py
+!**/*.example
+
+# --- BASURA DE SISTEMA Y LOGS ---
+**/__pycache__/
+**/*.log
+.git/
+.zenflow/
+logs/
+tmp/
+
+# --- LIMPIEZA DE REPORTES Y DOCS PERSONALES ---
+audit_report_singularity.txt
+refactor_log.txt
+init-structure.txt
+Executive_resume.md
+docs/
+mkdocs.yml
+
+# --- SCRIPTS DE CONTROL DEL HOST ---
+.dockerignore
+.gitignore
+install-commands.sh
+makefile
+
+# Bloqueo de la carpeta de archivados del Mass Editor
+extras/MASS-EDITION-UNIT3D/archive/
+**/MASS-EDITION-UNIT3D/archive/

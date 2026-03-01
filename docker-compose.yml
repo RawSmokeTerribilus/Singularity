@@ -1,0 +1,41 @@
+services:
+  singularity:
+    # 1. IMAGEN (DESDE DOCKER HUB)
+    image: rawsmoke/singularity-suite:v1.0
+    container_name: singularity_core
+    restart: unless-stopped
+    privileged: true
+    command: tail -f /dev/null
+
+    deploy:
+      resources:
+        limits:
+          cpus: '6.0'
+          memory: 8G
+
+    # 3. INDENTACIÓN CORREGIDA (volumes debe ir dentro de singularity)
+    volumes:
+      # --- 1. CONFIGURACIÓN ---
+      - ./config/.env:/app/.env:z
+      - ./config/singularity_config.py:/app/singularity_config.py:z
+      - ./config/config.py:/app/RawLoadrr/data/config.py:z
+      - ./config/mass_config.py:/app/extras/MASS-EDITION-UNIT3D/config.py:z
+
+      # --- 2. WORK DATA ---
+      - ./work_data/mass_editor/ids.txt:/app/extras/MASS-EDITION-UNIT3D/ids.txt:z
+      - ./work_data/mass_editor/completados.txt:/app/extras/MASS-EDITION-UNIT3D/completados.txt:z
+      - ./work_data/mass_editor/completados_img.txt:/app/extras/MASS-EDITION-UNIT3D/completados_img.txt:z
+      - ./work_data/mass_editor/mapeo_maestro.json:/app/extras/MASS-EDITION-UNIT3D/mapeo_maestro.json:z
+      - ./work_data/tmp:/app/RawLoadrr/tmp:z
+      - ./work_data/logs:/app/logs:z
+      - ./work_data/logs/MKVerything:/app/MKVerything/logs:z
+      - ./work_data/logs/RawLoadrr:/app/RawLoadrr/logs:z
+      - ./work_data/reports:/app/MKVerything/docs:z
+
+      # --- 3. EL ARSENAL (30TB) ---
+      - /run/media/rawserver:/run/media/rawserver:z
+      - /home/rawserver:/home/rawserver:z
+    
+    network_mode: host
+    stdin_open: true
+    tty: true

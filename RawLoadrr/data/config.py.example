@@ -1,0 +1,542 @@
+##---------THE LAST DIGITAL UNDERGROUND PRESENTS-------##
+        ##                                                     ##
+        ##                 Special Recruitment :)              ##
+        ##          @ https://TheLDU.to/application            ##
+        ##                                                     ##
+        ##                              Ref: Uploadrr by CvT   ##
+        ##-----------------------------------------------------##
+
+  #Refer to `/backup/example-config.py` for additional options + comments
+
+config = {
+"version": "1.0.7",
+
+"DEFAULT": {
+    "tmdb_api": "YOUR_TMDB_API_KEY",
+    "imgbb_api": "YOUR_IMGBB_API_KEY",
+    "ptpimg_api": "YOUR_PTPIMG_API_KEY",
+    "lensdump_api": "YOUR_LENSDUMP_API_KEY",
+    "ptscreens_api": "YOUR_PTSCREENS_API_KEY",
+    "oeimg_api": "YOUR_OEIMG_API_KEY",
+    "img_host_1": "imgbox",
+    "img_host_2": "imgbb",
+    "img_host_3": "pixhos",
+    "img_host_4": "ptscreens",
+    "img_host_5": "lensdump",
+    "img_host_6": "oeimg",
+    "img_host_7": "ptpimg",
+    "screens": "4",
+    "img_size": "500",
+    "optimize_images": True,
+    "add_logo": False,
+    "add_trailer": True,
+    "use_global_sigs": False,
+    "global_sig": "\n[center][url=https://codeberg.org/CvT/Uploadrr][img=400]https://i.ibb.co/2NVWb0c/uploadrr.webp[/img][/url][/center]",
+    "global_anon_sig": "\n[center][url=https://codeberg.org/CvT/Uploadrr][img=40]https://i.ibb.co/n0jF73x/hacker.png[/img][/url][/center]",
+    "global_pr_sig": "\n[center][size=6][b]Personal Release[/b][/size][/center]\n[center][url=https://codeberg.org/CvT/Uploadrr][img=400]https://i.ibb.co/2NVWb0c/uploadrr.webp[/img][/url][/center]",
+    "global_anon_pr_sig": "\n[center][url=https://codeberg.org/CvT/Uploadrr][img=40]https://i.ibb.co/n0jF73x/hacker.png[/img][/url][/center]",
+    "default_torrent_client": "qbit",
+    "sfx_on_prompt": True,
+    "inline_imgs": 3
+},
+
+"AUTO": {
+    "description_folder": None,
+    "delay": 0,
+    "size_tolerance": 1,
+    "dupe_similarity": 80
+},
+
+"TRACKERS": {
+    "default_trackers": "YOUR_DEFAULT_TRACKER",
+    "ACM": {
+            "api_key": "YOUR_API_KEY",
+            "announce_url": "https://asiancinema.me/announce/YOUR_PASSKEY",
+            "anon": False,
+            "signature": "\n[center][b]PLEASE SEED ACM FAMILY[/b][/center]",
+            "anon_signature": "\n[center][url=...][img=40]...[/img][/url][/center]",
+            "pr_signature": "\n [center][b][size=6]PERSONAL RELEASE[/size][/b][/center]",
+            "anon_pr_signature": "\n[center][url=...][img=40]...[/img][/url][/center]"
+    },
+    "AITHER": {
+            "api_key": "YOUR_API_KEY",
+            "announce_url": "https://aither.cc/announce/YOUR_PASSKEY",
+            "anon": False,
+            "signature": "\n[center][b]PLEASE SEED AITHER FAMILY[/b][/center]",
+            "anon_signature": "\n[center][url=...][img=40]...[/img][/url][/center]",
+            "pr_signature": "\n [center][b][size=6]PERSONAL RELEASE[/size][/b][/center]",
+            "anon_pr_signature": "\n[center][url=...][img=40]...[/img][/url][/center]"
+    },
+    "ANT": {
+            "api_key": "YOUR_API_KEY",
+            "announce_url": "https://anthelion.me/announce/YOUR_PASSKEY",
+            "anon": False,
+            "signature": "\n[center][b]PLEASE SEED ANT FAMILY[/b][/center]",
+            "anon_signature": "\n[center][url=...][img=40]...[/img][/url][/center]",
+            "pr_signature": "\n [center][b][size=6]PERSONAL RELEASE[/size][/b][/center]",
+            "anon_pr_signature": "\n[center][url=...][img=40]...[/img][/url][/center]"
+    },
+    "AR": {
+            "username": "YOUR_USERNAME",
+            "password": "YOUR_PASSWORD",
+            "announce_url": "http://tracker.alpharatio.cc:2710/YOUR_PASSKEY/announce"
+    },
+    "BHD": {
+            "api_key": "YOUR_API_KEY",
+            "announce_url": "https://beyond-hd.me/announce/YOUR_PASSKEY",
+            "draft_default": True,
+            "anon": False,
+            "signature": "\n[center][b]PLEASE SEED BHD FAMILY[/b][/center]",
+            "anon_signature": "\n[center][url=...][img=40]...[/img][/url][/center]",
+            "pr_signature": "\n [center][b][size=6]PERSONAL RELEASE[/size][/b][/center]",
+            "anon_pr_signature": "\n[center][url=...][img=40]...[/img][/url][/center]"
+    },
+    "BHDTV": {
+            "api_key": "YOUR_API_KEY",
+            "announce_url": "https://trackerr.bit-hdtv.com/announce",
+            "my_announce_url": "https://trackerr.bit-hdtv.com/YOUR_PASSKEY/announce",
+            "anon": False
+    },
+    "BLU": {
+            "useAPI": False,
+            "api_key": "YOUR_API_KEY",
+            "announce_url": "https://blutopia.cc/announce/YOUR_PASSKEY",
+            "anon": False,
+            "signature": "\n[center][b]PLEASE SEED BLU FAMILY[/b][/center]",
+            "anon_signature": "\n[center][url=...][img=40]...[/img][/url][/center]",
+            "pr_signature": "\n [center][b][size=6]PERSONAL RELEASE[/size][/b][/center]",
+            "anon_pr_signature": "\n[center][url=...][img=40]...[/img][/url][/center]"
+    },
+    "CBR": {
+            "api_key": "YOUR_API_KEY",
+            "announce_url": "https://capybarabr.com/announce/YOUR_PASSKEY",
+            "anon": False,
+            "signature": "[url=...][img=69]https://capybarabr.com/img/capybara.svg[/img][/url][/center]",
+            "anon_signature": "\n[center][url=...][img=40]...[/img][/url][/center]",
+            "pr_signature": "\n [center][b][size=6]PERSONAL RELEASE[/size][/b][/center]",
+            "anon_pr_signature": "\n[center][url=...][img=40]...[/img][/url][/center]"
+    },
+    "EMU": {
+            "api_key": "YOUR_API_KEY",
+            "announce_url": "https://emuwarez.com/announce/YOUR_PASSKEY",
+            "anon": False,
+            "signature": "\n[center][url=...][img=400]...[/img][/url][/center]",
+            "anon_signature": "\n[center][url=...][img=40]...[/img][/url][/center]",
+            "pr_signature": "\n [center][b][size=6]PERSONAL RELEASE[/size][/b][/center]",
+            "anon_pr_signature": "\n[center][url=...][img=40]...[/img][/url][/center]"
+    },
+    "FL": {
+            "username": "YOUR_USERNAME",
+            "password": "YOUR_PASSWORD",
+            "announce_url": "",
+            "uploader_name": "",
+            "anon": False
+    },
+    "FNP": {
+            "api_key": "YOUR_API_KEY",
+            "announce_url": "https://fearnopeer.com/announce/YOUR_PASSKEY",
+            "anon": False,
+            "signature": "\n[center][b]PLEASE SEED FNP FAMILY[/b][/center]",
+            "anon_signature": "\n[center][url=...][img=40]...[/img][/url][/center]",
+            "pr_signature": "\n [center][b][size=6]PERSONAL RELEASE[/size][/b][/center]",
+            "anon_pr_signature": "\n[center][url=...][img=40]...[/img][/url][/center]"
+    },
+    "HDB": {
+            "api_key": "YOUR_API_KEY",
+            "announce_url": "https://hdbits.org/announce/YOUR_PASSKEY",
+            "anon": False,
+            "signature": "\n[center][b]PLEASE SEED HDB FAMILY[/b][/center]",
+            "anon_signature": "\n[center][url=...][img=40]...[/img][/url][/center]",
+            "pr_signature": "\n [center][b][size=6]PERSONAL RELEASE[/size][/b][/center]",
+            "anon_pr_signature": "\n[center][url=...][img=40]...[/img][/url][/center]"
+    },
+    "HDT": {
+            "username": "YOUR_USERNAME",
+            "password": "YOUR_PASSWORD",
+            "my_announce_url": "https://hdts-announce.ru/announce.php?pid=YOUR_PASSKEY",
+            "anon": False,
+            "announce_url": "https://hdts-announce.ru/announce.php"
+    },
+    "HHD": {
+            "api_key": "YOUR_API_KEY",
+            "announce_url": "https://homiehelpdesk.net/announce/YOUR_PASSKEY",
+            "anon": False,
+            "signature": "\n[center][size=7][b]PLEASE SEED HOMIES[/b][/size][/center]",
+            "anon_signature": "\n[center][url=...][img=40]...[/img][/url][/center]",
+            "pr_signature": "\n [center][b][size=6]PERSONAL RELEASE[/size][/b][/center]",
+            "anon_pr_signature": "\n[center][url=...][img=40]...[/img][/url][/center]"
+    },
+    "HP": {
+            "api_key": "YOUR_API_KEY",
+            "announce_url": "https://hidden-palace.net/announce/YOUR_PASSKEY",
+            "anon": False,
+            "signature": "\n[center][b]PLEASE SEED HP FAMILY[/b][/center]",
+            "anon_signature": "\n[center][url=...][img=40]...[/img][/url][/center]",
+            "pr_signature": "\n [center][b][size=6]PERSONAL RELEASE[/size][/b][/center]",
+            "anon_pr_signature": "\n[center][url=...][img=40]...[/img][/url][/center]"
+    },
+    "HUNO": {
+            "api_key": "YOUR_API_KEY",
+            "announce_url": "https://hawke.uno/announce/YOUR_PASSKEY",
+            "anon": False,
+            "signature": "\n[center][b]PLEASE SEED HUNO FAMILY[/b][/center]",
+            "anon_signature": "\n[center][url=...][img=40]...[/img][/url][/center]",
+            "pr_signature": "\n [center][b][size=6]PERSONAL RELEASE[/size][/b][/center]",
+            "anon_pr_signature": "\n[center][url=...][img=40]...[/img][/url][/center]"
+    },
+    "ITA": {
+            "api_key": "YOUR_API_KEY",
+            "announce_url": "https://itatorrents.xyz/announce/YOUR_PASSKEY",
+            "anon": False,
+            "signature": "\n[center][b]PLEASE SEED ITATorrents[/b][/center]",
+            "anon_signature": "\n[center][url=...][img=40]...[/img][/url][/center]",
+            "pr_signature": "\n [center][b][size=6]PERSONAL RELEASE[/size][/b][/center]",
+            "anon_pr_signature": "\n[center][url=...][img=40]...[/img][/url][/center]"
+    },
+    "JPTV": {
+            "api_key": "YOUR_API_KEY",
+            "announce_url": "https://jptv.club/announce/YOUR_PASSKEY",
+            "anon": False,
+            "signature": "\n[center][b]PLEASE SEED JPTV FAMILY[/b][/center]",
+            "anon_signature": "\n[center][url=...][img=40]...[/img][/url][/center]",
+            "pr_signature": "\n [center][b][size=6]PERSONAL RELEASE[/size][/b][/center]",
+            "anon_pr_signature": "\n[center][url=...][img=40]...[/img][/url][/center]"
+    },
+    "LCD": {
+            "api_key": "YOUR_API_KEY",
+            "announce_url": "https://locadora.cc/announce/YOUR_PASSKEY",
+            "anon": False,
+            "signature": "\n[center][b]PLEASE SEED LCD FAMILY[/b][/center]",
+            "anon_signature": "\n[center][url=...][img=40]...[/img][/url][/center]",
+            "pr_signature": "\n [center][b][size=6]PERSONAL RELEASE[/size][/b][/center]",
+            "anon_pr_signature": "\n[center][url=...][img=40]...[/img][/url][/center]"
+    },
+    "LDU": {
+            "api_key": "YOUR_API_KEY",
+            "announce_url": "https://theldu.to/announce/YOUR_PASSKEY",
+            "anon": False,
+            "signature": "\n[center][b]PLEASE SEED LDU FAMILY[/b][/center]",
+            "anon_signature": "\n[center][url=...][img=40]...[/img][/url][/center]",
+            "pr_signature": "\n [center][b][size=6]PERSONAL RELEASE[/size][/b][/center]",
+            "anon_pr_signature": "\n[center][url=...][img=40]...[/img][/url][/center]"
+    },
+    "LST": {
+            "api_key": "YOUR_API_KEY",
+            "announce_url": "https://lst.gg/announce/YOUR_PASSKEY",
+            "anon": False,
+            "signature": "\n[center][b]PLEASE SEED LST FAMILY[/b][/center]",
+            "anon_signature": "\n[center][url=...][img=40]...[/img][/url][/center]",
+            "pr_signature": "\n [center][b][size=6]PERSONAL RELEASE[/size][/b][/center]",
+            "anon_pr_signature": "\n[center][url=...][img=40]...[/img][/url][/center]"
+    },
+    "LT": {
+            "api_key": "YOUR_API_KEY",
+            "announce_url": "https://lat-team.com/announce/YOUR_PASSKEY",
+            "anon": False,
+            "signature": "\n[center][b]PLEASE SEED LAT-Team[/b][/center]",
+            "anon_signature": "\n[center][url=...][img=40]...[/img][/url][/center]",
+            "pr_signature": "\n [center][b][size=6]PERSONAL RELEASE[/size][/b][/center]",
+            "anon_pr_signature": "\n[center][url=...][img=40]...[/img][/url][/center]"
+    },
+    "MANUAL": {
+    },
+    "MB": {
+            "api_key": "YOUR_API_KEY",
+            "announce_url": "https://malayabits.cc/announce/YOUR_PASSKEY",
+            "anon": False,
+            "signature": "\n[center][b]PLEASE SEED MalayaBits[/b][/center]",
+            "anon_signature": "\n[center][url=...][img=40]...[/img][/url][/center]",
+            "pr_signature": "\n [center][b][size=6]PERSONAL RELEASE[/size][/b][/center]",
+            "anon_pr_signature": "\n[center][url=...][img=40]...[/img][/url][/center]"
+    },
+    "MILNU": {
+            "api_key": "YOUR_API_KEY",
+            "announce_url": "https://milnueve.neklair.es/announce/YOUR_PASSKEY",
+            "anon": False,
+            "signature": "\n[center][b]PLEASE SEED MILNUEVE FAMILY[/b][/center]",
+            "anon_signature": "\n[center][url=...][img=40]...[/img][/url][/center]",
+            "pr_signature": "\n [center][b][size=6]PERSONAL RELEASE[/size][/b][/center]",
+            "anon_pr_signature": "\n[center][url=...][img=40]...[/img][/url][/center]"
+    },
+    "MTV": {
+            "api_key": "Get_from_security_page",
+            "username": "YOUR_USERNAME",
+            "password": "YOUR_PASSWORD",
+            "announce_url": "get from https://www.morethantv.me/upload.php",
+            "anon": False
+    },
+    "NBL": {
+            "api_key": "YOUR_API_KEY",
+            "announce_url": "https://nebulance.io/YOUR_PASSKEY",
+            "anon": False,
+            "signature": "\n[center][b]PLEASE SEED Nebulance FAMILY[/b][/center]",
+            "anon_signature": "\n[center][url=...][img=40]...[/img][/url][/center]",
+            "pr_signature": "\n [center][b][size=6]PERSONAL RELEASE[/size][/b][/center]",
+            "anon_pr_signature": "\n[center][url=...][img=40]...[/img][/url][/center]"
+    },
+    "OE": {
+            "api_key": "YOUR_API_KEY",
+            "announce_url": "https://onlyencodes.cc/announce/YOUR_PASSKEY",
+            "anon": False,
+            "signature": "\n[center][b]PLEASE SEED OnlyEncodes FAMILY[/b][/center]",
+            "anon_signature": "\n[center][url=...][img=40]...[/img][/url][/center]",
+            "pr_signature": "\n [center][b][size=6]PERSONAL RELEASE[/size][/b][/center]",
+            "anon_pr_signature": "\n[center][url=...][img=40]...[/img][/url][/center]"
+    },
+    "OINK": {
+            "api_key": "YOUR_API_KEY",
+            "announce_url": "https://yoinked.org/announce/YOUR_PASSKEY",
+            "anon": False,
+            "signature": "\n[center][b]PLEASE SEED YOiNKED FAMILY[/b][/center]",
+            "anon_signature": "\n[center][url=...][img=40]...[/img][/url][/center]",
+            "pr_signature": "\n [center][b][size=6]PERSONAL RELEASE[/size][/b][/center]",
+            "anon_pr_signature": "\n[center][url=...][img=40]...[/img][/url][/center]"
+    },
+    "OTW": {
+            "api_key": "YOUR_API_KEY",
+            "announce_url": "https://oldtoons.world/announce/YOUR_PASSKEY",
+            "anon": False,
+            "signature": "\n[center][b]PLEASE SEED OldToons FAMILY[/b][/center]",
+            "anon_signature": "\n[center][url=...][img=40]...[/img][/url][/center]",
+            "pr_signature": "\n [center]PERSONAL RELEASE[/center]",
+            "anon_pr_signature": "\n[center][url=...][img=40]...[/img][/url][/center]"
+    },
+    "PSS": {
+            "api_key": "YOUR_API_KEY",
+            "announce_url": "https://privatesilverscreen.cc/announce/YOUR_PASSKEY",
+            "anon": False,
+            "signature": "\n[center][b]PLEASE SEED PrivateSilverScreen FAMILY[/b][/center]",
+            "anon_signature": "\n[center][url=...][img=40]...[/img][/url][/center]",
+            "pr_signature": "\n [center][b][size=6]PERSONAL RELEASE[/size][/b][/center]",
+            "anon_pr_signature": "\n[center][url=...][img=40]...[/img][/url][/center]"
+    },
+    "PTER": {
+            "passkey": "passkey",
+            "img_rehost": False,
+            "username": "",
+            "password": "",
+            "ptgen_api": "",
+            "anon": False
+    },
+    "PTP": {
+            "useAPI": False,
+            "add_web_source_to_desc": True,
+            "ApiUser": "YOUR_API_USER",
+            "ApiKey": "YOUR_API_KEY",
+            "username": "",
+            "password": "",
+            "announce_url": ""
+    },
+    "PTT": {
+            "api_key": "YOUR_API_KEY",
+            "announce_url": "https://polishtorrent.top/announce/YOUR_PASSKEY",
+            "anon": False,
+            "signature": "\n[center][b]PLEASE SEED PolishTorrent FAMILY[/b][/center]",
+            "anon_signature": "\n[center][url=...][img=40]...[/img][/url][/center]",
+            "pr_signature": "\n [center][b][size=6]PERSONAL RELEASE[/size][/b][/center]",
+            "anon_pr_signature": "\n[center][url=...][img=40]...[/img][/url][/center]"
+    },
+    "R4E": {
+            "api_key": "YOUR_API_KEY",
+            "announce_url": "https://racing4everyone.eu/announce/YOUR_PASSKEY",
+            "anon": False,
+            "signature": "\n[center][b]PLEASE SEED Racing4Everyone FAMILY[/b][/center]",
+            "anon_signature": "\n[center][url=...][img=40]...[/img][/url][/center]",
+            "pr_signature": "\n [center][b][size=6]PERSONAL RELEASE[/size][/b][/center]",
+            "anon_pr_signature": "\n[center][url=...][img=40]...[/img][/url][/center]"
+    },
+    "RF": {
+            "api_key": "YOUR_API_KEY",
+            "announce_url": "https://reelflix.xyz/announce/YOUR_PASSKEY",
+            "anon": False,
+            "signature": "\n[center][b]PLEASE SEED ReelFliX FAMILY[/b][/center]",
+            "anon_signature": "\n[center][url=...][img=40]...[/img][/url][/center]",
+            "pr_signature": "\n [center][b][size=6]PERSONAL RELEASE[/size][/b][/center]",
+            "anon_pr_signature": "\n[center][url=...][img=40]...[/img][/url][/center]"
+    },
+    "RHD": {
+            "api_key": "YOUR_API_KEY",
+            "announce_url": "https://r0k3t.li/announce/YOUR_PASSKEY",
+            "anon": False,
+            "signature": "\n[center][b]PLEASE SEED RocketHD[/b][/center]",
+            "anon_signature": "\n[center][url=...][img=40]...[/img][/url][/center]",
+            "pr_signature": "\n [center][b][size=6]PERSONAL RELEASE[/size][/b][/center]",
+            "anon_pr_signature": "\n[center][url=...][img=40]...[/img][/url][/center]"
+    },
+    "RTF": {
+            "api_key": "YOUR_API_KEY",
+            "announce_url": "YOUR_ANNOUNCE_URL",
+            "anon": False,
+            "signature": "\n[center][b]PLEASE SEED RetroFlix FAMILY[/b][/center]",
+            "anon_signature": "\n[center][url=...][img=40]...[/img][/url][/center]",
+            "pr_signature": "\n [center][b][size=6]PERSONAL RELEASE[/size][/b][/center]",
+            "anon_pr_signature": "\n[center][url=...][img=40]...[/img][/url][/center]"
+    },
+    "SHRI": {
+            "api_key": "YOUR_API_KEY",
+            "announce_url": "https://shareisland.org/announce/YOUR_PASSKEY",
+            "anon": False,
+            "signature": "\n[center][b]PLEASE SEED ShareIsland[/b][/center]",
+            "anon_signature": "\n[center][url=...][img=40]...[/img][/url][/center]",
+            "pr_signature": "\n [center][b][size=6]PERSONAL RELEASE[/size][/b][/center]",
+            "anon_pr_signature": "\n[center][url=...][img=40]...[/img][/url][/center]"
+    },
+    "SN": {
+            "api_key": "YOUR_API_KEY",
+            "announce_url": "https://tracker.swarmazon.club:8443/YOUR_PASSKEY/announce",
+            "anon": False,
+            "signature": "\n[center][b]PLEASE SEED Swarmazon[/b][/center]",
+            "anon_signature": "\n[center][url=...][img=40]...[/img][/url][/center]",
+            "pr_signature": "\n [center][b][size=6]PERSONAL RELEASE[/size][/b][/center]",
+            "anon_pr_signature": "\n[center][url=...][img=40]...[/img][/url][/center]"
+    },
+    "SP": {
+            "api_key": "YOUR_API_KEY",
+            "announce_url": "https://seedpool.org/announce/YOUR_PASSKEY",
+            "anon": False,
+            "signature": "\n[center][b]PLEASE SEED[/b][/center]",
+            "anon_signature": "\n[center][url=...][img=40]...[/img][/url][/center]",
+            "pr_signature": "\n [center][b][size=6]PERSONAL RELEASE[/size][/b][/center]",
+            "anon_pr_signature": "\n[center][url=...][img=40]...[/img][/url][/center]"
+    },
+    "THR": {
+            "username": "YOUR_USERNAME",
+            "password": "YOUR_PASSWORD",
+            "img_api": "YOUR_API_KEY",
+            "announce_url": "http://www.torrenthr.org/announce.php?passkey=YOUR_PASSKEY",
+            "pronfo_api_key": "YOUR_API_KEY",
+            "pronfo_theme": "YOUR_THEME",
+            "pronfo_rapi_id": "YOUR_API_ID",
+            "anon": False
+    },
+    "TL": {
+            "announce_key": "YOUR_ANNOUNCE_KEY"
+    },
+    "TLZ": {
+            "api_key": "YOUR_API_KEY",
+            "announce_url": "https://tlzdigital.com/announce/YOUR_PASSKEY",
+            "anon": False,
+            "signature": "\n[center][b]PLEASE SEED TLZ[/b][/center]",
+            "anon_signature": "\n[center][url=...][img=40]...[/img][/url][/center]",
+            "pr_signature": "\n [center][b][size=6]PERSONAL RELEASE[/size][/b][/center]",
+            "anon_pr_signature": "\n[center][url=...][img=40]...[/img][/url][/center]"
+    },
+    "TOCA": {
+            "api_key": "YOUR_API_KEY",
+            "announce_url": "https://tocashare.com/announce/YOUR_PASSKEY",
+            "anon": False,
+            "signature": "\n[center][b]PLEASE SEED TOCA SHARE[/b][/center]",
+            "anon_signature": "\n[center][size=6]we are anonymous[/size][/center]",
+            "pr_signature": "\n [center][b][size=6]PERSONAL RELEASE[/size][/b][/center]",
+            "anon_pr_signature": "\n[center][url=...][img=40]...[/img][/url][/center]"
+    },
+    "TTR": {
+            "api_key": "YOUR_API_KEY",
+            "announce_url": "https://torrenteros.org/announce/YOUR_PASSKEY",
+            "anon": False,
+            "signature": "\n[center][b]PLEASE SEED TorrentEros[/b][/center]",
+            "anon_signature": "\n[center][size=6]we are anonymous[/size][/center]",
+            "pr_signature": "\n [center][b][size=6]PERSONAL RELEASE[/size][/b][/center]",
+            "anon_pr_signature": "\n[center][url=...][img=40]...[/img][/url][/center]"
+    },
+    "ULCX": {
+            "api_key": "YOUR_API_KEY",
+            "announce_url": "https://upload.cx/announce/YOUR_PASSKEY",
+            "anon": False,
+            "signature": "\n[center][b]PLEASE SEED ULCX FAMILY[/b][/center]",
+            "anon_signature": "\n[center][url=...][img=40]...[/img][/url][/center]",
+            "pr_signature": "\n [center][b][size=6]PERSONAL RELEASE[/size][/b][/center]",
+            "anon_pr_signature": "\n[center][url=...][img=40]...[/img][/url][/center]"
+    },
+    "UTP": {
+            "api_key": "YOUR_API_KEY",
+            "announce_url": "https://utp.to/announce/YOUR_PASSKEY",
+            "anon": False,
+            "signature": "\n[center][b]PLEASE SEED UTP FAMILY[/b][/center]",
+            "anon_signature": "\n[center][url=...][img=40]...[/img][/url][/center]",
+            "pr_signature": "\n [center][b][size=6]PERSONAL RELEASE[/size][/b][/center]",
+            "anon_pr_signature": "\n[center][url=...][img=40]...[/img][/url][/center]"
+    },
+    "YU": {
+            "api_key": "YOUR_API_KEY",
+            "announce_url": "https://yu-scene.net/announce/YOUR_PASSKEY",
+            "anon": False,
+            "signature": "\n[center][b]PLEASE SEED YU-SCENE FAMILY[/b][/center]",
+            "anon_signature": "\n[center][url=...][img=40]...[/img][/url][/center]",
+            "pr_signature": "\n [center][b][size=6]PERSONAL RELEASE[/size][/b][/center]",
+            "anon_pr_signature": "\n[center][url=...][img=40]...[/img][/url][/center]"
+    },
+    "PRBLM" : {
+            "api_key" : "YOUR_API_KEY",
+            "announce_url" : "https://parabellumhd.cx/announce/YOUR_PASSKEY",
+            "anon" : False,
+            "signature": "\n[center][b]PLEASE SEED PARABELLUM FAMILY[/b][/center]",
+            "anon_signature": "\n[center][url=...][img=40]...[/img][/url][/center]",
+            "pr_signature": "\n [center][b][size=6]PERSONAL RELEASE[/size][/b][/center]",
+            "anon_pr_signature": "\n[center][url=...][img=40]...[/img][/url][/center]"
+    }
+},
+
+"TORRENT_CLIENTS": {
+    "Client1": {
+            "torrent_client": "qbit",
+            "qbit_url": "http://127.0.0.1",
+            "qbit_port": "8080",
+            "qbit_user": "YOUR_USERNAME",
+            "qbit_pass": "YOUR_PASSWORD"
+    },
+    "qbit": {
+            "torrent_client": "qbit",
+            "enable_search": True,
+            "qbit_url": "http://127.0.0.1",
+            "qbit_port": "8888",
+            "qbit_user": "YOUR_USERNAME",
+            "qbit_pass": "YOUR_PASSWORD",
+            "torrent_storage_dir": "/app/temp/qbit_backup",
+            "content_layout": "Original",
+            "VERIFY_WEBUI_CERTIFICATE": False
+    },
+    "rtorrent": {
+            "torrent_client": "rtorrent",
+            "rtorrent_url": "https://YOUR_USER:YOUR_PASS@YOUR_HOST:443/YOUR_PATH/action.php"
+    },
+    "deluge": {
+            "torrent_client": "deluge",
+            "deluge_url": "localhost",
+            "deluge_port": "8112",
+            "deluge_user": "YOUR_USERNAME",
+            "deluge_pass": "YOUR_PASSWORD"
+    },
+    "transmission": {
+            "torrent_client": "transmission",
+            "transmission_url": "http://localhost:9091",
+            "transmission_user": "YOUR_USERNAME",
+            "transmission_pass": "YOUR_PASSWORD",
+            "torrent_storage_dir": "/app/temp/transmission_watch",
+            "enable_search": True
+    },
+    "watch": {
+            "torrent_client": "watch",
+            "watch_folder": "/app/watch"
+    }
+},
+
+"DISCORD": {
+    "discord_bot_token": "YOUR_DISCORD_TOKEN",
+    "discord_bot_description": "Upload Assistant",
+    "command_prefix": "!",
+    "discord_channel_id": "YOUR_CHANNEL_ID",
+    "admin_id": "YOUR_USER_ID",
+    "search_dir": "/app/downloads/",
+    "discord_emojis": {
+            "BLU": "💙",
+            "BHD": "🎉",
+            "AITHER": "🛫",
+            "STC": "📺",
+            "ACM": "🍙",
+            "MANUAL": "📩",
+            "UPLOAD": "✅",
+            "CANCEL": "🚫"
+    }
+}
+}

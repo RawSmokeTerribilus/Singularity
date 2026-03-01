@@ -1,0 +1,24 @@
+# ==========================================
+# ⚙️ UNIT3D MASS EDITION SUITE - CONFIG
+# ==========================================
+
+# 1. Credenciales y Tracker
+BASE_URL = "https://tu-tracker.com"        # Ej: https://milnueve.neklair.es
+USERNAME = "TU_USUARIO"                    # Para el Scraper
+COOKIE_NAME = "laravel_session"            # O el nombre que use tu tracker
+COOKIE_VALUE = "TU_COOKIE_AQUI"            # Pega aquí el churrete de la cookie
+
+# 2. Rutas Locales (Dentro del Contenedor)
+# Carpeta donde están los subdirectorios con los meta.json
+TMP_ROOT = "/app/tmp" 
+
+# 3. Textos a Reemplazar (Opcional)
+MSG_VIEJO = "[center][b]MENSAJE ANTIGUO[/b][/center]"
+MSG_NUEVO = "[center][b]🌱 ¡La magia del P2P eres tú! 🌱[/b][/center]"
+
+BANNER_VIEJO = "[center][url=...][img=400]...[/img][/url][/center]"
+BANNER_NUEVO = "[center][url=...][img=400]...[/img][/url][/center]"
+
+# 4. Settings del Bot
+DELAY_MIN = 4.5  # Segundos mínimos entre peticiones (Jitter)
+DELAY_MAX = 7.5  # Segundos máximos

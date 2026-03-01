@@ -1,0 +1,15 @@
+# Núcleo y TUI
+rich
+python-dotenv
+requests
+
+# Web Dashboard
+fastapi
+uvicorn
+jinja2
+
+# Procesamiento de Video (VapourSynth)
+# Nota: En Docker instalaremos la base por apt-get, 
+# pero estas librerías de python son los puentes.
+vapoursynth
+awsmfunc

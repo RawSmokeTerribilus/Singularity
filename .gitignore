@@ -1,0 +1,41 @@
+# --- EXCLUSIONES CORE (DATOS REALES - ¡PROHIBIDO SUBIR!) ---
+.env
+**/.env
+**/config.py
+**/singularity_config.py
+**/mass_config.py
+
+# NOTA: He quitado *.example y MKVerything/example.env de aquí 
+# para que Git SÍ los incluya en el repositorio como plantillas.
+
+# --- PERSISTENCIA Y TRABAJO LOCAL ---
+logs/
+tmp/
+temp/
+watch/
+downloads/
+**/ids.txt
+audit_report_singularity.txt
+refactor_log.txt
+init-structure.txt
+audit_filtracion.txt
+
+# --- MASS EDITOR (Telemetría y registros reales) ---
+extras/MASS-EDITION-UNIT3D/completados.txt
+extras/MASS-EDITION-UNIT3D/completados_img.txt
+extras/MASS-EDITION-UNIT3D/mapeo_maestro.json
+
+# --- PYTHON & VENV ---
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.venv/
+venv/
+env/
+
+# --- SYSTEM & CHATS ---
+.DS_Store
+Thumbs.db
+.zenflow/
+.zencoder/

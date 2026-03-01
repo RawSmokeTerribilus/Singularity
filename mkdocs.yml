@@ -1,0 +1,46 @@
+site_name: "RaW Suite: Singularity"
+site_description: "Automatización total para la gestión de medios y trackers UNIT3D"
+site_author: "RaW Team"
+
+theme:
+  name: material
+  language: es
+  palette:
+    - scheme: slate  # Modo oscuro por defecto, muy "hacker"
+      primary: cyan
+      accent: cyan
+    - scheme: default
+      primary: indigo
+      accent: indigo
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - search.highlight
+    - content.code.copy
+
+nav:
+  - Inicio: index.md
+  - Instalación y Configuración: setup.md
+  - Módulos Principales:
+      - MKVerything: mkverything.md
+      - RawLoadrr: rawloadrr.md
+      - UNIT3D Orchestrator: unit3d_orchestrator.md
+      - UNIT3D Mass-Edition Suite: mass_editor.md
+  - Dashboard Web: dashboard.md
+  - Utilidades Extras: extras.md
+  - Notas Técnicas: technical_notes.md
+
+markdown_extensions:
+  - admonition
+  - pymdownx.details
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - attr_list
+  - md_in_html
