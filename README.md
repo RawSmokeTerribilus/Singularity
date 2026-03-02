@@ -84,3 +84,10 @@ Monitoriza todo tu imperio P2P en tiempo real. El Dashboard consume un JSON así
 *Power to the People.* Esta herramienta es para preservación y compartición ética. No la uses para spam masivo o contenido basura. Mantén los estándares de calidad de tu comunidad.
 
 **Spanglish P2P Power. Made by the scene, for the scene.**
+
+---
+
+## 📝 TODO / Próximos Pasos
+- [ ] **Refactorización de Scripts de Mantenimiento**: Migrar los valores hardcodeados (cookies, URLs) de los scripts en `extras/MASS-EDITION-UNIT3D/` a un archivo de configuración centralizado (`singularity_config.py` o similar).
+- [ ] **Mejora de la Gestión de Secretos**: Implementar soporte nativo para variables de entorno en todas las herramientas de la suite para evitar filtraciones accidentales.
+

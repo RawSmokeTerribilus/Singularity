@@ -23,7 +23,7 @@ audit_filtracion.txt
 # --- MASS EDITOR (Telemetría y registros reales) ---
 extras/MASS-EDITION-UNIT3D/completados.txt
 extras/MASS-EDITION-UNIT3D/completados_img.txt
-extras/MASS-EDITION-UNIT3D/mapeo_maestro.json
+# mapeo_maestro.json se incluye como estructura vacía necesaria.
 
 # --- PYTHON & VENV ---
 __pycache__/
