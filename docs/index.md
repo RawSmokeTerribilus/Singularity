@@ -19,10 +19,12 @@ Singularity resuelve el problema de las bibliotecas de medios fragmentadas, corr
 La suite está diseñada para ejecutarse principalmente a través de su interfaz TUI (Terminal User Interface).
 
 1.  **Docker (Recomendado):**
-    ```bash
-    make up      # Levanta el contenedor
-    make attach  # Entra en la interfaz interactiva (Singularity Core)
-    ```
+```bash
+make install
+make up
+make attach
+singularity
+```
 2.  **Manual:**
     ```bash
     python3 singularity.py
