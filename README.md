@@ -5,7 +5,7 @@
 [![License: GPL-3.0](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://opensource.org/licenses/GPL-3.0)
 [![Spanglish Power](https://img.shields.io/badge/Spanglish-P2P_Power-orange.svg)]()
 
-**Singularity Core** (RaW_Suite) no es solo un script de subida. Es un ecosistema completo diseñado para la comunidad Spanish-speaking scene (EMUWAREZ/MILNU) que asume que el entorno es hostil. Archivos corruptos, ISOs mal estructuradas, trackers caídos o falta de espacio: **Singularity lo aguanta todo.**
+**Singularity Core** (RaW_Suite) no es solo un script de subida. Es un ecosistema completo diseñado para la Spanish-speaking scene (PARABELLUM/EMUWAREZ/MILNUEVE y otros muchos trackers basados en UNIT3D) que asume que el entorno es hostil. Archivos corruptos, ISOs mal estructuradas, trackers caídos o falta de espacio: **Singularity lo aguanta todo.**
 
 ---
 
@@ -17,6 +17,22 @@ Este proyecto no sería nada sin el trabajo de aquellos que mantienen viva la ll
 - **MKVToolNix**: El estándar de oro para la manipulación de contenedores Matroska.
 - **FFmpeg**: La navaja suiza que hace posible cualquier rescate multimedia.
 - **The TOR Project**: Por darnos la capa de anonimato necesaria para operar de forma segura.
+
+---
+
+## 📖 Documentación Oficial (Wiki)
+
+[![Documentation](https://img.shields.io/badge/Wiki-Documentation-blueviolet?style=for-the-badge&logo=github)](https://rawsmoketerribilus.github.io/Singularity/)
+
+Para guías detalladas sobre la configuración del entorno, el funcionamiento de los módulos internos y técnicas avanzadas de inyección de metadatos, visita nuestra Wiki oficial:
+
+### 👉 [**Acceder a la Wiki de Singularity**](https://RawSmokeTerribilus.github.io/Singularity/)
+
+Dentro encontrarás todo el conocimiento técnico del Tanque:
+* **Setup Guide:** Instalación de dependencias y despliegue del contenedor.
+* **MKVerything:** Guía de análisis profundo, verificación de pistas y rescate.
+* **Mass Editor:** Orquestación de edición masiva en trackers UNIT3D.
+* **RawLoadrr:** Configuración de auto-upload y gestión de trackers.
 
 ---
 
@@ -53,8 +69,14 @@ Diseñado para la privacidad desde el primer bit:
 ## 🛠️ Instalación y Configuración
 
 ### 🐳 Vía Docker (Recomendado)
+Descargar final-user-install.sh, makefile y docker-compose.yml
+Guárdalos en el directorio de tu elección y ejecuta:
+
 ```bash
-docker-compose up -d --build
+make install
+make up
+make attach
+singularity
 ```
 El Dashboard estará disponible en el puerto `8002`.
 
