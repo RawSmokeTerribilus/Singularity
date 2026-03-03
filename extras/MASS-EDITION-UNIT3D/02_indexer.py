@@ -1,13 +1,26 @@
 import os
 import json
+import sys
 
-TMP_ROOT = "/home/rawserver/scripts/Media-Management/WIP-milnueve-Uploadrr/tmp"
+# Add project root to path to import singularity_config
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
+
+try:
+    from singularity_config import TMP_DIR_PATH as TMP_ROOT
+except ImportError:
+    # Fallback to hardcoded for standalone use or if config is missing
+    TMP_ROOT = "/app/RawLoadrr/tmp" # Default in Docker
+
 OUTPUT_INDEX = "mapeo_maestro.json"
 
 def generar_indice():
     indice = {}
     print(f"🔍 Escaneando carpetas en {TMP_ROOT}...")
     
+    if not os.path.exists(TMP_ROOT):
+        print(f"❌ El directorio {TMP_ROOT} no existe.")
+        return
+
     # Recorremos todas las subcarpetas de tmp
     for root, dirs, files in os.walk(TMP_ROOT):
         if "meta.json" in files:

@@ -29,7 +29,7 @@ class TLZ():
 
     async def get_type_id(self, type, cat, tv_pack, original_language):
         try:
-            if original_language is not 'en':
+            if original_language != 'en':
                 type_id = '13'
             elif cat == 'TV':
                 if tv_pack:

@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 import asyncio
+import requests
 import json
 import os
 import platform
@@ -8,10 +9,9 @@ from src.trackers.COMMON import COMMON
 from src.console import console
 from src.rate_limiter import rate_limiter
 from src.logger import get_logger
-from src.tor_client import TorFallbackMixin
 
 
-class MILNU(TorFallbackMixin):
+class MILNU():
     def __init__(self, config):
         self.config = config
         self.tracker = 'MILNU'
@@ -20,7 +20,6 @@ class MILNU(TorFallbackMixin):
         self.search_url = 'https://milnueve.neklair.es/api/torrents/filter'
         self.banned_groups = [""]
         self.logger = get_logger(self.tracker)
-        TorFallbackMixin.__init__(self)
         pass
     
     async def get_cat_id(self, category_name):
@@ -140,21 +139,9 @@ class MILNU(TorFallbackMixin):
             # Respect rate limiter
             await rate_limiter.acquire(self.tracker)
             
-            response, used_tor = await self.request_with_fallback(
-                method='post',
-                url=self.upload_url,
-                files=files,
-                data=data,
-                headers=headers,
-                params=params,
-                timeout=60,
-                fallback_on_codes=[403, 408, 500, 502, 503, 504]
-            )
-
-            if response is None:
-                self.logger.error(f"Upload failed for {meta['clean_name']}: no response received (direct and Tor both failed)")
-                return_value = False
-            elif response.status_code >= 200 and response.status_code < 300:
+            response = requests.post(url=self.upload_url, files=files, data=data, headers=headers, params=params, timeout=60)
+            
+            if response.status_code >= 200 and response.status_code < 300:
                 response_json = response.json()
                 if meta['debug']:
                     self.logger.info(f"Full upload response from tracker: {response_json}")
@@ -200,21 +187,27 @@ class MILNU(TorFallbackMixin):
                             self.logger.error(f"HTTP {response.status_code}: {error_heading.text.strip()}")
                         else:
                             console.print(f"[red]Encountered HTTP Error: {response.status_code}[/red]")
-                            if meta.get('debug'):
-                                console.print(f"[blue]Server Response[/blue]: {response.text}")
+                            console.print(f"[blue]Server Response[/blue]: {response.text}")
                             self.logger.error(f"HTTP {response.status_code} - Could not parse response, raw text below")
                             self.logger.error(response.text) # Log raw text if not parsed
                     except Exception as parse_error:
                         console.print(f"[red]Failed to parse error response: {parse_error}[/red]")
-                        if meta.get('debug'):
-                            console.print(f"[blue]Server Response[/blue]: {response.text}")
+                        console.print(f"[blue]Server Response[/blue]: {response.text}")
                         self.logger.error(f"Failed to parse error response: {str(parse_error)}")
                     
                     return_value = False # Explicitly return False
-
-        except Exception as e:
-            console.print(f"[red]Unexpected error during upload: {e}[/red]")
-            self.logger.error(f"Unexpected upload error: {str(e)}")
+                    
+        except requests.exceptions.Timeout:
+            console.print(f"[red]Upload timeout - connection took too long[/red]")
+            self.logger.error(f"Upload timeout for {meta['clean_name']}")
+            return_value = False
+        except requests.exceptions.ConnectionError as e:
+            console.print(f"[red]Connection error: {e}[/red]")
+            self.logger.error(f"Connection error: {str(e)}")
+            return_value = False
+        except requests.exceptions.RequestException as e:
+            console.print(f"[red]Request error: {e}[/red]")
+            self.logger.error(f"Request error: {str(e)}")
             return_value = False
 
         if return_value == False: # Only print failed message if it wasn't a success dictionary
@@ -256,24 +249,7 @@ class MILNU(TorFallbackMixin):
                 # Respect rate limiter
                 await rate_limiter.acquire(self.tracker)
                 
-                response, used_tor = await self.request_with_fallback(
-                    method='get',
-                    url=self.search_url,
-                    params=params,
-                    timeout=timeout,
-                    fallback_on_codes=[403, 408, 500, 502, 503, 504]
-                )
-
-                if response is None:
-                    self.logger.warning(f"Dupe search failed: no response (attempt {attempt+1}/{max_retries})")
-                    if attempt < max_retries - 1:
-                        console.print(f"[yellow]Connection failed, retrying... (attempt {attempt+1}/{max_retries})")
-                        await asyncio.sleep(2)
-                    else:
-                        console.print('[bold yellow]Connection failed: Proceeding without dupe check')
-                        self.logger.warning("Skipping dupe check due to repeated failures")
-                    continue
-
+                response = requests.get(url=self.search_url, params=params, timeout=timeout)
                 try:
                     response_json = response.json()
                     for each in response_json['data']:
@@ -288,6 +264,15 @@ class MILNU(TorFallbackMixin):
                     console.print('[bold red]Unable to search for existing torrents on site. Either the site is down or your API key is incorrect')
                     break
 
+            except requests.exceptions.Timeout:
+                self.logger.warning(f"Dupe search timeout (attempt {attempt+1}/{max_retries})")
+                if attempt < max_retries - 1:
+                    console.print(f"[yellow]Timeout searching dupes, retrying... (attempt {attempt+1}/{max_retries})")
+                    await asyncio.sleep(2)  # Wait before retry
+                else:
+                    console.print('[bold yellow]Timeout: Proceeding without dupe check')
+                    self.logger.warning("Skipping dupe check due to repeated timeouts")
+                    
             except Exception as e:
                 console.print('[bold red]Unable to search for existing torrents on site. Either the site is down or your API key is incorrect')
                 self.logger.error(f"Dupe search error: {str(e)}")

@@ -8,7 +8,13 @@ import json
 import os
 import qbittorrentapi
 from deluge_client import DelugeRPCClient, LocalDelugeRPCClient
-from pyrobase.parts import Bunch
+
+class Bunch(dict):
+    """Simple dictionary-like object that allows attribute access."""
+    def __init__(self, *args, **kwargs):
+        super(Bunch, self).__init__(*args, **kwargs)
+        self.__dict__ = self
+
 import shutil
 import ssl
 import time

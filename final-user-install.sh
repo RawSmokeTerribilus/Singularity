@@ -32,7 +32,7 @@ IMGBB_API_KEY=TU_API_KEY_AQUI
 PTSCREENS_API_KEY=TU_API_KEY_AQUI
 
 # --- RUTAS (INTERNAS AL CONTENEDOR) ---
-TMP_ROOT=/app/tmp
+TMP_ROOT=/app/RawLoadrr/tmp
 QBIT_BACKUP_DIR=/app/temp/qbit_backup
 
 # --- GESTIÓN DE IDS ---
@@ -82,7 +82,7 @@ BASE_URL = os.getenv("TRACKER_BASE_URL", "https://milnueve.neklair.es")
 COOKIE_VALUE = os.getenv("TRACKER_COOKIE_VALUE", "")
 IMGBB_API = os.getenv("IMGBB_API_KEY", "")
 PTSCREENS_API = os.getenv("PTSCREENS_API_KEY", "")
-TMP_DIR_PATH = os.getenv("TMP_ROOT", os.path.join(BASE_DIR, "tmp"))
+TMP_DIR_PATH = os.getenv("TMP_ROOT", os.path.join(BASE_DIR, "RawLoadrr", "tmp"))
 
 ID_INICIO = int(os.getenv("ID_START", 14)) # Ajustado a 14 por paridad
 ID_FIN = int(os.getenv("ID_END", 2000))
@@ -661,7 +661,7 @@ COOKIE_VALUE = "TU_COOKIE_AQUI"            # Pega aquí el churrete de la cookie
 
 # 2. Rutas Locales (Dentro del Contenedor)
 # Carpeta donde están los subdirectorios con los meta.json
-TMP_ROOT = "/app/tmp" 
+TMP_ROOT = "/app/RawLoadrr/tmp" 
 
 # 3. Textos a Reemplazar (Opcional)
 MSG_VIEJO = "[center][b]MENSAJE ANTIGUO[/b][/center]"

@@ -7,15 +7,23 @@ import urllib.parse
 import sys
 import random
 
-# --- CONFIGURACIÓN DE SESIÓN ---
-BASE_URL = "https://milnueve.neklair.es"
-COOKIE_VALUE = "eyJpdiI6Ik9rV21oSExwR1Vsc29zZ1MyYWJXeUE9PSIsInZhbHVlIjoiOWl4ZWlERXduVUJJR3RBQjdkcjJ5N2dXbGhpQmIxT1pOUnpmUjdNR2pVTmoxWGk1Y1N5enQwVGYrM01nZ0gzbkErWEphQmdZYzFocDN6V1V4eTkycUlVUUtRYzM0U3p2dkcrMkQ2WXNoNFp5TVpITS9nTDdzQmEzc1o4SWIrSVAiLCJtYWMiOiJiNmU3OWZjMWYxM2M1ZjAxNGY4MGM4NDU3MWZmMTRhN2UzNTdjNDc5MjljMzNmMThmZTU0YTBjZTJlODVhZGI2IiwidGFnIjoiIn0%3D" # Asegúrate de poner tu cookie actual
+# Add project root to path to import singularity_config
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
+
+try:
+    from singularity_config import BASE_URL, COOKIE_NAME, COOKIE_VALUE, MSG_NUEVO
+except ImportError:
+    # Fallback to hardcoded for standalone use or if config is missing
+    BASE_URL = "https://milnueve.neklair.es"
+    COOKIE_NAME = "milnueve_session"
+    COOKIE_VALUE = ""
+    MSG_NUEVO = "[center][b]🌱 ¡La magia del P2P eres tú! Por favor, quédate compartiendo (seeding) para mantener viva la comunidad. 🌱[/b][/center]"
 
 # --- CONFIGURACIÓN DE REEMPLAZOS ---
 MSG_VIEJO = "[center][b]PLEASE SEED MILNUEVE FAMILY[/b][/center]"
 BANNER_VIEJO = "[center][url=https://codeberg.org/CvT/Uploadrr][img=400]https://i.ibb.co/2NVWb0c/uploadrr.webp[/img][/url][/center]"
 
-MSG_NUEVO = "[center][b]🌱 ¡La magia del P2P eres tú! Por favor, quédate compartiendo (seeding) para mantener viva la comunidad. 🌱[/b][/center]"
+# For compatibility with existing banner replacement logic if MSG_NUEVO doesn't have it
 BANNER_NUEVO = "[center][url=https://github.com/RawSmokeTerribilus/RaW-Suite-TUI-ed][img=400]https://i.ibb.co/1NLtMkN/banner-milnueve.png[/img][/url][/center]"
 
 # --- CARGA DE ÍNDICE ---
@@ -27,7 +35,9 @@ with open("mapeo_maestro.json", "r", encoding='utf-8') as f:
     MAPA = json.load(f)
 
 session = requests.Session()
-session.cookies.set("milnueve_session", COOKIE_VALUE, domain="milnueve.neklair.es")
+if COOKIE_VALUE:
+    session.cookies.set(COOKIE_NAME, COOKIE_VALUE, domain=BASE_URL.split("//")[-1])
+
 headers = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36",
     "X-Requested-With": "XMLHttpRequest"
@@ -55,9 +65,19 @@ def procesar_torrent(torrent_id):
     if not ruta_carpeta: return False, "Mapping fallido"
 
     try:
+        # Check for different possible description file names
+        desc_file = os.path.join(ruta_carpeta, "[MILNU]DESCRIPTION.txt")
+        if not os.path.exists(desc_file):
+            # Try to find any .txt file that might be the description
+            txt_files = [f for f in os.listdir(ruta_carpeta) if f.endswith("DESCRIPTION.txt")]
+            if txt_files:
+                desc_file = os.path.join(ruta_carpeta, txt_files[0])
+            else:
+                return False, "Archivo de descripción no encontrado"
+
         with open(os.path.join(ruta_carpeta, "meta.json"), "r", encoding='utf-8') as f:
             m = json.load(f)
-        with open(os.path.join(ruta_carpeta, "[MILNU]DESCRIPTION.txt"), "r", encoding='utf-8') as f:
+        with open(desc_file, "r", encoding='utf-8') as f:
             desc_limpia = f.read().strip()
     except Exception as e: return False, f"Error local: {e}"
 
@@ -82,7 +102,9 @@ def procesar_torrent(torrent_id):
         desc_limpia = desc_limpia.replace(MSG_VIEJO, MSG_NUEVO)
         desc_limpia = desc_limpia.replace(BANNER_VIEJO, BANNER_NUEVO)
     else:
-        desc_limpia = f"{desc_limpia}\n\n{MSG_NUEVO}\n{BANNER_NUEVO}"
+        # Check if already has the new message to avoid duplicates
+        if MSG_NUEVO not in desc_limpia:
+            desc_limpia = f"{desc_limpia}\n\n{MSG_NUEVO}"
 
     payload['description'] = desc_limpia
     payload['_method'] = "PATCH"
@@ -100,7 +122,6 @@ def procesar_torrent(torrent_id):
         add_meta('tmdb_tv_id', 'tmdb')
         add_meta('tvdb', 'tvdb_id')
     else:
-        # AQUÍ ESTÁ EL CAMBIO MÁGICO
         add_meta('tmdb_movie_id', 'tmdb')
         
     if m.get('anime'): add_meta('mal', 'mal_id')

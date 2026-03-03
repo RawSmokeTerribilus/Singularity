@@ -203,11 +203,11 @@ def _submenu_extras():
                 Prompt.ask("Enter para continuar", default="")
 
         elif sub == "4.2":
-            script = BASE_DIR / "RawLoadrr" / "torrents comparison" / "checkit.py"
+            script = BASE_DIR / "extras" / "torrents comparison" / "checkit.py"
             if script.exists():
                 _run(["python3", str(script)], cwd=script.parent)
             else:
-                console.print("[yellow]⚠ RawLoadrr/torrents comparison/checkit.py no encontrado.[/yellow]")
+                console.print("[yellow]⚠ extras/torrents comparison/checkit.py no encontrado.[/yellow]")
                 Prompt.ask("Enter para continuar", default="")
 
         elif sub == "4.3":
@@ -217,7 +217,10 @@ def _submenu_extras():
                 if path.is_dir():
                     break
                 console.print(f"[red]✗ No es un directorio válido: {path_raw}[/red]")
-            _run(["python3", "RawLoadrr/triage_mkv.py", str(path)])
+            
+            # Correct path for Triage MKV script
+            triage_script = "extras/Triaje-mkv/triage_mkv.py"
+            _run(["python3", triage_script, str(path)])
 
         elif sub == "4.4":
             console.print()
@@ -708,7 +711,9 @@ def singularity_mode():
     t2 = time.time()
     upload_list_path: "Path | None" = None
     try:
-        _run(["python3", "RawLoadrr/triage_mkv.py", str(media_root)])
+        # Correct path for Triage MKV script
+        triage_script = "extras/Triaje-mkv/triage_mkv.py"
+        _run(["python3", triage_script, str(media_root)])
         date_str = datetime.now().strftime("%d-%m-%y")
         if list_mode == "1":
             candidate = BASE_DIR / f"todo-hevc-{date_str}.txt"

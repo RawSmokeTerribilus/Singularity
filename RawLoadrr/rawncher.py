@@ -409,7 +409,7 @@ class Rawncher:
             console.print(f"[red]✗ No es un directorio válido: {ruta_raw}[/red]")
 
         console.print(f"\n[cyan]Ejecutando triage en:[/cyan] {ruta}")
-        self._ejecutar_comando(["python3", "triage_mkv.py", str(ruta)])
+        self._ejecutar_comando(["python3", "../extras/Triaje-mkv/triage_mkv.py", str(ruta)])
 
         hevc_files = sorted(self.base_dir.glob("todo-hevc-*.txt"))
         h264_files = sorted(self.base_dir.glob("sigue-h264-*.txt"))

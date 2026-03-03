@@ -69,15 +69,29 @@ Diseñado para la privacidad desde el primer bit:
 ## 🛠️ Instalación y Configuración
 
 ### 🐳 Vía Docker (Recomendado)
-Descargar final-user-install.sh, makefile y docker-compose.yml
+
+#### Linux / macOS
+Descargar `final-user-install.sh`, `makefile` y `docker-compose.yml`.
 Guárdalos en el directorio de tu elección y ejecuta:
 
 ```bash
 make install
 make up
 make attach
+```
+Ejecuta:
+```bash
 singularity
 ```
+Para acceder al menú interactivo.
+
+#### Windows
+1. Descarga los archivos `install-windows.bat`, `setup-windows.ps1` y `docker-compose.yml`.
+2. Haz **doble clic** en `install-windows.bat`. Esto creará la estructura de carpetas y los archivos de configuración iniciales.
+3. Edita tus credenciales en la carpeta `config/`.
+4. Haz **doble clic** en `up.bat` para iniciar los contenedores.
+5. Haz **doble clic** en `singularity.bat` para acceder al menú interactivo.
+
 El Dashboard estará disponible en el puerto `8002`.
 
 ### 🐍 Manual (Linux/macOS)
@@ -109,7 +123,27 @@ Monitoriza todo tu imperio P2P en tiempo real. El Dashboard consume un JSON así
 
 ---
 
+## 🔄 Integración con el ecosistema -arr
+**Singularity Core** no es una isla; es el centinela de tu biblioteca. Está diseñado para trabajar codo con codo con el **arr stack** (Radarr, Sonarr, Tdarr):
+
+- **Pre-Importación**: Diagnostica la salud de tus descargas antes de que Radarr/Sonarr las importen a tu biblioteca final. Evita meter archivos corruptos, mal etiquetados o con spam en tu colección final.
+- **Rescate de Legacy Codecs**: Tdarr es excelente para transcodificar, pero a menudo falla o rechaza archivos en contenedores muy antiguos (.avi, .divx, .mp4 legacy) o con errores de cabecera que impiden el análisis. **MKVerything** normaliza estos archivos a MKV H.264/HEVC verificados que Tdarr puede entonces procesar sin fricciones.
+- **Cierre del Círculo (Zero Loss)**: Dado que **RawLoadrr** solo procesa contenedores modernos y codecs eficientes, pasar tu contenido por el pipeline de MKVerything primero garantiza que *todo* lo que tengas sea apto para subida automática, sin importar cuán antiguo fuera el origen.
+- **Diagnóstico Tdarr**: Ayuda a identificar por qué ciertos archivos fallan en los nodos de Tdarr antes de intentar procesarlos masivamente.
+
+---
+
+## 🚀 Últimos Cambios (v1.1.0)
+- **Fix Crítico en RawLoadrr**: Corregido un `AttributeError` en `src/prep.py` que causaba que muchos lanzamientos (especialmente Anime) fallaran al detectar episodios si el valor era devuelto como entero por `guessit`.
+- **Mejora en Parsing Español**: Optimización de la detección de palabras clave españolas (`Cap`, `Cap.`, `Temp`) para una mejor integración con bibliotecas no estandarizadas.
+- **Forensic Stability**: Mejorada la resiliencia de MKVerything ante archivos con duraciones inconsistentes detectadas por FFmpeg.
+- **Arr Integration Docs**: Actualización de la documentación para reflejar el papel de la suite en el stack automatizado.
+
+---
+
 ## 📝 TODO / Próximos Pasos
-- [ ] **Refactorización de Scripts de Mantenimiento**: Migrar los valores hardcodeados (cookies, URLs) de los scripts en `extras/MASS-EDITION-UNIT3D/` a un archivo de configuración centralizado (`singularity_config.py` o similar).
-- [ ] **Mejora de la Gestión de Secretos**: Implementar soporte nativo para variables de entorno en todas las herramientas de la suite para evitar filtraciones accidentales.
+- [x] **Fix Episode Detection**: Corregir crash en el parsing de episodios cuando `guessit` devuelve enteros.
+- [ ] **Refactorización de Scripts de Mantenimiento**: Migrar los valores hardcodeados (cookies, URLs) de los scripts en `extras/MASS-EDITION-UNIT3D/` a un archivo de configuración centralizado (`singularity_config.py`).
+- [ ] **Mejora de la Gestión de Secretos**: Implementar soporte nativo para variables de entorno en todas las herramientas de la suite.
+- [ ] **Generalizar frases de trolleo**: Dada la duración de los pipeline, llevar el trolleo a cada esquina para amenizar.
 

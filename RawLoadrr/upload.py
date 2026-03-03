@@ -119,13 +119,14 @@ def reconfigure():
 if 'version' not in config or Version(config.get('version')) < minimum_version:  # Check for version and reconfigures
     reconfigure()
 
+# Version check against example config (optional)
 try:
     from data.backup import example_config
     if 'version' in example_config.config and Version(example_config.config.get('version')) > Version(config.get('version')):
         console.print("[bold yellow]WARN[/bold yellow]: Config version out of date, updating is recommended.")
         console.print("[bold yellow]WARN[/bold yellow]: Simply pass --reconfig")
-except Exception as e:
-    console.print(f"[bold red]Error: {str(e)}[/bold red]")
+except Exception:
+    # Ignore errors here as it's just a version check
     pass
 
 # Initialize client and argument parser
@@ -426,6 +427,11 @@ async def do_the_thing(base_dir):
                 continue
 
             if tracker in tracker_data['api']:
+                if tracker not in tracker_class_map:
+                    console.print(f"[bold red]Error:[/bold red] Tracker [cyan]{tracker}[/cyan] module could not be loaded. Check logs for import errors.")
+                    skipped_files += 1
+                    skipped_details.append((path, f"Tracker module load failure: {tracker}"))
+                    continue
                 tracker_class = tracker_class_map[tracker](config=config)
                 # Auto-upload by default (unless debug mode without unattended flag)
                 if meta.get('debug', False) and not meta.get('unattended', False):

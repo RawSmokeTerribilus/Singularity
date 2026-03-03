@@ -35,14 +35,16 @@ def get_video_codec(mkv_file):
 
 def analyze_folder(folder_path):
     """
-    Analiza una carpeta y retorna:
-    - is_hevc_only: True si todos los MKV son HEVC
+    Analiza una carpeta (no recursiva para evitar solapamientos) y retorna:
+    - is_hevc_only: True si todos los MKV en esta carpeta son HEVC
     - has_legacy: True si hay al menos un H264 u otro legacy
     """
-    mkv_files = list(Path(folder_path).rglob('*.mkv'))
+    # Usamos glob simple (*) en lugar de rglob (**) para que scan_directory
+    # que ya es recursivo, maneje la jerarquía carpeta por carpeta.
+    mkv_files = list(Path(folder_path).glob('*.mkv'))
     
     if not mkv_files:
-        return None, False  # Sin MKV, no es relevante
+        return None, False
     
     codecs_found = set()
     for mkv_file in mkv_files:
@@ -51,10 +53,11 @@ def analyze_folder(folder_path):
             codecs_found.add(codec)
     
     if not codecs_found:
-        return None, False  # No se pudo determinar codecs
+        return None, False
     
     is_hevc_only = codecs_found <= HEVC_CODECS
-    has_legacy = bool(codecs_found & (LEGACY_CODECS | {'h264'}))
+    # Consideramos legacy cualquier cosa que no esté en HEVC_CODECS
+    has_legacy = not is_hevc_only
     
     return is_hevc_only, has_legacy
 
@@ -70,9 +73,9 @@ def scan_directory(root_path):
     print(f"📁 Escaneando: {root_path}")
     print(f"⏳ Analizando carpetas...")
     
-    # Recorrer todas las carpetas
+    # Recorrer todas las carpetas recursivamente
     for root, dirs, files in os.walk(root_path):
-        # Verificar si hay MKV en esta carpeta
+        # SOLO analizamos si la carpeta actual tiene MKVs directos
         mkv_count = len([f for f in files if f.lower().endswith('.mkv')])
         
         if mkv_count > 0:

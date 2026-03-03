@@ -1,12 +1,42 @@
+# --- RaW Suite Master Requirements ---
+setuptools
+
 # Núcleo y TUI
 rich
 python-dotenv
-requests
+requests[socks]>=2.28.0
+PySocks
 
 # Web Dashboard
 fastapi
 uvicorn
 jinja2
+beautifulsoup4
+
+# RawLoadrr & Subida
+aiofiles
+aiohttp
+anitopy
+bencode.py
+cinemagoer
+deluge-client
+ffmpeg-python
+guessit
+language-data<=1.2.0; python_version<='3.8'
+langcodes<=3.4.0; python_version<='3.8'
+langcodes; python_version>'3.8'
+nest_asyncio
+packaging
+pyimgbox
+pyotp
+pyoxipng
+pymediainfo
+qbittorrent-api<=2023.9.53; python_version<'3.8'
+qbittorrent-api; python_version>='3.8'
+tinytag
+torf
+tmdbsimple
+unidecode
 
 # Procesamiento de Video (VapourSynth)
 # Nota: En Docker instalaremos la base por apt-get, 

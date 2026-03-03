@@ -63,9 +63,12 @@ class TorSession:
     
     def _create_tor_session(self) -> requests.Session:
         """Create session that routes through Tor SOCKS5"""
+        host = self.tor_socks_host
+        port = self.tor_socks_port
+        
         class TorHTTPAdapter(HTTPAdapter):
             def init_poolmanager(self, *args, **kwargs):
-                kwargs['_socks_options'] = (SOCKS5, self.tor_socks_host, self.tor_socks_port)
+                kwargs['_socks_options'] = (SOCKS5, host, port)
                 return super().init_poolmanager(*args, **kwargs)
         
         session = requests.Session()

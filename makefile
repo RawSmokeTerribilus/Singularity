@@ -6,6 +6,9 @@
 pull:
 	docker compose pull
 
+build:
+	docker build -t rawsmoke/singularity-suite:v1.4 .
+
 up:
 	docker compose up -d
 

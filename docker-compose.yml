@@ -1,7 +1,7 @@
 services:
   singularity:
-    # 1. IMAGEN (DESDE DOCKER HUB)
-    image: rawsmoke/singularity-suite:v1.0
+    # 1. IMAGEN (LOCAL v1.4)
+    image: rawsmoke/singularity-suite:latest
     container_name: singularity_core
     restart: unless-stopped
     privileged: true

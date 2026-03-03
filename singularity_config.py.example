@@ -22,7 +22,9 @@ os.makedirs(LOGS_DIR, exist_ok=True)
 
 # --- CARGA DE SECRETOS (.env) ---
 BASE_URL = os.getenv("TRACKER_BASE_URL", "https://milnueve.neklair.es")
+COOKIE_NAME = os.getenv("TRACKER_COOKIE_NAME", "milnueve_session")
 COOKIE_VALUE = os.getenv("TRACKER_COOKIE_VALUE", "")
+USERNAME = os.getenv("TRACKER_USERNAME", "RawSmoke")
 IMGBB_API = os.getenv("IMGBB_API_KEY", "")
 PTSCREENS_API = os.getenv("PTSCREENS_API_KEY", "")
 TMP_DIR_PATH = os.getenv("TMP_ROOT", os.path.join(BASE_DIR, "tmp"))

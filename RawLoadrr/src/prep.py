@@ -270,6 +270,8 @@ class Prep():
             if " AKA " in filename.replace('.',' '):
                 filename = filename.split('AKA')[0]
             meta['filename'] = filename
+            meta['title'] = filename
+            meta['year'] = meta['search_year']
 
             meta['bdinfo'] = bdinfo
             
@@ -3371,7 +3373,7 @@ class Prep():
                 if len(filelist) == 1:
                     try:
                         episodes = parsed.get('episode_number', guessit(video).get('episode', '1'))
-                        if not isinstance(episodes, list) and not episodes.isnumeric():
+                        if not isinstance(episodes, list) and not str(episodes).isnumeric():
                             episodes = guessit(video)['episode']
                         if type(episodes) == list:
                             episode = ""
