@@ -36,6 +36,46 @@ Desde el menú principal, puedes acceder a los módulos individuales o lanzar el
 
 El sistema se basa en un diseño modular donde cada componente cumple una función específica dentro del ciclo de vida del contenido:
 
+```mermaid
+graph TB
+    subgraph Core [Singularity Core TUI]
+        UI[Menu Interface]
+        SM[Singularity Mode Pipeline]
+        DM[Dashboard Monitor]
+    end
+
+    subgraph MKV [MKVerything - Normalización]
+        V4[Verifier 4-Capas]
+        RS[Universal Rescuer]
+        MM[MakeMKV Engine]
+    end
+
+    subgraph RLD [RawLoadrr - Distribución]
+        TG[Triage Engine]
+        MT[Metadata Injection]
+        UL[Auto-Uploader]
+    end
+
+    subgraph UNT [UNIT3D Mass-Edition - Curación]
+        SC[Scraper/Indexer]
+        MU[Mass Updater]
+        IR[Image Resurrector]
+    end
+
+    Data[(Almacenamiento Local)] --> MKV
+    MKV --> |Archivos Limpios| Data
+    Data --> TG
+    TG --> |Listas de Subida| UL
+    UL --> |Torrents| Trackers((Trackers UNIT3D))
+    Trackers --> SC
+    SC --> MU
+    MU --> Trackers
+    
+    SM --> MKV
+    SM --> RLD
+    SM --> UNT
+```
+
 | Módulo | Acción | Objetivo |
 | :--- | :--- | :--- |
 | **MKVerything** | Normalización | Convierte todo a MKV limpio y verificado. |

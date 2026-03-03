@@ -16,7 +16,7 @@
         <link rel="prev" href="../mkverything/">
       
       
-        <link rel="next" href="../mass_editor/">
+        <link rel="next" href="../unit3d_orchestrator/">
       
       
         
@@ -239,6 +239,25 @@
   
   
   
+  
+    <li class="md-tabs__item">
+      <a href="../singularity_mode/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Singularity Mode
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
     
   
   
@@ -405,6 +424,33 @@
       
   
   
+  
+  
+    <li class="md-nav__item">
+      <a href="../singularity_mode/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Singularity Mode
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
     
   
   
@@ -426,10 +472,10 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" checked>
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" checked>
         
           
-          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="">
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="">
             
   
   
@@ -447,8 +493,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="true">
-          <label class="md-nav__title" for="__nav_3">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_4">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -729,7 +775,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../unit3d_orchestrator.md" class="md-nav__link">
+      <a href="../unit3d_orchestrator/" class="md-nav__link">
         
   
   
@@ -737,34 +783,6 @@
     
   
     UNIT3D Orchestrator
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../mass_editor/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    UNIT3D Mass-Edition Suite
   
 
     
@@ -1230,6 +1248,24 @@
 </table>
 <hr />
 <h2 id="funcionamiento-y-resiliencia">⚙️ Funcionamiento y Resiliencia</h2>
+<p>RawLoadrr opera como un motor de pasos secuenciales con validación constante:</p>
+<pre class="mermaid"><code>graph TD
+    In[Carpeta de Medios] --&gt; TR[Triage Engine]
+    TR --&gt;|HEVC Priority| Prep[Prep Material]
+
+    subgraph Engine [RawLoadrr Engine]
+        Prep --&gt; MD[Metadata Scraper: TMDB/IMDB/MAL]
+        MD --&gt; SC[Screens Generation: FFmpeg/VapourSynth]
+        SC --&gt; IH[Image Hosting Upload: Imgbox/ImgBB]
+        IH --&gt; TOR[Torrent Creation: mkvmerge/torf]
+        TOR --&gt; DP[Dupe Check: Tracker API]
+        DP --&gt;|No Dupe| UL[Upload: UNIT3D API]
+    end
+
+    UL --&gt;|Success| QBT[Add to qBittorrent/Deluge]
+    UL --&gt;|Fail| Log[Error Logging]
+
+    QBT --&gt; Next[Siguiente en Cola]</code></pre>
 <h3 id="deteccion-de-duplicados">Detección de Duplicados</h3>
 <p>RawLoadrr realiza una consulta API al tracker antes de cada subida. Si detecta un torrent con el mismo nombre o ID de TMDb/IMDb, <strong>omite la subida</strong> automáticamente para evitar penalizaciones o spam en el sitio.</p>
 <h3 id="motor-de-triage">Motor de Triage</h3>

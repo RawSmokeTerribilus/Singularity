@@ -64,6 +64,28 @@ Si prefieres usar `upload.py` directamente, aquí tienes la artillería pesada. 
 
 ## ⚙️ Funcionamiento y Resiliencia
 
+RawLoadrr opera como un motor de pasos secuenciales con validación constante:
+
+```mermaid
+graph TD
+    In[Carpeta de Medios] --> TR[Triage Engine]
+    TR -->|HEVC Priority| Prep[Prep Material]
+    
+    subgraph Engine [RawLoadrr Engine]
+        Prep --> MD[Metadata Scraper: TMDB/IMDB/MAL]
+        MD --> SC[Screens Generation: FFmpeg/VapourSynth]
+        SC --> IH[Image Hosting Upload: Imgbox/ImgBB]
+        IH --> TOR[Torrent Creation: mkvmerge/torf]
+        TOR --> DP[Dupe Check: Tracker API]
+        DP -->|No Dupe| UL[Upload: UNIT3D API]
+    end
+    
+    UL -->|Success| QBT[Add to qBittorrent/Deluge]
+    UL -->|Fail| Log[Error Logging]
+    
+    QBT --> Next[Siguiente en Cola]
+```
+
 ### Detección de Duplicados
 RawLoadrr realiza una consulta API al tracker antes de cada subida. Si detecta un torrent con el mismo nombre o ID de TMDb/IMDb, **omite la subida** automáticamente para evitar penalizaciones o spam en el sitio.
 

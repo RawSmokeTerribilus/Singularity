@@ -21,11 +21,11 @@ theme:
 nav:
   - Inicio: index.md
   - Instalación y Configuración: setup.md
+  - Singularity Mode: singularity_mode.md
   - Módulos Principales:
       - MKVerything: mkverything.md
       - RawLoadrr: rawloadrr.md
       - UNIT3D Orchestrator: unit3d_orchestrator.md
-      - UNIT3D Mass-Edition Suite: mass_editor.md
   - Dashboard Web: dashboard.md
   - Utilidades Extras: extras.md
   - Notas Técnicas: technical_notes.md

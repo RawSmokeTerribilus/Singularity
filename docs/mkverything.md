@@ -23,7 +23,39 @@ Para procesar una biblioteca completa de forma desatendida, selecciona la **Opci
 
 ## ⚙️ Funcionamiento Interno (The Guts)
 
-El núcleo de MKVerything es su **algoritmo de verificación en 4 capas**, diseñado para garantizar que ningún archivo corrupto pase el filtro:
+El núcleo de MKVerything es su **algoritmo de verificación en 4 capas** y su **motor de rescate recursivo**:
+
+```mermaid
+graph TD
+    Start[Entrada de Medios] --> Audit[Auditoría Forense 4-Capas]
+    
+    subgraph Verifier [Algoritmo Verifier]
+        Audit --> C1[C1: Estructura mkvmerge]
+        C1 --> C2[C2: Streams ffprobe]
+        C2 --> C3[C3: Bitstream Scan ffmpeg]
+        C3 --> C4[C4: Ratio Size/Dur]
+    end
+    
+    C4 -->|Todo OK| Success[Archivo Validado]
+    C1 -->|Fallo| Rescue[Escalado de Rescate]
+    C2 -->|Fallo| Rescue
+    C3 -->|Fallo| Rescue
+    C4 -->|Fallo| Rescue
+    
+    subgraph Engine [Universal Rescuer]
+        Rescue --> L1[L1: Remux Bit-Copy]
+        L1 --> L2[L2: Stream Cleaning]
+        L2 --> L3[L3: Audio Re-encode]
+        L3 --> L4[L4: Full Video Encode libx264]
+    end
+    
+    L1 --> Audit
+    L2 --> Audit
+    L3 --> Audit
+    L4 --> Audit
+    
+    Success --> Final[Sustitución Segura y Registro]
+```
 
 1.  **Capa 1 (Estructura):** Usa `mkvmerge` para validar que el contenedor es íntegro. Si falla, intenta un remux directo.
 2.  **Capa 2 (Metadatos):** Usa `ffprobe` para verificar que los streams de audio/video/subs son legibles.

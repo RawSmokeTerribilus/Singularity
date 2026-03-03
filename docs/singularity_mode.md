@@ -21,35 +21,42 @@ Permite al operador configurar un flujo completo de trabajo —desde la extracci
 
 ## 🏗️ Las 4 Fases del Pipeline
 
-El Singularity Mode orquesta los módulos en el siguiente orden lógico:
+El Singularity Mode orquesta los módulos en el siguiente orden lógico, con **puntos de recuperación** en cada transición:
 
 ```mermaid
 graph TD
-    subgraph F1 [Fase 1: Normalización]
-        MKV[MKVerything God Mode]
-        ISO[Extracción ISO]
-        LEG[Conversión Legacy]
-        RSC[Rescate de Corruptos]
-        MKV --> ISO
-        MKV --> LEG
-        MKV --> RSC
+    subgraph F1 [Fase 1: Saneamiento]
+        MKV[MKVerything Engine]
+        MKV --> V1[Normalizar ISO/Legacy]
+        V1 --> V2[Auditar Forense 4-Capas]
     end
     
     subgraph F2 [Fase 2: Inteligencia]
-        TRG[Triage MKV: HEVC vs H264]
+        TRG[Triage MKV]
+        TRG --> L1[Lista HEVC]
+        TRG --> L2[Lista H264]
     end
     
     subgraph F3 [Fase 3: Distribución]
         ULD[RawLoadrr Auto-Upload]
+        ULD --> MT[Metadata/Dupe Check]
+        MT --> UP[Upload UNIT3D]
     end
     
     subgraph F4 [Fase 4: Curación]
         UNT[UNIT3D Orchestrator]
+        UNT --> C1[Banners/BBDC]
+        C1 --> C2[Resurrección Imágenes]
     end
     
-    F1 --> TRG
-    TRG --> ULD
-    ULD --> UNT
+    MKV -->|OK| TRG
+    TRG -->|OK| ULD
+    ULD -->|OK| UNT
+    
+    V2 -.->|WARN/Error| Log[Log Error & Continue]
+    Log -.-> TRG
+    L2 -.->|Skip| ULD
+    UP -.->|Fail| UNT
 ```
 
 ### Fase 1: MKVerything God Mode
@@ -59,24 +66,20 @@ graph TD
 ```mermaid
 graph TD
     A[Inicio: God Mode] --> B[Escaneo Recursivo]
-    B --> C{¿Es ISO?}
-    C -->|Sí| D[Fase 1: MakeMKV Extraction]
-    C -->|No| E{¿Es Legacy .avi/.mp4?}
-    E -->|Sí| F[Fase 2: Universal Rescuer]
-    E -->|No| G{¿Es MKV?}
-    G -->|Sí| H[Fase 3: Auditoría Verifier]
+    B --> C{¿Es ISO/Legacy?}
+    C -->|Sí| D[Proceso de Conversión]
+    C -->|No| E{¿Es MKV?}
     
-    D --> I[Generar MKV Temporal]
-    F --> I
-    H -->|Falla| I
+    D --> F[Temporal MKV]
+    E -->|Sí| G[Auditoría Forense]
+    F --> G
     
-    I --> J[Validación en 4 Capas]
-    J -->|OK| K[Sustituir Original]
-    J -->|Falla| L[Escalar Rescate Nivel 1-4]
+    G -->|Pasa V4| H[Sustituir y Validar]
+    G -->|Falla| I[Bucle de Rescate N1-N4]
+    I --> G
     
-    L --> I
-    K --> M[Actualizar Persistence State]
-    M --> N[Fin de Ciclo]
+    H --> J[Registrar en States]
+    J --> K[Notificar Dashboard]
 ```
 
 *   **Resiliencia:** Si una extracción falla, el sistema lo loguea y continúa con la siguiente.
