@@ -147,4 +147,4 @@ Monitoriza todo tu imperio P2P en tiempo real. El Dashboard consume un JSON así
 - [ ] **Refactorización de Scripts de Mantenimiento**: Migrar los valores hardcodeados (cookies, URLs) de los scripts en `extras/MASS-EDITION-UNIT3D/` a un archivo de configuración centralizado (`singularity_config.py`).
 - [ ] **Mejora de la Gestión de Secretos**: Implementar soporte nativo para variables de entorno en todas las herramientas de la suite.
 - [ ] **Generalizar frases de trolleo**: Dada la duración de los pipeline, llevar el trolleo a cada esquina para amenizar.
-
+- [ ] **Sync chaosmaker con auditoría**: Ajustar los sectores e intensidad del chaosmaker para que sea más eficiente, actualmente algunas inyecciones de ruido en archivos pequeños no son detectables por la auditoría.
