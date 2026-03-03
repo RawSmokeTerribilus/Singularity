@@ -133,7 +133,8 @@ Monitoriza todo tu imperio P2P en tiempo real. El Dashboard consume un JSON así
 
 ---
 
-## 🚀 Últimos Cambios (v1.1.0)
+## 🚀 Últimos Cambios (v1.4.0)
+
 - **Fix Crítico en RawLoadrr**: Corregido un `AttributeError` en `src/prep.py` que causaba que muchos lanzamientos (especialmente Anime) fallaran al detectar episodios si el valor era devuelto como entero por `guessit`.
 - **Mejora en Parsing Español**: Optimización de la detección de palabras clave españolas (`Cap`, `Cap.`, `Temp`) para una mejor integración con bibliotecas no estandarizadas.
 - **Forensic Stability**: Mejorada la resiliencia de MKVerything ante archivos con duraciones inconsistentes detectadas por FFmpeg.
