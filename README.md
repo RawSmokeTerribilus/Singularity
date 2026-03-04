@@ -148,4 +148,5 @@ Monitoriza todo tu imperio P2P en tiempo real. El Dashboard consume un JSON así
 - [ ] **Mejora de la Gestión de Secretos**: Implementar soporte nativo para variables de entorno en todas las herramientas de la suite.
 - [ ] **Generalizar frases de trolleo**: Dada la duración de los pipeline, llevar el trolleo a cada esquina para amenizar.
 - [ ] **Sync chaosmaker con auditoría**: Ajustar los sectores e intensidad del chaosmaker para que sea más eficiente, actualmente algunas inyecciones de ruido en archivos pequeños no son detectables por la auditoría.
-**Hacer editor de torrents general**: Actualmente la url se pasa de variable desde el pipeline completo, la cookie también. sin embargo debería de pedirla en el menú interactivo.
+- [ ]**Hacer editor de torrents general**: Actualmente la url se pasa de variable desde el pipeline completo, la cookie también. sin embargo debería de pedirla en el menú interactivo.
+- [ ]**Quitar privileged mode**: El contenedor actualmente se ejecuta como root, por motivos de infraestructura. Ajsutar los permisos a los elementos extrictamente necesarios tras acabar la fase de test.
