@@ -5,7 +5,7 @@ services:
     container_name: singularity_core
     restart: unless-stopped
     privileged: true
-    command: tail -f /dev/null
+    command: bash -c "python3 -m core.dashboard & tail -f /dev/null"
 
     deploy:
       resources:
@@ -20,6 +20,8 @@ services:
       - ./config/singularity_config.py:/app/singularity_config.py:z
       - ./config/config.py:/app/RawLoadrr/data/config.py:z
       - ./config/mass_config.py:/app/extras/MASS-EDITION-UNIT3D/config.py:z
+      - ./clean_vs_bad_descriptions.txt:/app/clean_vs_bad_descriptions.txt:z
+      - ./leftover_pixhost_dirs.txt:/app/leftover_pixhost_dirs.txt:z
 
       # --- 2. WORK DATA ---
       - ./work_data/mass_editor/ids.txt:/app/extras/MASS-EDITION-UNIT3D/ids.txt:z

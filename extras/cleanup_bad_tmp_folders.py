@@ -3,9 +3,13 @@ import shutil
 from pathlib import Path
 
 # Configuración
-TMP_DIR = "/home/rawserver/RaW_Suite_Docker/work_data/tmp/"
-LEFTOVER_FILE = "/home/rawserver/scripts/Media-Management/RaW_Suite/leftover_pixhost_dirs.txt"
-CLEAN_VS_BAD_FILE = "/home/rawserver/scripts/Media-Management/RaW_Suite/clean_vs_bad_descriptions.txt"
+# Obtener la raíz del proyecto (padre de 'extras')
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+
+# Rutas relativas a la raíz del proyecto
+TMP_DIR = PROJECT_ROOT / "RawLoadrr" / "tmp"
+LEFTOVER_FILE = PROJECT_ROOT / "leftover_pixhost_dirs.txt"
+CLEAN_VS_BAD_FILE = PROJECT_ROOT / "clean_vs_bad_descriptions.txt"
 
 def cleanup_folder(folder_path):
     folder = Path(folder_path)

@@ -6,6 +6,7 @@ import random
 import logging
 import subprocess
 import threading
+import socket
 from pathlib import Path
 from datetime import datetime
 from rich.console import Console
@@ -299,11 +300,19 @@ def unit3d_orchestrator():
 # ------------------------------------------------------------------ #
 
 def main_menu():
-    # Iniciar dashboard en segundo plano
-    dash_thread = threading.Thread(target=run_dashboard, daemon=True)
-    dash_thread.start()
+    # Iniciar dashboard en segundo plano si no está corriendo
+    def is_dashboard_running(port=8002):
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            return s.connect_ex(('localhost', port)) == 0
+
+    if not is_dashboard_running():
+        dash_thread = threading.Thread(target=run_dashboard, daemon=True)
+        dash_thread.start()
+        details_msg = "Dashboard activo en puerto 8002"
+    else:
+        details_msg = "Dashboard persistente detectado (Puerto 8002)"
     
-    update_status("CORE", "Menú Principal", "ONLINE", details="Dashboard activo en puerto 8002")
+    update_status("CORE", "Menú Principal", "ONLINE", details=details_msg)
     boot_sequence()
     while True:
         clear_screen()

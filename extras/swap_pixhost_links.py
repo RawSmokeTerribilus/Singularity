@@ -4,7 +4,11 @@ import re
 from pathlib import Path
 
 # Configuración
-TMP_DIR = "/home/rawserver/RaW_Suite_Docker/work_data/tmp/"
+# Obtener la raíz del proyecto (padre de 'extras')
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+
+# Ruta relativa a la raíz del proyecto
+TMP_DIR = PROJECT_ROOT / "RawLoadrr" / "tmp"
 
 def update_meta_json(folder_path):
     folder = Path(folder_path)

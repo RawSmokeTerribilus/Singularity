@@ -10,6 +10,7 @@ import random
 # Add project root to path to import singularity_config
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
 
+from core.status_manager import update_status
 try:
     from singularity_config import BASE_URL, COOKIE_NAME, COOKIE_VALUE, MSG_NUEVO
 except ImportError:
@@ -173,6 +174,8 @@ if __name__ == "__main__":
     print("🚀 Iniciando motor de restauración recursiva...\n")
 
     for i, tid in enumerate(ids_pendientes, 1):
+        prog = int((i / len(ids_pendientes)) * 100)
+        update_status("UNIT3D", "Actualización Masiva", "PROCESSING", progress=prog, details=f"Editando ID: {tid} ({i}/{len(ids_pendientes)})")
         reintentos = 0
         exito = False
         mensaje = ""
@@ -206,3 +209,4 @@ if __name__ == "__main__":
             time.sleep(delay)
 
     print("\n🏁 ¡Proceso masivo finalizado!")
+    update_status("UNIT3D", "Actualización Masiva", "COMPLETED", progress=100)

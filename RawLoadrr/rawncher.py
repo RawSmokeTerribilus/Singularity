@@ -16,7 +16,9 @@ from typing import Optional
 from datetime import datetime
 
 sys.path.insert(0, str(Path(__file__).parent))
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
+from core.status_manager import update_status
 from src.console import console
 from rich.prompt import Prompt, Confirm
 from rich.panel import Panel
@@ -206,7 +208,8 @@ class Rawncher:
         tracker = self._seleccionar_tracker(preselected=preselected_tracker)
         if tracker is None:
             return
-
+        
+        update_status("RAWLOADRR", "Configuración", "PROCESSING", details=f"Tracker: {tracker}")
         console.print()
         console.print(
             Panel(
@@ -364,7 +367,9 @@ class Rawncher:
         )
 
         if Confirm.ask("[bold]¿Ejecutar?[/bold]", default=True):
+            update_status("RAWLOADRR", "Subida", "PROCESSING", details=f"Subiendo: {os.path.basename(ruta)}")
             self._ejecutar_comando(cmd)
+            update_status("RAWLOADRR", "Subida", "COMPLETED")
 
     def _flujo_lista_existente(self, tracker: str) -> None:
         """Sub-flujo: usar lista .txt con rutas ya preparada"""
@@ -397,7 +402,9 @@ class Rawncher:
         )
 
         if Confirm.ask("[bold]¿Ejecutar?[/bold]", default=True):
+            update_status("RAWLOADRR", "Subida", "PROCESSING", details=f"Subiendo: {os.path.basename(ruta)}")
             self._ejecutar_comando(cmd)
+            update_status("RAWLOADRR", "Subida", "COMPLETED")
 
     def _flujo_triage(self, tracker: str) -> None:
         """Sub-flujo: ejecutar triage_mkv.py y luego subir las listas generadas"""

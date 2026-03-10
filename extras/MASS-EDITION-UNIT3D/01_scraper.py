@@ -7,6 +7,7 @@ import sys
 # Add project root to path to import singularity_config
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
 
+from core.status_manager import update_status
 try:
     from singularity_config import BASE_URL, COOKIE_NAME, COOKIE_VALUE, USERNAME
 except ImportError:
@@ -37,7 +38,9 @@ def scrape_my_ids():
 
     for page in range(1, MAX_PAGES + 1):
         url = f"{USER_UPLOADS_URL}?page={page}"
+        prog = int((page / MAX_PAGES) * 100)
         print(f"📄 Procesando página {page}/{MAX_PAGES}...", end="\r")
+        update_status("UNIT3D", "Scraping IDs", "PROCESSING", progress=prog, details=f"Página {page}/{MAX_PAGES}")
         
         try:
             res = session.get(url, headers=headers, timeout=10)
@@ -75,6 +78,7 @@ def scrape_my_ids():
 
     print(f"\n\n✅ ¡Cosecha completada!")
     print(f"📦 Total de IDs únicos encontrados: {len(all_ids)}")
+    update_status("UNIT3D", "Scraping IDs", "COMPLETED", progress=100, details=f"Total: {len(all_ids)} IDs")
 
     # Guardamos en el archivo para el siguiente script
     with open("ids.txt", "w") as f:

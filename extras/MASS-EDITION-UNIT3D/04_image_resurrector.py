@@ -1,5 +1,6 @@
 import sys, os
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
+from core.status_manager import update_status
 from singularity_config import BASE_URL, COOKIE_VALUE, IMGBB_API, PTSCREENS_API, MSG_NUEVO, FIRMAS_VIEJAS, TMP_DIR_PATH, get_target_ids
 
 import requests
@@ -181,7 +182,9 @@ if __name__ == "__main__":
     
     print(f"🚀 Iniciando Mass Resurrector | Pendientes: {len(ids_pendientes)}")
     
-    for tid in ids_pendientes:
+    for i, tid in enumerate(ids_pendientes, 1):
+        prog = int((i / len(ids_pendientes)) * 100)
+        update_status("UNIT3D", "Resurrección de Imágenes", "PROCESSING", progress=prog, details=f"Resucitando ID: {tid} ({i}/{len(ids_pendientes)})")
         print(f"Procesando ID {tid}... ", end="", flush=True)
         exito, mensaje, log_buffer = procesar_total(tid)
 
@@ -204,3 +207,5 @@ if __name__ == "__main__":
             print(f"❌ {mensaje}")
             
         if len(ids_pendientes) > 1: time.sleep(2)
+
+    update_status("UNIT3D", "Resurrección de Imágenes", "COMPLETED", progress=100)
