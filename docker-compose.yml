@@ -33,6 +33,8 @@ services:
       - ./work_data/logs/MKVerything:/app/MKVerything/logs:z
       - ./work_data/logs/RawLoadrr:/app/RawLoadrr/logs:z
       - ./work_data/reports:/app/MKVerything/docs:z
+      # --- 4. PERSISTENCIA DE TRACKERS ---
+      - ./work_data/trackers:/app/RawLoadrr/src/trackers:z
 
       # --- 3. EL ARSENAL (30TB) ---
       - /run/media/rawserver:/run/media/rawserver:z
