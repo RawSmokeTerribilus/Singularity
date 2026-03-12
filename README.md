@@ -146,9 +146,10 @@ Monitoriza todo tu imperio P2P en tiempo real. El Dashboard consume un JSON así
 - [x] **Fix Episode Detection**: Corregir crash en el parsing de episodios cuando `guessit` devuelve enteros.
 - [x] **Refactorización de Scripts de Mantenimiento**: Migrar los valores hardcodeados (cookies, URLs) de los scripts en `extras/MASS-EDITION-UNIT3D/` a un archivo de configuración centralizado (`singularity_config.py`).
 - [x] **Mejora de la Gestión de Secretos**: Implementar soporte nativo para variables de entorno en todas las herramientas de la suite.
-- [ ] **Improve Dashboard**: Implementar no solo singularity, también los demás procesos individuales.
-- [ ] **Generalizar frases de trolleo**: Dada la duración de los pipeline, llevar el trolleo a cada esquina para amenizar.
-- [ ] **Sync chaosmaker con auditoría**: Ajustar los sectores e intensidad del chaosmaker para que sea más eficiente, actualmente algunas inyecciones de ruido en archivos pequeños no son detectables por la auditoría.
+- [x] **Improve Dashboard**: Implementar no solo singularity, también los demás procesos individuales.
+- [ ] **Heurística de Main Feature**: En `extract.py`, mejorar la selección del título principal cruzando el tamaño de archivo con la duración detectada en el escaneo previo de `analyzer.py` para evitar falsos positivos en discos con extras pesados.
+- [ ] **Sincronización Chaos-Maker / Verifier**: Ajustar los algoritmos de inyección de ruido para que el Verificador pueda detectar patrones de sabotaje incluso en archivos pequeños, asegurando que la auditoría sea infalible ante el Chaos-Maker.
+- [ ] **Modo 'Fast-Pass' en God Mode**: Implementar un flag para saltar el `health_check` profundo en Singularity/God Mode para casos donde la confianza en el origen sea absoluta o se busque velocidad extrema.
 - [ ] **Hacer editor de torrents general**: Actualmente la url se pasa de variable desde el pipeline completo, la cookie también. sin embargo debería de pedirla en el menú interactivo.
 - [ ] **Quitar privileged mode**: El contenedor actualmente se ejecuta como root, por motivos de infraestructura. Ajsutar los permisos a los elementos extrictamente necesarios tras acabar la fase de test.
 - [ ] **FIX trackers creation**: Actualmente la url que se integra en el archivo de tracker nuevo .py de src se crea con la url de milnueve. esto es una putada que obliga a modificarlo a mano desde el contendor.

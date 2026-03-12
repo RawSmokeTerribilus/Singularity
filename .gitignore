@@ -39,3 +39,11 @@ env/
 Thumbs.db
 .zenflow/
 .zencoder/
+
+# --- MKDOCS & WIKIS ---
+docs/
+site/
+docs/mkverything_wiki
+docs/rawloadrr_wiki
+MKVerything/docs_mkv/
+RawLoadrr/docs-loadrr/

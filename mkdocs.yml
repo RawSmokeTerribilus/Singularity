@@ -29,6 +29,20 @@ nav:
   - Dashboard Web: dashboard.md
   - Utilidades Extras: extras.md
   - Notas Técnicas: technical_notes.md
+  - Wiki RawLoadrr (ES):
+      - Inicio: rawloadrr_wiki/Home.md
+      - Guía de Argumentos: rawloadrr_wiki/Arguments-User-Guide.md
+      - Configuración Completa: rawloadrr_wiki/Full-Config-Guide.md
+      - Configuración Interactiva: rawloadrr_wiki/Interactive-Config.md
+      - Edición Masiva: rawloadrr_wiki/Mass-Edition.md
+      - Grupos Prohibidos: rawloadrr_wiki/Banned-Groups.md
+      - Contenidos Prohibidos: rawloadrr_wiki/Content-Bans.md
+  - Wiki MKVerything (ES):
+      - Inicio: mkverything_wiki/Home.md
+      - Auditoría de Binarios: mkverything_wiki/Binary-Audit.md
+      - Arquitectura: mkverything_wiki/Architecture.md
+      - Guía de Módulos: mkverything_wiki/Modules-Guide.md
+      - Deep Dive Verificador: mkverything_wiki/Verifier-Deep-Dive.md
 
 markdown_extensions:
   - admonition
