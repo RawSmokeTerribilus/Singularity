@@ -247,13 +247,13 @@ Recuperando el rigor visual de RHEL y la estética Commodore:
 - [x] **FIX Trackers Creation**: URL integrada en nuevo .py de tracker debería auto-detectar, no hardcodear Milnueve.
 - [x] **Improve Trackers Edition**: Aplicar lógica de cambio de API, base URL y announce automáticamente.
 
-### 📊 Volumen de Código (RaW_Suite)
-
-| Categoría | Formatos | Líneas |
-| :--- | :--- | ---: |
-| 🐍 **Python** | Código puro | `34,761` |
-| 🔧 **Scripts** | SH / PS1 / BAT | `12,991` |
-| 📚 **Documentación** | MD | `5,100` |
-| 📄 **Datos / Logs** | TXT / TSV | `3,517` |
-| ⚙️ **Configuración** | YAML / JSON | `2,068` |
-| **TOTAL** | | **`58,437`** |
+```text
+─────────────────────────────────────────────────
+ 🐍 Python (código puro)          34,761 líneas
+ 🔧 Scripts (SH/PS1/BAT)          12,991 líneas
+ 📚 Documentación (MD)             5,100 líneas  
+ 📄 Datos/Logs (TXT/TSV)           3,517 líneas
+ ⚙️  Configuración (YAML/JSON)     2,068 líneas
+─────────────────────────────────────────────────
+                     TOTAL        58,437 líneas
+─────────────────────────────────────────────────
