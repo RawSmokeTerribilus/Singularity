@@ -1,0 +1,2665 @@
+
+<!doctype html>
+<html lang="es" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Automatización total para la gestión de medios y trackers UNIT3D">
+      
+      
+        <meta name="author" content="RaW Team">
+      
+      
+      
+        <link rel="prev" href="../workflows/">
+      
+      
+        <link rel="next" href="../../dashboard/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.3">
+    
+    
+      
+        <title>Setup & Seguridad - RaW Suite: Singularity</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="slate" data-md-color-primary="cyan" data-md-color-accent="cyan">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#setup-seguridad" class="md-skip">
+          Saltar a contenido
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Cabecera">
+    <a href="../.." title="RaW Suite: Singularity" class="md-header__button md-logo" aria-label="RaW Suite: Singularity" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            RaW Suite: Singularity
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Setup & Seguridad
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="cyan" data-md-color-accent="cyan"  aria-hidden="true"  type="radio" name="__palette" id="__palette_0">
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-hidden="true"  type="radio" name="__palette" id="__palette_1">
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Búsqueda" placeholder="Búsqueda" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Buscar">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Limpiar" aria-label="Limpiar" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Inicializando búsqueda
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Pestañas" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../.." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Inicio
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../setup/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Instalación
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../singularity_mode/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Singularity
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../mkverything/" class="md-tabs__link">
+          
+  
+  
+  Módulos
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+  
+  
+    
+    
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../" class="md-tabs__link">
+          
+  
+  
+  Mass Editor
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../dashboard/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Dashboard
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../extras/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Utilidades
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../technical_notes/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Notas
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../rawloadrr_wiki/Home/" class="md-tabs__link">
+          
+  
+  
+  RawLoadrr
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../mkverything_wiki/Home/" class="md-tabs__link">
+          
+  
+  
+  MKVerything
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navegación" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="RaW Suite: Singularity" class="md-nav__button md-logo" aria-label="RaW Suite: Singularity" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    RaW Suite: Singularity
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Inicio
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../setup/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Instalación
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../singularity_mode/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Singularity
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Módulos
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Módulos
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../mkverything/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    MKVerything
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../rawloadrr/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    RawLoadrr
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../unit3d_orchestrator/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    UNIT3D Orch
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Mass Editor
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Mass Editor
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Inicio
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../pipeline/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Pipeline (4 Fases)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../workflows/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Workflows
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Setup & Seguridad
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Setup & Seguridad
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Tabla de contenidos">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Tabla de contenidos
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#dependencias" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Dependencias
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Dependencias">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#paquetes-python-obligatorios" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Paquetes Python Obligatorios
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#dependencias-del-sistema" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Dependencias del Sistema
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#configuracion-inicial" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Configuración Inicial
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Configuración Inicial">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#1-extraer-cookie-de-sesion" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. Extraer Cookie de Sesión
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="1. Extraer Cookie de Sesión">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#obtener-cookie-firefox-chrome" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Obtener Cookie (Firefox / Chrome)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#guardar-en-env" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Guardar en .env
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2-configurar-tmp_root" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Configurar TMP_ROOT
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#3-apis-para-resurreccion-de-imagenes-opcional" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. APIs para Resurrección de Imágenes (Opcional)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="3. APIs para Resurrección de Imágenes (Opcional)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#imgbb-recomendado" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ImgBB (Recomendado)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#ptscreens-fallback" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        PtScreens (Fallback)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#consideraciones-criticas-de-seguridad" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ⚠️ Consideraciones Críticas de Seguridad
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="⚠️ Consideraciones Críticas de Seguridad">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#1-cookies-de-sesion-contrasenas" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. Cookies de Sesión = Contraseñas
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="1. Cookies de Sesión = Contraseñas">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#revocacion-de-sesion" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Revocación de Sesión
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2-sistema-de-jitter-anti-bot" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Sistema de Jitter Anti-Bot
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#3-manejo-de-errores-criticos" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Manejo de Errores Críticos
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="3. Manejo de Errores Críticos">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#rate-limiting-http-429" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Rate Limiting (HTTP 429)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#cloudflare-http-502-503-504" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Cloudflare (HTTP 502, 503, 504)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#cookie-expirada-http-422-persistente" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Cookie Expirada (HTTP 422 persistente)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#4-resiliencia-mediante-checkpoints" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. Resiliencia mediante Checkpoints
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="4. Resiliencia mediante Checkpoints">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#ejemplo-resumen-interrupcion" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Ejemplo: Resumen Interrupción
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#buenas-practicas-operacionales" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        🛡️ Buenas Prácticas Operacionales
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="🛡️ Buenas Prácticas Operacionales">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#pre-ejecucion" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Pre-Ejecución
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#durante-ejecucion" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Durante Ejecución
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#post-ejecucion" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Post-Ejecución
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rotacion-de-credenciales" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Rotación de Credenciales
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#checklist-de-despliegue" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        📋 Checklist de Despliegue
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="📋 Checklist de Despliegue">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#inicial-una-sola-vez" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Inicial (Una sola vez)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#por-ejecucion" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Por Ejecución
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#troubleshooting" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Troubleshooting
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../dashboard/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dashboard
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../extras/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Utilidades
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../technical_notes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Notas
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_9" >
+        
+          
+          <label class="md-nav__link" for="__nav_9" id="__nav_9_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    RawLoadrr
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_9_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_9">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    RawLoadrr
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../rawloadrr_wiki/Home/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Inicio
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../rawloadrr_wiki/Arguments-User-Guide/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Guía de Argumentos
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../rawloadrr_wiki/Full-Config-Guide/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuración Completa
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../rawloadrr_wiki/Interactive-Config/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuración Interactiva
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../rawloadrr_wiki/Mass-Edition/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Edición Masiva
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../rawloadrr_wiki/Banned-Groups/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Grupos Prohibidos
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../rawloadrr_wiki/Content-Bans/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Contenidos Prohibidos
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_10" >
+        
+          
+          <label class="md-nav__link" for="__nav_10" id="__nav_10_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    MKVerything
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_10_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_10">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    MKVerything
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../mkverything_wiki/Home/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Inicio
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../mkverything_wiki/Binary-Audit/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Auditoría de Binarios
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../mkverything_wiki/Architecture/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Arquitectura
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../mkverything_wiki/Modules-Guide/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Guía de Módulos
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../mkverything_wiki/Verifier-Deep-Dive/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Deep Dive Verificador
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Tabla de contenidos">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Tabla de contenidos
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#dependencias" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Dependencias
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Dependencias">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#paquetes-python-obligatorios" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Paquetes Python Obligatorios
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#dependencias-del-sistema" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Dependencias del Sistema
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#configuracion-inicial" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Configuración Inicial
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Configuración Inicial">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#1-extraer-cookie-de-sesion" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. Extraer Cookie de Sesión
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="1. Extraer Cookie de Sesión">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#obtener-cookie-firefox-chrome" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Obtener Cookie (Firefox / Chrome)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#guardar-en-env" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Guardar en .env
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2-configurar-tmp_root" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Configurar TMP_ROOT
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#3-apis-para-resurreccion-de-imagenes-opcional" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. APIs para Resurrección de Imágenes (Opcional)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="3. APIs para Resurrección de Imágenes (Opcional)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#imgbb-recomendado" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ImgBB (Recomendado)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#ptscreens-fallback" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        PtScreens (Fallback)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#consideraciones-criticas-de-seguridad" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ⚠️ Consideraciones Críticas de Seguridad
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="⚠️ Consideraciones Críticas de Seguridad">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#1-cookies-de-sesion-contrasenas" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. Cookies de Sesión = Contraseñas
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="1. Cookies de Sesión = Contraseñas">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#revocacion-de-sesion" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Revocación de Sesión
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2-sistema-de-jitter-anti-bot" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Sistema de Jitter Anti-Bot
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#3-manejo-de-errores-criticos" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Manejo de Errores Críticos
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="3. Manejo de Errores Críticos">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#rate-limiting-http-429" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Rate Limiting (HTTP 429)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#cloudflare-http-502-503-504" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Cloudflare (HTTP 502, 503, 504)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#cookie-expirada-http-422-persistente" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Cookie Expirada (HTTP 422 persistente)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#4-resiliencia-mediante-checkpoints" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. Resiliencia mediante Checkpoints
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="4. Resiliencia mediante Checkpoints">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#ejemplo-resumen-interrupcion" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Ejemplo: Resumen Interrupción
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#buenas-practicas-operacionales" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        🛡️ Buenas Prácticas Operacionales
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="🛡️ Buenas Prácticas Operacionales">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#pre-ejecucion" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Pre-Ejecución
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#durante-ejecucion" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Durante Ejecución
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#post-ejecucion" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Post-Ejecución
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rotacion-de-credenciales" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Rotación de Credenciales
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#checklist-de-despliegue" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        📋 Checklist de Despliegue
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="📋 Checklist de Despliegue">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#inicial-una-sola-vez" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Inicial (Una sola vez)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#por-ejecucion" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Por Ejecución
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#troubleshooting" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Troubleshooting
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="setup-seguridad">Setup &amp; Seguridad</h1>
+<hr />
+<h2 id="dependencias">Dependencias</h2>
+<p>Todas las dependencias están incluidas en <code>requirements.txt</code> del proyecto. El pipeline requiere:</p>
+<h3 id="paquetes-python-obligatorios">Paquetes Python Obligatorios</h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>pip<span class="w"> </span>install<span class="w"> </span>-r<span class="w"> </span>requirements.txt
+</code></pre></div>
+<table>
+<thead>
+<tr>
+<th>Paquete</th>
+<th>Versión</th>
+<th>Uso</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>requests</strong></td>
+<td>≥2.28.0</td>
+<td>HTTP GET/POST/PATCH con sesiones y timeouts</td>
+</tr>
+<tr>
+<td><strong>beautifulsoup4</strong></td>
+<td>≥4.11.0</td>
+<td>Parseo HTML de formularios y scraping de IDs</td>
+</tr>
+</tbody>
+</table>
+<h3 id="dependencias-del-sistema">Dependencias del Sistema</h3>
+<table>
+<thead>
+<tr>
+<th>Componente</th>
+<th>Requerido Para</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Python 3.8+</td>
+<td>Ejecución de scripts</td>
+</tr>
+<tr>
+<td>curl / wget</td>
+<td>Descargas manuales de imágenes (opcional)</td>
+</tr>
+</tbody>
+</table>
+<div class="admonition note">
+<p class="admonition-title">Verificación Pre-Vuelo</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>python3<span class="w"> </span>-c<span class="w"> </span><span class="s2">&quot;import requests, bs4; print(&#39;✅ Dependencias OK&#39;)&quot;</span>
+</code></pre></div>
+</div>
+<hr />
+<h2 id="configuracion-inicial">Configuración Inicial</h2>
+<h3 id="1-extraer-cookie-de-sesion">1. Extraer Cookie de Sesión</h3>
+<p>La autenticación se realiza mediante <strong>cookie de sesión</strong>. Es la forma más directa de acceder a endpoints protegidos sin exponer contraseñas.</p>
+<h4 id="obtener-cookie-firefox-chrome">Obtener Cookie (Firefox / Chrome)</h4>
+<ol>
+<li>Abre el navegador y <strong>inicia sesión</strong> en tu tracker UNIT3D</li>
+<li>Abre <strong>DevTools</strong> (<code>F12</code> en la mayoría de navegadores)</li>
+<li>Ve a <strong>Application</strong> (Chrome) o <strong>Storage</strong> (Firefox)</li>
+<li>Selecciona <strong>Cookies</strong> → <code>https://tu-tracker.org</code></li>
+<li>Busca una cookie con nombre similar a:</li>
+<li><code>session</code> (genérico)</li>
+<li><code>milnueve_session</code> (específico de Milnueve)</li>
+<li><code>tracker_name_session</code></li>
+<li><strong>Copia el valor completo</strong> (largo string)</li>
+</ol>
+<h4 id="guardar-en-env">Guardar en <code>.env</code></h4>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="c1"># .env</span>
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="nv">UNIT3D_COOKIE_NAME</span><span class="o">=</span>milnueve_session
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="nv">UNIT3D_COOKIE_VALUE</span><span class="o">=</span>eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...muy_largo...
+</code></pre></div>
+<h3 id="2-configurar-tmp_root">2. Configurar TMP_ROOT</h3>
+<p>Esta es la carpeta donde <strong>RawLoadrr</strong> almacena los metadatos (<code>meta.json</code>) de tus subidas.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="c1"># .env</span>
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="nv">TMPDIR_PATH</span><span class="o">=</span>/path/to/RawLoadrr/tmp
+</code></pre></div>
+<p>Estructura esperada:
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>TMP_ROOT/
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>├── torrents_subido_1/
+<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>│   ├── meta.json
+<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a>│   ├── [MILNU]DESCRIPTION.txt
+<a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a>│   └── (archivos de media)
+<a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a>├── torrents_subido_2/
+<a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a>│   ├── meta.json
+<a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a>│   ├── [MILNU]DESCRIPTION.txt
+<a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a>│   └── (archivos de media)
+<a id="__codelineno-4-10" name="__codelineno-4-10" href="#__codelineno-4-10"></a>└── ...
+</code></pre></div></p>
+<h3 id="3-apis-para-resurreccion-de-imagenes-opcional">3. APIs para Resurrección de Imágenes (Opcional)</h3>
+<p>El script <code>04_image_resurrector.py</code> sube imágenes a hosting externo. Requiere API keys.</p>
+<h4 id="imgbb-recomendado">ImgBB (Recomendado)</h4>
+<ol>
+<li>Regístrate en <a href="https://imgbb.com">imgbb.com</a></li>
+<li>Ve a <strong>API</strong> → <strong>API Documentation</strong></li>
+<li>Genera un nuevo API key</li>
+<li>Configura:
+   <div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="nv">IMGBB_API</span><span class="o">=</span>a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6
+</code></pre></div></li>
+</ol>
+<h4 id="ptscreens-fallback">PtScreens (Fallback)</h4>
+<p>Opcional, para fallback si ImgBB no funciona:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="nv">PTSCREENS_API</span><span class="o">=</span>optional_key_here
+</code></pre></div>
+<div class="admonition tip">
+<p class="admonition-title">SIN APIs Configuradas</p>
+<p>Si no configuras APIs, el script <code>04_image_resurrector.py</code> registra imágenes como "pendientes" pero <strong>no falla</strong>. Las descripciones se limpian igual, solo sin reupload.</p>
+</div>
+<hr />
+<h2 id="consideraciones-criticas-de-seguridad">⚠️ Consideraciones Críticas de Seguridad</h2>
+<h3 id="1-cookies-de-sesion-contrasenas">1. Cookies de Sesión = Contraseñas</h3>
+<div class="admonition danger">
+<p class="admonition-title">TRATA LA COOKIE COMO UNA CONTRASEÑA</p>
+<ul>
+<li><strong>Nunca</strong> la hagas commit en Git</li>
+<li><strong>Nunca</strong> la compartas en Slack/Discord/email</li>
+<li><strong>Nunca</strong> la expongas en logs o screenshots</li>
+<li><strong>Usa <code>.env</code></strong> o variables de entorno cifradas en CI/CD</li>
+<li><strong>Rota periódicamente</strong> (cada 30 días en producción)</li>
+</ul>
+</div>
+<h4 id="revocacion-de-sesion">Revocación de Sesión</h4>
+<p>Si accidentalmente expones tu cookie:</p>
+<ol>
+<li>Inicia sesión en tu cuenta del tracker</li>
+<li>Ve a <strong>Settings</strong> → <strong>Sessions</strong> o <strong>Logout All</strong></li>
+<li>Cierra todas las sesiones</li>
+<li>Genera una cookie nueva</li>
+</ol>
+<h3 id="2-sistema-de-jitter-anti-bot">2. Sistema de Jitter Anti-Bot</h3>
+<div class="admonition warning">
+<p class="admonition-title">NO DESACTIVES EL JITTER</p>
+<p>El script incluye retrasos aleatorios (<code>random.uniform(4.5, 7.5)</code> segundos) entre peticiones para:
+- Simular comportamiento humano
+- Evitar ser bloqueado por Cloudflare / WAF
+- Respetar límites de rate limiting (<code>429</code>)</p>
+<p>Si los desactivas:
+- ⚠️ Riesgo de <strong>IP ban temporal</strong> (24-48h)
+- ⚠️ Possibilidad de <strong>ban permanente</strong> si se detecta automatización agresiva
+- ⚠️ Tracker puede implementar <strong>CAPTCHA</strong> para tu cuenta</p>
+</div>
+<p><strong>Duración estimada:</strong>
+- 1000 torrents × 5.5s media Jitter ≈ <strong>1.5 horas</strong>
+- Esto es <strong>aceptable</strong> y <strong>sostenible</strong></p>
+<div class="admonition tip">
+<p class="admonition-title">Acelerar Responsablemente</p>
+<p>Si necesitas ir más rápido:
+- Consulta al admin del tracker sobre limits
+- Usa rangos más pequeños (<code>ID_START=1 ID_END=100</code>)
+- Ejecuta en horarios de baja carga (madrugada)</p>
+</div>
+<h3 id="3-manejo-de-errores-criticos">3. Manejo de Errores Críticos</h3>
+<h4 id="rate-limiting-http-429">Rate Limiting (HTTP 429)</h4>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="k">if</span> <span class="n">post_res</span><span class="o">.</span><span class="n">status_code</span> <span class="o">==</span> <span class="mi">429</span><span class="p">:</span>
+<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>    <span class="c1"># Script pausa 30 segundos e intenta hasta 3 veces</span>
+<a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a>    <span class="n">time</span><span class="o">.</span><span class="n">sleep</span><span class="p">(</span><span class="mi">30</span><span class="p">)</span>
+<a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a>    <span class="n">reintentos</span> <span class="o">+=</span> <span class="mi">1</span>
+</code></pre></div>
+<p><strong>Acción recomendada:</strong> Deja que el script maneje esto automáticamente. Si se repite, el script se detiene para evitar ban.</p>
+<h4 id="cloudflare-http-502-503-504">Cloudflare (HTTP 502, 503, 504)</h4>
+<p>El tracker está detrás de Cloudflare. Si recibo estos códigos:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="k">if</span> <span class="n">res</span><span class="o">.</span><span class="n">status_code</span> <span class="ow">in</span> <span class="p">[</span><span class="mi">502</span><span class="p">,</span> <span class="mi">503</span><span class="p">,</span> <span class="mi">504</span><span class="p">]:</span>
+<a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>    <span class="k">return</span> <span class="kc">False</span><span class="p">,</span> <span class="s2">&quot;CLOUDFLARE_ERROR&quot;</span>
+<a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a>    <span class="c1"># Pausa 30 segundos, intenta 3 veces</span>
+</code></pre></div>
+<p><strong>Acción recomendada:</strong> Esperar. Cloudflare suele recuperarse en 5-10 minutos. El script reintenta automáticamente.</p>
+<h4 id="cookie-expirada-http-422-persistente">Cookie Expirada (HTTP 422 persistente)</h4>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>Error 422: {
+<a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a>  &quot;errors&quot;: {
+<a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a>    &quot;name&quot;: [&quot;Campo requerido&quot;],
+<a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a>    &quot;imdb&quot;: [&quot;Formato inválido&quot;]
+<a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a>  }
+<a id="__codelineno-9-6" name="__codelineno-9-6" href="#__codelineno-9-6"></a>}
+</code></pre></div>
+<p>Si ves 422 <strong>repentinamente después de funcionar bien</strong>, la cookie probó <strong>expiró</strong>.</p>
+<p><strong>Acción inmediata:</strong>
+1. Renuevalatokenfresco desde las DevTools del navegador
+2. Actualiza <code>.env</code> o <code>config.py</code>
+3. <strong>Reinicia el script</strong> (detectará el nuevo checkpoint)</p>
+<h3 id="4-resiliencia-mediante-checkpoints">4. Resiliencia mediante Checkpoints</h3>
+<p>El pipeline genera archivos de control que permiten <strong>reanudar sin pérdida de progreso</strong>:</p>
+<table>
+<thead>
+<tr>
+<th>Archivo</th>
+<th>Script</th>
+<th>Contenido</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>ids.txt</code></td>
+<td><code>01_scraper.py</code></td>
+<td>IDs únicos extraídos</td>
+</tr>
+<tr>
+<td><code>mapeo_maestro.json</code></td>
+<td><code>02_indexer.py</code></td>
+<td meta.json="meta.json" nombre:="nombre:" ruta="ruta">Mapping</td>
+</tr>
+<tr>
+<td><code>completados.txt</code></td>
+<td><code>03_mass_updater.py</code></td>
+<td>IDs ya editados (una línea por ID)</td>
+</tr>
+<tr>
+<td><code>completados_resurrector.txt</code></td>
+<td><code>04_image_resurrector.py</code></td>
+<td>IDs con imágenes reparadas</td>
+</tr>
+</tbody>
+</table>
+<h4 id="ejemplo-resumen-interrupcion">Ejemplo: Resumen Interrupción</h4>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="c1"># Ejecuta fase 03, falla en ID 350 (error de red)</span>
+<a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a>python3<span class="w"> </span>03_mass_updater.py
+<a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a><span class="c1"># ℹ️ Total: 523 | ✅ Completados: 349 | ⏳ Pendientes: 174</span>
+<a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a>
+<a id="__codelineno-10-5" name="__codelineno-10-5" href="#__codelineno-10-5"></a><span class="c1"># [Tu ISP falla 30 minutos]</span>
+<a id="__codelineno-10-6" name="__codelineno-10-6" href="#__codelineno-10-6"></a>
+<a id="__codelineno-10-7" name="__codelineno-10-7" href="#__codelineno-10-7"></a><span class="c1"># Reinicia, automáticamente salta IDs 1-349</span>
+<a id="__codelineno-10-8" name="__codelineno-10-8" href="#__codelineno-10-8"></a>python3<span class="w"> </span>03_mass_updater.py
+<a id="__codelineno-10-9" name="__codelineno-10-9" href="#__codelineno-10-9"></a><span class="c1"># ℹ️ Total: 523 | ✅ Completados: 349 | ⏳ Pendientes: 174</span>
+<a id="__codelineno-10-10" name="__codelineno-10-10" href="#__codelineno-10-10"></a><span class="c1"># [Continúa desde ID 350]</span>
+</code></pre></div>
+<p><strong>NO hay que hacer nada.</strong> Los scripts son <strong>idempotentes</strong>: procesar el mismo ID dos veces es seguro (segundo intento es NOOP si ya fue completado).</p>
+<div class="admonition tip">
+<p class="admonition-title">Backup de Checkpoints</p>
+<p>Antes de experiments o rollbacks:
+<div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a>cp<span class="w"> </span>completados.txt<span class="w"> </span>completados.txt.backup_<span class="k">$(</span>date<span class="w"> </span>+%s<span class="k">)</span>
+</code></pre></div></p>
+</div>
+<hr />
+<h2 id="buenas-practicas-operacionales">🛡️ Buenas Prácticas Operacionales</h2>
+<h3 id="pre-ejecucion">Pre-Ejecución</h3>
+<ul>
+<li>[ ] ✅ Cookie vigente (test: GET <code>/users/{USERNAME}/uploads</code>, espero status 200)</li>
+<li>[ ] ✅ <code>TMP_ROOT</code> accesible y contiene <code>meta.json</code></li>
+<li>[ ] ✅ Conexión a internet estable</li>
+<li>[ ] ✅ Espacio disco suficiente (imágenes temporales pueden requerir 1-2 GB)</li>
+<li>[ ] ✅ No ejecutar múltiples instancias simultáneamente en el mismo directorio</li>
+</ul>
+<h3 id="durante-ejecucion">Durante Ejecución</h3>
+<ul>
+<li>⏱️ Monitorea la primera hora (cambios inesperados → para agresivo)</li>
+<li>📊 Revisa <code>completados.txt</code> cada 100 torrents</li>
+<li>🚨 Si ves 429 / 502 repetido → detén, espera 1 hora</li>
+<li>📸 Documenta rate limits observados para ajustar Jitter si es necesario</li>
+</ul>
+<h3 id="post-ejecucion">Post-Ejecución</h3>
+<ul>
+<li>[ ] Verificar <code>completados.txt</code> contiene el total esperado</li>
+<li>[ ] Inspeccionar 5-10 torrents aleatorios en el tracker</li>
+<li>[ ] Validar que imágenes nuevas (si aplica) se muestran correctamente</li>
+<li>[ ] Guardar logs en directorio <code>logs/archive/</code></li>
+</ul>
+<h3 id="rotacion-de-credenciales">Rotación de Credenciales</h3>
+<p>Cada 30 días en producción:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a><span class="c1"># 1. Extrae cookie fresca desde navegador</span>
+<a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a><span class="c1"># 2. Actualiza .env</span>
+<a id="__codelineno-12-3" name="__codelineno-12-3" href="#__codelineno-12-3"></a><span class="nb">export</span><span class="w"> </span><span class="nv">UNIT3D_COOKIE_VALUE</span><span class="o">=</span><span class="s2">&quot;nuevo_valor&quot;</span>
+<a id="__codelineno-12-4" name="__codelineno-12-4" href="#__codelineno-12-4"></a>
+<a id="__codelineno-12-5" name="__codelineno-12-5" href="#__codelineno-12-5"></a><span class="c1"># 3. Test rápido</span>
+<a id="__codelineno-12-6" name="__codelineno-12-6" href="#__codelineno-12-6"></a>python3<span class="w"> </span>-c<span class="w"> </span><span class="s2">&quot;</span>
+<a id="__codelineno-12-7" name="__codelineno-12-7" href="#__codelineno-12-7"></a><span class="s2">import requests</span>
+<a id="__codelineno-12-8" name="__codelineno-12-8" href="#__codelineno-12-8"></a><span class="s2">from singularity_config import BASE_URL, COOKIE_VALUE</span>
+<a id="__codelineno-12-9" name="__codelineno-12-9" href="#__codelineno-12-9"></a><span class="s2">s = requests.Session()</span>
+<a id="__codelineno-12-10" name="__codelineno-12-10" href="#__codelineno-12-10"></a><span class="s2">s.cookies.set(&#39;milnueve_session&#39;, COOKIE_VALUE)</span>
+<a id="__codelineno-12-11" name="__codelineno-12-11" href="#__codelineno-12-11"></a><span class="s2">r = s.get(f&#39;{BASE_URL}/users/TuUsuario/uploads&#39;, timeout=5)</span>
+<a id="__codelineno-12-12" name="__codelineno-12-12" href="#__codelineno-12-12"></a><span class="s2">print(f&#39;Status: {r.status_code}&#39;)</span>
+<a id="__codelineno-12-13" name="__codelineno-12-13" href="#__codelineno-12-13"></a><span class="s2">print(&#39;✅ Cookie válida&#39; if r.status_code == 200 else &#39;❌ Cookie inválida&#39;)</span>
+<a id="__codelineno-12-14" name="__codelineno-12-14" href="#__codelineno-12-14"></a><span class="s2">&quot;</span>
+</code></pre></div>
+<hr />
+<h2 id="checklist-de-despliegue">📋 Checklist de Despliegue</h2>
+<h3 id="inicial-una-sola-vez">Inicial (Una sola vez)</h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a><span class="c1"># 1. Clonar / acceder al proyecto</span>
+<a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a><span class="nb">cd</span><span class="w"> </span>/path/to/RaW_Suite
+<a id="__codelineno-13-3" name="__codelineno-13-3" href="#__codelineno-13-3"></a>
+<a id="__codelineno-13-4" name="__codelineno-13-4" href="#__codelineno-13-4"></a><span class="c1"># 2. Crear .env</span>
+<a id="__codelineno-13-5" name="__codelineno-13-5" href="#__codelineno-13-5"></a>cp<span class="w"> </span>.env.example<span class="w"> </span>.env
+<a id="__codelineno-13-6" name="__codelineno-13-6" href="#__codelineno-13-6"></a><span class="c1"># Editar .env con credenciales reales</span>
+<a id="__codelineno-13-7" name="__codelineno-13-7" href="#__codelineno-13-7"></a>
+<a id="__codelineno-13-8" name="__codelineno-13-8" href="#__codelineno-13-8"></a><span class="c1"># 3. Instalar dependencias (si no están)</span>
+<a id="__codelineno-13-9" name="__codelineno-13-9" href="#__codelineno-13-9"></a>pip<span class="w"> </span>install<span class="w"> </span>-r<span class="w"> </span>requirements.txt
+<a id="__codelineno-13-10" name="__codelineno-13-10" href="#__codelineno-13-10"></a>
+<a id="__codelineno-13-11" name="__codelineno-13-11" href="#__codelineno-13-11"></a><span class="c1"># 4. Test de conectividad</span>
+<a id="__codelineno-13-12" name="__codelineno-13-12" href="#__codelineno-13-12"></a>python3<span class="w"> </span>-c<span class="w"> </span><span class="s2">&quot;</span>
+<a id="__codelineno-13-13" name="__codelineno-13-13" href="#__codelineno-13-13"></a><span class="s2">import requests</span>
+<a id="__codelineno-13-14" name="__codelineno-13-14" href="#__codelineno-13-14"></a><span class="s2">from singularity_config import BASE_URL, COOKIE_VALUE, USERNAME</span>
+<a id="__codelineno-13-15" name="__codelineno-13-15" href="#__codelineno-13-15"></a><span class="s2">s = requests.Session()</span>
+<a id="__codelineno-13-16" name="__codelineno-13-16" href="#__codelineno-13-16"></a><span class="s2">s.cookies.set(&#39;milnueve_session&#39;, COOKIE_VALUE)</span>
+<a id="__codelineno-13-17" name="__codelineno-13-17" href="#__codelineno-13-17"></a><span class="s2">r = s.get(f&#39;{BASE_URL}/users/{USERNAME}/uploads&#39;, timeout=5)</span>
+<a id="__codelineno-13-18" name="__codelineno-13-18" href="#__codelineno-13-18"></a><span class="s2">assert r.status_code == 200, f&#39;Error {r.status_code}&#39;</span>
+<a id="__codelineno-13-19" name="__codelineno-13-19" href="#__codelineno-13-19"></a><span class="s2">print(&#39;✅ Listo para ejecutar pipeline&#39;)</span>
+<a id="__codelineno-13-20" name="__codelineno-13-20" href="#__codelineno-13-20"></a><span class="s2">&quot;</span>
+<a id="__codelineno-13-21" name="__codelineno-13-21" href="#__codelineno-13-21"></a>
+<a id="__codelineno-13-22" name="__codelineno-13-22" href="#__codelineno-13-22"></a><span class="c1"># 5. Backup de estado inicial</span>
+<a id="__codelineno-13-23" name="__codelineno-13-23" href="#__codelineno-13-23"></a>mkdir<span class="w"> </span>backups/
+<a id="__codelineno-13-24" name="__codelineno-13-24" href="#__codelineno-13-24"></a>tar<span class="w"> </span>czf<span class="w"> </span>backups/initial_state.tar.gz<span class="w"> </span>./
+</code></pre></div>
+<h3 id="por-ejecucion">Por Ejecución</h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a><span class="c1"># 1. Actualizar archivos de control si es reanudación</span>
+<a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a><span class="c1"># (Los scripts lo hacen automáticamente)</span>
+<a id="__codelineno-14-3" name="__codelineno-14-3" href="#__codelineno-14-3"></a>
+<a id="__codelineno-14-4" name="__codelineno-14-4" href="#__codelineno-14-4"></a><span class="c1"># 2. Ejecutar pipeline (Orquestador o Manual)</span>
+<a id="__codelineno-14-5" name="__codelineno-14-5" href="#__codelineno-14-5"></a>python3<span class="w"> </span>singularity.py
+<a id="__codelineno-14-6" name="__codelineno-14-6" href="#__codelineno-14-6"></a><span class="c1"># O manualmente:</span>
+<a id="__codelineno-14-7" name="__codelineno-14-7" href="#__codelineno-14-7"></a><span class="c1"># python3 extras/MASS-EDITION-UNIT3D/01_scraper.py</span>
+<a id="__codelineno-14-8" name="__codelineno-14-8" href="#__codelineno-14-8"></a><span class="c1"># ...</span>
+<a id="__codelineno-14-9" name="__codelineno-14-9" href="#__codelineno-14-9"></a>
+<a id="__codelineno-14-10" name="__codelineno-14-10" href="#__codelineno-14-10"></a><span class="c1"># 3. Monitorear logs</span>
+<a id="__codelineno-14-11" name="__codelineno-14-11" href="#__codelineno-14-11"></a>tail<span class="w"> </span>-f<span class="w"> </span>logs/unit3d_mass_edition.log
+<a id="__codelineno-14-12" name="__codelineno-14-12" href="#__codelineno-14-12"></a>
+<a id="__codelineno-14-13" name="__codelineno-14-13" href="#__codelineno-14-13"></a><span class="c1"># 4. Validar completados.txt</span>
+<a id="__codelineno-14-14" name="__codelineno-14-14" href="#__codelineno-14-14"></a>wc<span class="w"> </span>-l<span class="w"> </span>completados.txt<span class="w">  </span><span class="c1"># ¿Número esperado?</span>
+<a id="__codelineno-14-15" name="__codelineno-14-15" href="#__codelineno-14-15"></a>
+<a id="__codelineno-14-16" name="__codelineno-14-16" href="#__codelineno-14-16"></a><span class="c1"># 5. Test de muestra</span>
+<a id="__codelineno-14-17" name="__codelineno-14-17" href="#__codelineno-14-17"></a><span class="c1"># Abre tracker, revisa 5 torrents aleatorios</span>
+<a id="__codelineno-14-18" name="__codelineno-14-18" href="#__codelineno-14-18"></a>
+<a id="__codelineno-14-19" name="__codelineno-14-19" href="#__codelineno-14-19"></a><span class="c1"># 6. Archivar resultado</span>
+<a id="__codelineno-14-20" name="__codelineno-14-20" href="#__codelineno-14-20"></a>mkdir<span class="w"> </span>logs/archive/run_<span class="k">$(</span>date<span class="w"> </span>+%Y%m%d_%H%M%S<span class="k">)</span>/
+<a id="__codelineno-14-21" name="__codelineno-14-21" href="#__codelineno-14-21"></a>mv<span class="w"> </span>completados.txt<span class="w"> </span>*.log<span class="w"> </span>logs/archive/run_*/
+</code></pre></div>
+<hr />
+<h2 id="troubleshooting">Troubleshooting</h2>
+<table>
+<thead>
+<tr>
+<th>Síntoma</th>
+<th>Causa Probable</th>
+<th>Solución</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>Connection refused</code></td>
+<td>Tracker offline</td>
+<td>Comprueba <code>BASE_URL</code>, espera a recuperación</td>
+</tr>
+<tr>
+<td><code>403 Forbidden</code></td>
+<td>Cookie expirada</td>
+<td>Extrae nueva cookie, actualiza <code>.env</code></td>
+</tr>
+<tr>
+<td><code>429 Too Many Requests</code></td>
+<td>Rate limit alcanzado</td>
+<td>Esperá 30+ minutos, script reintenta automáticamente</td>
+</tr>
+<tr>
+<td><code>422 Unprocessable Entity</code></td>
+<td>Validación tracker fallida</td>
+<td>Revisa <code>meta.json</code>, puede faltar campo crítico</td>
+</tr>
+<tr>
+<td><code>KeyError: 'name'</code></td>
+<td>Cookie malformada o credenciales incorrectas</td>
+<td>Verifica <code>COOKIE_VALUE</code>, <code>USERNAME</code> en <code>.env</code></td>
+</tr>
+<tr>
+<td><code>FileNotFoundError: mapeo_maestro.json</code></td>
+<td>Fase 02 no ejecutada</td>
+<td>Ejecuta <code>02_indexer.py</code> antes de <code>03_mass_updater.py</code></td>
+</tr>
+</tbody>
+</table>
+<div class="admonition note">
+<p class="admonition-title">Debug Avanzado</p>
+<p>Para habilitación de logging detallado:
+<div class="highlight"><pre><span></span><code><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">logging</span>
+<a id="__codelineno-15-2" name="__codelineno-15-2" href="#__codelineno-15-2"></a><span class="n">logging</span><span class="o">.</span><span class="n">basicConfig</span><span class="p">(</span><span class="n">level</span><span class="o">=</span><span class="n">logging</span><span class="o">.</span><span class="n">DEBUG</span><span class="p">)</span>
+<a id="__codelineno-15-3" name="__codelineno-15-3" href="#__codelineno-15-3"></a><span class="c1"># Los scripts registrarán requests/responses completas</span>
+</code></pre></div></p>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.tabs", "navigation.sections", "search.highlight", "content.code.copy"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copiado al portapapeles", "clipboard.copy": "Copiar al portapapeles", "search.result.more.one": "1 m\u00e1s en esta p\u00e1gina", "search.result.more.other": "# m\u00e1s en esta p\u00e1gina", "search.result.none": "No se encontraron documentos", "search.result.one": "1 documento encontrado", "search.result.other": "# documentos encontrados", "search.result.placeholder": "Teclee para comenzar b\u00fasqueda", "search.result.term.missing": "Falta", "select.version": "Seleccionar versi\u00f3n"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>

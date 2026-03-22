@@ -13,10 +13,10 @@
       
       
       
-        <link rel="prev" href="../unit3d_mass_edition/setup_y_seguridad/">
+        <link rel="prev" href="../unit3d_orchestrator/">
       
       
-        <link rel="next" href="../extras/">
+        <link rel="next" href="pipeline/">
       
       
         
@@ -27,7 +27,7 @@
     
     
       
-        <title>Dashboard - RaW Suite: Singularity</title>
+        <title>Inicio - RaW Suite: Singularity</title>
       
     
     
@@ -78,7 +78,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#dashboard-de-monitorizacion-real-time" class="md-skip">
+        <a href="#unit3d-mass-edition-suite" class="md-skip">
           Saltar a contenido
         </a>
       
@@ -112,7 +112,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Dashboard
+              Inicio
             
           </span>
         </div>
@@ -278,11 +278,13 @@
   
   
   
+    
+  
   
     
     
-      <li class="md-tabs__item">
-        <a href="../unit3d_mass_edition/" class="md-tabs__link">
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="./" class="md-tabs__link">
           
   
   
@@ -298,11 +300,9 @@
   
   
   
-    
   
-  
-    <li class="md-tabs__item md-tabs__item--active">
-      <a href="./" class="md-tabs__link">
+    <li class="md-tabs__item">
+      <a href="../dashboard/" class="md-tabs__link">
         
   
   
@@ -654,26 +654,31 @@
       
   
   
+    
   
   
+  
     
     
     
     
+      
+        
+        
       
       
         
       
     
     
-    <li class="md-nav__item md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" checked>
         
           
-          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="">
             
   
   
@@ -691,7 +696,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="true">
           <label class="md-nav__title" for="__nav_5">
             <span class="md-nav__icon md-icon"></span>
             
@@ -706,10 +711,37 @@
                 
   
   
+    
   
   
-    <li class="md-nav__item">
-      <a href="../unit3d_mass_edition/" class="md-nav__link">
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Inicio
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
         
   
   
@@ -725,6 +757,87 @@
   
 
       </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Tabla de contenidos">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Tabla de contenidos
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#mision" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Misión
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#la-filosofia-pipeline-de-4-fases" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        La Filosofía: Pipeline de 4 Fases
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="La Filosofía: Pipeline de 4 Fases">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#flujo-de-datos" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Flujo de Datos
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#casos-de-uso" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Casos de Uso
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#proximos-pasos" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Próximos Pasos
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
     </li>
   
 
@@ -737,7 +850,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../unit3d_mass_edition/pipeline/" class="md-nav__link">
+      <a href="pipeline/" class="md-nav__link">
         
   
   
@@ -765,7 +878,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../unit3d_mass_edition/workflows/" class="md-nav__link">
+      <a href="workflows/" class="md-nav__link">
         
   
   
@@ -793,7 +906,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../unit3d_mass_edition/setup_y_seguridad/" class="md-nav__link">
+      <a href="setup_y_seguridad/" class="md-nav__link">
         
   
   
@@ -825,37 +938,10 @@
       
   
   
-    
   
   
-  
-    <li class="md-nav__item md-nav__item--active">
-      
-      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
-      
-      
-        
-      
-      
-        <label class="md-nav__link md-nav__link--active" for="__toc">
-          
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Dashboard
-  
-
-    
-  </span>
-  
-  
-
-          <span class="md-nav__icon md-icon"></span>
-        </label>
-      
-      <a href="./" class="md-nav__link md-nav__link--active">
+    <li class="md-nav__item">
+      <a href="../dashboard/" class="md-nav__link">
         
   
   
@@ -871,81 +957,6 @@
   
 
       </a>
-      
-        
-
-<nav class="md-nav md-nav--secondary" aria-label="Tabla de contenidos">
-  
-  
-  
-    
-  
-  
-    <label class="md-nav__title" for="__toc">
-      <span class="md-nav__icon md-icon"></span>
-      Tabla de contenidos
-    </label>
-    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
-      
-        <li class="md-nav__item">
-  <a href="#para-que-sirve" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        🎯 ¿Para qué sirve?
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#como-acceder" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        🛠️ ¿Cómo acceder?
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#interfaz-y-datos" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        🖥️ Interfaz y Datos
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#funcionamiento-tecnico-para-admins" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        ⚙️ Funcionamiento Técnico (Para Admins)
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#como-probarlo-test-rapido" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        🚀 Cómo Probarlo (Test Rápido)
-      
-    </span>
-  </a>
-  
-</li>
-      
-    </ul>
-  
-</nav>
-      
     </li>
   
 
@@ -1485,10 +1496,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#para-que-sirve" class="md-nav__link">
+  <a href="#mision" class="md-nav__link">
     <span class="md-ellipsis">
       
-        🎯 ¿Para qué sirve?
+        Misión
       
     </span>
   </a>
@@ -1496,10 +1507,38 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#como-acceder" class="md-nav__link">
+  <a href="#la-filosofia-pipeline-de-4-fases" class="md-nav__link">
     <span class="md-ellipsis">
       
-        🛠️ ¿Cómo acceder?
+        La Filosofía: Pipeline de 4 Fases
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="La Filosofía: Pipeline de 4 Fases">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#flujo-de-datos" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Flujo de Datos
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#casos-de-uso" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Casos de Uso
       
     </span>
   </a>
@@ -1507,32 +1546,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#interfaz-y-datos" class="md-nav__link">
+  <a href="#proximos-pasos" class="md-nav__link">
     <span class="md-ellipsis">
       
-        🖥️ Interfaz y Datos
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#funcionamiento-tecnico-para-admins" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        ⚙️ Funcionamiento Técnico (Para Admins)
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#como-probarlo-test-rapido" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        🚀 Cómo Probarlo (Test Rápido)
+        Próximos Pasos
       
     </span>
   </a>
@@ -1556,80 +1573,96 @@
 
 
 
-<h1 id="dashboard-de-monitorizacion-real-time">Dashboard de Monitorización (Real-Time)</h1>
-<blockquote>
-<p><strong>"Status at a glance. Control from anywhere."</strong></p>
-</blockquote>
-<p>Singularity Core incluye un <strong>Dashboard Web ligero</strong> basado en FastAPI diseñado para monitorizar el progreso de tus tareas de larga duración (como el God Mode o subidas masivas) sin necesidad de estar pegado a la terminal.</p>
-<h2 id="para-que-sirve">🎯 ¿Para qué sirve?</h2>
+<h1 id="unit3d-mass-edition-suite">UNIT3D Mass Edition Suite</h1>
+<p>Conjunto de herramientas Python para <strong>curación y mantenimiento masivo</strong> de torrents en trackers basados en UNIT3D.</p>
+<h2 id="mision">Misión</h2>
+<p>Automatizar tareas de edición tediosas:</p>
 <ul>
-<li><strong>Monitorización Remota:</strong> Visualiza el estado del sistema desde tu móvil, tablet u otro ordenador en la red local.</li>
-<li><strong>Barras de Progreso Reales:</strong> Muestra el porcentaje completado de las fases del pipeline.</li>
-<li><strong>Historial de Tareas:</strong> Indica qué está haciendo exactamente cada módulo en tiempo real.</li>
-<li><strong>Resiliencia Visual:</strong> El dashboard se auto-actualiza cada 5 segundos.</li>
+<li>✨ Restaurar metadatos perdidos (IMDb, TMDb, TVDb)</li>
+<li>📦 Inyectar banners y firmas corporativas</li>
+<li>🖼️ Resucitar imágenes rotas en descripciones</li>
+<li>🔧 Arreglar errores de "Info Providers"</li>
+<li>⚙️ Mantener sincronización tracker-local</li>
 </ul>
-<h2 id="como-acceder">🛠️ ¿Cómo acceder?</h2>
-<p>El dashboard se inicia automáticamente en segundo plano cuando lanzas Singularity Core.</p>
-<ol>
-<li><strong>Asegúrate de que el contenedor está corriendo:</strong> <code>make up</code>.</li>
-<li><strong>Abre tu navegador preferido.</strong></li>
-<li><strong>Introduce la dirección:</strong><ul>
-<li>Si estás en la misma máquina: <code>http://localhost:8002</code></li>
-<li>Desde otro dispositivo: <code>http://&lt;IP_DEL_SERVIDOR&gt;:8002</code></li>
-</ul>
-</li>
-</ol>
-<h2 id="interfaz-y-datos">🖥️ Interfaz y Datos</h2>
-<p>El panel presenta una serie de <strong>Tarjetas de Módulo</strong> que contienen:</p>
+<p>Todo de forma automática y respetuosa con los límites del servidor.</p>
+<hr />
+<h2 id="la-filosofia-pipeline-de-4-fases">La Filosofía: Pipeline de 4 Fases</h2>
+<p>La suite funciona como una <strong>cadena de montaje</strong>. Cada script realiza una tarea específica y prepara el terreno para el siguiente, asegurando un proceso ordenado y robusto:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>[Scraper] → [Indexer] → [Mass Updater] → [Image Resurrector]
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>   IDs       Mapping    Metadatos      Imágenes &amp; Formato
+</code></pre></div>
+<h3 id="flujo-de-datos">Flujo de Datos</h3>
+<pre class="mermaid"><code>sequenceDiagram
+    participant Tracker as UNIT3D Tracker
+    participant Local as Sistema Local
+    participant Script1 as 01_scraper.py
+    participant Script2 as 02_indexer.py
+    participant Script3 as 03_mass_updater.py
+    participant Script4 as 04_image_resurrector.py
+
+    Script1-&gt;&gt;Tracker: GET /users/{username}/uploads
+    Tracker--&gt;&gt;Script1: HTML con torrents
+    Script1-&gt;&gt;Local: ids.txt
+
+    Script2-&gt;&gt;Local: Lee ids.txt
+    Script2-&gt;&gt;Local: Busca meta.json
+    Script2-&gt;&gt;Local: mapeo_maestro.json
+
+    Script3-&gt;&gt;Local: Carga mapeo_maestro.json
+    Script3-&gt;&gt;Tracker: PATCH /torrents/{id}/edit
+    Script3-&gt;&gt;Local: completados.txt (checkpoint)
+
+    Script4-&gt;&gt;Local: Carga completados.json
+    Script4-&gt;&gt;Local: Procesa imágenes
+    Script4-&gt;&gt;Tracker: PATCH /torrents/{id}/edit
+    Script4-&gt;&gt;Local: Actualiza DESCRIPTION.txt</code></pre>
+<div class="admonition note">
+<p class="admonition-title">Diseño Resiliente</p>
+<p>Cada script genera archivos de control (<code>ids.txt</code>, <code>mapeo_maestro.json</code>, <code>completados.txt</code>) que permiten reanudar el proceso si se interrumpe. No hay pérdida de trabajo.</p>
+</div>
+<div class="admonition warning">
+<p class="admonition-title">Alcance Actual</p>
+<p>Los scripts están optimizados para trackers <strong>UNIT3D</strong> con arquitectura estándar (endpoints <code>/torrents/{id}/edit</code>, validación de XSRF, cookies de sesión). Trackers con protecciones personalizadas pueden requerir adaptaciones.</p>
+</div>
+<hr />
+<h2 id="casos-de-uso">Casos de Uso</h2>
 <table>
 <thead>
 <tr>
-<th style="text-align: left;">Campo</th>
-<th style="text-align: left;">Descripción</th>
+<th>Caso</th>
+<th>Script(s) Recomendado</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td style="text-align: left;"><strong>Módulo</strong></td>
-<td style="text-align: left;">Identificador del sistema (CORE, PIPELINE, MKVERYTHING, etc.).</td>
+<td>He subido 500+ torrents y perdí metadatos</td>
+<td><code>02_indexer.py</code> + <code>03_mass_updater.py</code></td>
 </tr>
 <tr>
-<td style="text-align: left;"><strong>Tarea</strong></td>
-<td style="text-align: left;">El nombre de la operación actual (ej: "Fase 1: MKVerything").</td>
+<td>Mi banner antiguo está deprecado</td>
+<td><code>03_mass_updater.py</code> (reemplaza vía <code>MSG_VIEJO/MSG_NUEVO</code>)</td>
 </tr>
 <tr>
-<td style="text-align: left;"><strong>Estado</strong></td>
-<td style="text-align: left;">Estado operativo (ONLINE, IN_PROGRESS, SUCCESS, ERROR).</td>
+<td>Las imágenes de mis descripciones están rotas</td>
+<td><code>04_image_resurrector.py</code></td>
 </tr>
 <tr>
-<td style="text-align: left;"><strong>Progreso</strong></td>
-<td style="text-align: left;">Barra visual y porcentaje (solo para tareas compatibles).</td>
+<td>Necesito una restauración completa</td>
+<td>Ejecutar los 4 scripts en orden</td>
 </tr>
 <tr>
-<td style="text-align: left;"><strong>Detalles</strong></td>
-<td style="text-align: left;">Información adicional (ej: "Extrayendo ISO: Pelicula.iso").</td>
-</tr>
-<tr>
-<td style="text-align: left;"><strong>Última Actualización</strong></td>
-<td style="text-align: left;">Tiempo transcurrido desde el último reporte del motor.</td>
+<td>Tengo 50 torrents para editar</td>
+<td>Modo Manual standalone</td>
 </tr>
 </tbody>
 </table>
-<h2 id="funcionamiento-tecnico-para-admins">⚙️ Funcionamiento Técnico (Para Admins)</h2>
+<hr />
+<h2 id="proximos-pasos">Próximos Pasos</h2>
 <ul>
-<li><strong>Puerto:</strong> 8002 (Configurable en <code>core/dashboard.py</code>).</li>
-<li><strong>Motor:</strong> FastAPI + Jinja2 Templates + Uvicorn.</li>
-<li><strong>Persistencia:</strong> Los datos se leen desde <a href="./logs/current_status.json">./logs/current_status.json</a>.</li>
-<li><strong>Seguridad:</strong> El dashboard es de <strong>Solo Lectura</strong>. No acepta entradas del usuario ni permite ejecución de comandos, lo que lo hace seguro para exponer en redes locales.</li>
+<li><strong>Modo Recomendado:</strong> Consulta <a href="workflows/">Workflows</a> para integración vía <code>singularity.py</code>.</li>
+<li><strong>Detalles Técnicos:</strong> Lee <a href="pipeline/">Pipeline</a> para comprender cada fase.</li>
+<li><strong>Despliegue:</strong> Revisa <a href="setup_y_seguridad/">Setup &amp; Seguridad</a> para dependencias y consideraciones críticas.</li>
 </ul>
-<h2 id="como-probarlo-test-rapido">🚀 Cómo Probarlo (Test Rápido)</h2>
-<ol>
-<li>Lanza la suite: <code>make attach</code>.</li>
-<li>Entra en el <strong>Singularity Mode (Opción 5)</strong>.</li>
-<li>Configura una tarea mínima.</li>
-<li>En cuanto veas que la terminal empieza a trabajar, abre <code>http://localhost:8002</code>.</li>
-<li>Deberías ver la tarjeta <strong>PIPELINE</strong> en estado <code>IN_PROGRESS</code> con su barra de progreso moviéndose.</li>
-</ol>
 
 
 

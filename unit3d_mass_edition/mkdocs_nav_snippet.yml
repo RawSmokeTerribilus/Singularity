@@ -1,0 +1,10 @@
+# Fragmento de navegación para mkdocs.yml
+# Inserta este bloque bajo la sección 'nav:' en tu mkdocs.yml
+
+nav:
+  - Home: index.md
+  - UNIT3D Mass Edition:
+    - Inicio: unit3d_mass_edition/index.md
+    - Pipeline (4 Fases): unit3d_mass_edition/pipeline.md
+    - Workflows: unit3d_mass_edition/workflows.md
+    - Setup & Seguridad: unit3d_mass_edition/setup_y_seguridad.md
