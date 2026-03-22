@@ -19,6 +19,7 @@ audit_report_singularity.txt
 refactor_log.txt
 init-structure.txt
 audit_filtracion.txt
+**/*.tsv
 
 # --- MASS EDITOR (Telemetría y registros reales) ---
 extras/MASS-EDITION-UNIT3D/completados.txt
