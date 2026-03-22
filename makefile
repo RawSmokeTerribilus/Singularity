@@ -1,4 +1,4 @@
-SCRIPTS_SRC := /home/rawserver/scripts/Media-Management/RaW_Suite/RawLoadrr/src/trackers
+SCRIPTS_SRC := RawLoadrr/src/trackers
 WORK_TRACKERS := work_data/trackers
 
 .PHONY: pull build up down restart logs attach shell install prep
@@ -31,15 +31,17 @@ prep:
 	@mkdir -p $(WORK_TRACKERS)
 	@mkdir -p work_data/tmp/qbit_backup
 	@mkdir -p work_data/tmp/TEMP_RESCUE
-	@if [ -z "$$(ls -A $(WORK_TRACKERS))" ]; then \
-		echo "🧬 Infundiendo trackers desde el source..."; \
-		cp -r $(SCRIPTS_SRC)/* $(WORK_TRACKERS)/; \
+	@if [ -d "$(SCRIPTS_SRC)" ] && [ -n "$$(ls -A $(SCRIPTS_SRC) 2>/dev/null)" ]; then \
+		if [ -z "$$(ls -A $(WORK_TRACKERS))" ]; then \
+			echo "🧬 Infundiendo trackers desde el source..."; \
+			cp -rn $(SCRIPTS_SRC)/* $(WORK_TRACKERS)/; \
+		fi; \
 	fi
 	@touch work_data/mass_editor/completados.txt
 	@touch work_data/mass_editor/completados_img.txt
 	@touch work_data/mass_editor/ids.txt
 	@touch work_data/mass_editor/mapeo_maestro.json
-	@touch config/.env
+	@mkdir -p config && touch config/.env
 	@sudo chown -R $(USER):$(USER) work_data/
 	@chmod -R 755 $(WORK_TRACKERS)
 	@chmod -R 775 work_data/tmp

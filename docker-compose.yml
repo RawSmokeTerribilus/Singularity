@@ -5,7 +5,7 @@ services:
     container_name: singularity_core
     restart: unless-stopped
     privileged: true
-    user: "1000:1000"
+    user: "${PUID:-1000}:${PGID:-1000}"
     group_add:
       - "997"         # Acceso directo al grupo 'render' (AMD/Intel)
       - "107"         # Por si acaso, el grupo 'video' en algunos RHEL
@@ -13,8 +13,8 @@ services:
     command: bash -c "python3 -m core.dashboard & tail -f /dev/null"
     environment:
       - TZ=Europe/Madrid
-      - PUID=1000
-      - PGID=1000
+      - PUID=${PUID:-1000}
+      - PGID=${PGID:-1000}
       - LIBVA_DRIVER_NAME=radeonsi # Fuerza el driver de AMD
     devices:
       - /dev/dri:/dev/dri # Mapeo explícito del hardware gráfico
