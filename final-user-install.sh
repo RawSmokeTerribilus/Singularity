@@ -14,10 +14,15 @@ mkdir -p "$WORK_DIR/mass_editor" "$WORK_DIR/logs/MKVerything" "$WORK_DIR/logs/Ra
 mkdir -p "$WORK_DIR/tor/data" "$WORK_DIR/tor/logs"
 
 # 3. Crear placeholders para persistencia (Evita carpetas root en el mount)
+touch "$CONFIG_DIR/.env"
+touch "$CONFIG_DIR/cookies.txt"  # <--- CRÍTICO para el Scraper
 touch "$WORK_DIR/mass_editor/ids.txt"
 touch "$WORK_DIR/mass_editor/completados.txt"
 touch "$WORK_DIR/mass_editor/completados_img.txt"
-[ ! -f "$WORK_DIR/mass_editor/mapeo_maestro.json" ] && echo "{}" > "$WORK_DIR/mass_editor/mapeo_maestro.json"
+# Asegurar el JSON maestro con estructura mínima
+if [ ! -f "$WORK_DIR/mass_editor/mapeo_maestro.json" ]; then
+    echo "{}" > "$WORK_DIR/mass_editor/mapeo_maestro.json"
+fi
 
 # 4. Generación de Archivos de Configuración (Hardcoded para independencia)
 echo "Generando plantillas de configuración en $CONFIG_DIR..."

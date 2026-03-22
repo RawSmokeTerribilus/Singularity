@@ -29,6 +29,7 @@ from rich.panel import Panel
 from rich.table import Table
 from rich.align import Align
 from rich.rule import Rule
+from rich import box
 from rich.console import Group
 from rich.progress import Progress, TimeRemainingColumn
 from difflib import SequenceMatcher
@@ -36,26 +37,54 @@ import bencodepy as bencode
 from urllib.parse import urlparse, parse_qs
 import importlib
 
-####################################
-#######  Tracker List Here   #######
-### Add below + api or http list ###
-####################################
-tracker_data = {
-    'api': ['ACM', 'AITHER', 'ANT', 'BHD', 'BHDTV', 'BLU', 'CBR', 'EMU', 'FNP', 'HHD', 'HUNO', 'ITA', 'JPTV', 'LCD', 'LDU', 'LST', 'LT', 'MB', 'MILNU', 'NBL', 'OE', 'OINK', 'OTW', 'PSS', 'PTT', 'RF', 'R4E', 'RHD', 'RTF', 'SHRI', 'SN', 'SP', 'TLZ', 'TTR', 'TOCA', 'ULCX', 'UTP', 'YU', 'PRBLM'],
-    'http': ['FL', 'HDB', 'HDT', 'MTV', 'PTER', 'TTG'],
-    'other': ['AR', 'PTP', 'THR', 'TL']
- }
+# --- TROLLING SUBSYSTEM INJECTION ---
+try:
+    # Añadimos el directorio padre (RaW_Suite) al path para importar la config global
+    sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+    from singularity_config import GOD_PHRASES
+except ImportError:
+    GOD_PHRASES = []
 
-# Combine all trackers into one list
-tracker_list = tracker_data['api'] + tracker_data['http'] + tracker_data['other']
+if GOD_PHRASES:
+    # Monkey Patch: Secuestramos console.print para inyectar caos con 1% de probabilidad
+    if not hasattr(console, 'original_print'):
+        console.original_print = console.print
 
-# Import corresponding modules and create a dictionary mapping
-tracker_class_map = {}
-for tracker in tracker_list:
+    def troll_print(*args, **kwargs):
+        if random.random() < 0.01: # 1% de probabilidad
+            phrase = random.choice(GOD_PHRASES)
+            console.original_print(f"[dim italic magenta]« {phrase} »[/dim italic magenta]")
+        console.original_print(*args, **kwargs)
+
+    console.print = troll_print
+# ------------------------------------
+
+
+def _load_tracker_registry(registry_path: str) -> dict:
+    """Load tracker categorization from a JSON registry file.
+
+    The registry lives in the persistent src/trackers/ volume so that new
+    trackers can be added without ever modifying upload.py.
+    """
+    if not os.path.isfile(registry_path):
+        console.print(Panel(f"[bold red]FATAL ERROR[/bold red]\n\nTracker registry not found: {registry_path}\n\n[yellow]Create src/trackers/trackers_registry.json to define tracker categories.[/yellow]", box=box.HEAVY, border_style="red"))
+        sys.exit(1)
     try:
-        tracker_class_map[tracker] = getattr(importlib.import_module(f"src.trackers.{tracker}"), tracker)
-    except ImportError as e:
-        logging.error(f"Error importing {tracker}: {e}")
+        with open(registry_path, 'r', encoding='utf-8') as _f:
+            _raw = json.load(_f)
+    except json.JSONDecodeError as _e:
+        console.print(Panel(f"[bold red]FATAL ERROR[/bold red]\n\nInvalid JSON in tracker registry: {_e}", box=box.HEAVY, border_style="red"))
+        sys.exit(1)
+
+    _tracker_data: dict = {'api': [], 'http': [], 'other': []}
+    _valid_types = set(_tracker_data.keys())
+    for _name, _ttype in _raw.items():
+        if _ttype not in _valid_types:
+            logging.warning(f"Tracker '{_name}' has unknown type '{_ttype}' in registry — skipping.")
+            continue
+        _tracker_data[_ttype].append(_name.upper())
+    return _tracker_data
+
 
 # Detect python3 or fallback to default python command
 python_cmd = shutil.which("python3") or "python"
@@ -65,6 +94,19 @@ data_dir = os.path.join(base_dir, 'data')
 config_path = os.path.abspath(os.path.join(data_dir, 'config.py'))
 old_config_path = os.path.abspath(os.path.join(data_dir, 'backup', 'old_config.py'))
 minimum_version = Version('1.0.5')
+
+_registry_path = os.path.join(base_dir, 'src', 'trackers', 'trackers_registry.json')
+tracker_data = _load_tracker_registry(_registry_path)
+tracker_list = tracker_data['api'] + tracker_data['http'] + tracker_data['other']
+
+tracker_class_map = {}
+for _tracker in tracker_list:
+    try:
+        tracker_class_map[_tracker] = getattr(importlib.import_module(f"src.trackers.{_tracker}"), _tracker)
+    except ImportError as _ie:
+        logging.error(f"Error importing {_tracker}: {_ie}")
+    except Exception as _ex:
+        logging.error(f"Unexpected error loading tracker module '{_tracker}': {_ex}")
 
 def get_backup_name(path, suffix='_bu'):
     base, ext = os.path.splitext(path)
@@ -85,15 +127,14 @@ except ImportError as e:
     exit()
 
 def reconfigure():
-    console.print("[bold red]WARN[/bold red]: Version out of date, automatic upgrade in progress")
+    console.print(Panel("[bold red]SYSTEM ALERT[/bold red]\n\nVersion out of date. Initiating automatic upgrade sequence...", box=box.HEAVY, border_style="red"))
     try:
         if os.path.exists(old_config_path):
             backup_name = get_backup_name(old_config_path)
             shutil.move(old_config_path, backup_name)
         shutil.move(config_path, old_config_path)
     except Exception as e:
-        console.print("[bold red]ERROR[/bold red]: Unable to proceed with automatic upgrade. Please rename `config.py` to `old_config.py` move it to 'data/backup` and run `python3 data/reconfig.py`")
-        console.print(f"Error: {str(e)}")
+        console.print(Panel(f"[bold red]CRITICAL FAILURE[/bold red]\n\nUnable to proceed with automatic upgrade.\nPlease rename `config.py` to `old_config.py`, move it to `data/backup`,\nand run `python3 data/reconfig.py`.\n\nError: {str(e)}", box=box.HEAVY, border_style="red"))
         exit()
 
     result = subprocess.run(
@@ -102,29 +143,29 @@ def reconfigure():
         text=True
     )
     if result.returncode != 0:
-        console.print(f"[bold red]Error during reconfiguration: {result.stderr}[/bold red]")
+        console.print(Panel(f"[bold red]RECONFIGURATION FAILED[/bold red]\n\n{result.stderr}", box=box.HEAVY, border_style="red"))
         exit()
 
     if os.path.exists(config_path):
-        console.print("[bold green]Congratulations! config.py was successfully updated.[/bold green]")
+        console.print(Panel("[bold green]SUCCESS[/bold green]\n\nconfig.py was successfully updated.", box=box.DOUBLE, border_style="green"))
     else:
-        console.print("[bold][red]ERROR[/red]: config.py not found in the expected directory after reconfiguration.[/bold]")
+        console.print(Panel("[bold red]ERROR[/bold red]\n\nconfig.py not found in the expected directory after reconfiguration.", box=box.HEAVY, border_style="red"))
         exit()
 
-    console.print("Please double-check new config and ensure client settings were appropriately set.")
-    console.print("[bold yellow]WARN[/bold yellow]: After verification of config, rerun command.")
-    console.print("[dim green]Thanks for using Uploadrr :)")
+    console.print(Rule(style="yellow"))
+    console.print("[bold yellow]ACTION REQUIRED:[/bold yellow] Verify new config and ensure client settings are correct.")
+    console.print("[bold yellow]RESTART:[/bold yellow] After verification, rerun the command.")
+    console.print(Rule(style="yellow"))
     exit()
 
-if 'version' not in config or Version(config.get('version')) < minimum_version:  # Check for version and reconfigures
+if 'version' not in config or Version(config.get('version', '0')) < minimum_version:  # Check for version and reconfigures
     reconfigure()
 
 # Version check against example config (optional)
 try:
     from data.backup import example_config
-    if 'version' in example_config.config and Version(example_config.config.get('version')) > Version(config.get('version')):
-        console.print("[bold yellow]WARN[/bold yellow]: Config version out of date, updating is recommended.")
-        console.print("[bold yellow]WARN[/bold yellow]: Simply pass --reconfig")
+    if 'version' in example_config.config and 'version' in config and Version(example_config.config.get('version', '0')) > Version(config.get('version', '0')):
+        console.print(Panel("[bold yellow]CONFIG UPDATE AVAILABLE[/bold yellow]\n\nConfig version out of date.\nPass [bold cyan]--reconfig[/bold cyan] to update automatically.", border_style="yellow", box=box.ROUNDED))
 except Exception:
     # Ignore errors here as it's just a version check
     pass
@@ -230,7 +271,8 @@ async def do_the_thing(base_dir):
         root_path = os.path.abspath(meta['path'])
         if os.path.exists(root_path):
             if os.path.isdir(root_path):
-                console.print(f"[bold green]Starting recursive scan on:[/bold green] [cyan]{root_path}[/cyan]")
+                console.print(Rule("[bold green]RECURSIVE SCAN INITIATED[/bold green]", style="green"))
+                console.print(f"[dim]Scanning:[/dim] [cyan]{root_path}[/cyan]")
                 queue = build_recursive_queue(root_path)
             else: # It's a file
                 queue.append(root_path)
@@ -250,7 +292,7 @@ async def do_the_thing(base_dir):
         console.print("\n[bold green]Automatically queuing these files:[/bold green]", end='')
         console.print(Markdown(f"- {md_text.rstrip()}\n\n", style=Style(color='cyan')))
     
-    console.print(f"\nUnique uploads queued: [bold cyan]{len(queue)}[/bold cyan]")
+    console.print(f"\n[bold]Queue Size:[/bold] [bold cyan]{len(queue)}[/bold cyan] Items")
 
 
     delay = meta.get('delay', 0) or config['AUTO'].get('delay', 0)
@@ -305,14 +347,15 @@ async def do_the_thing(base_dir):
         except FileNotFoundError:
             pass
         
-        console.print(Align.center(f"\n\n——— Processing # [bold bright_cyan]{current_file}[/bold bright_cyan] of [bold bright_magenta]{total_files}[/bold bright_magenta] ———"))
+        console.print()
+        console.print(Rule(f"[bold]PROCESSING ITEM {current_file}/{total_files}[/bold]", style="bold magenta"))
         if delay > 0:
             with Progress("[progress.description]{task.description}", TimeRemainingColumn(), transient=True) as progress:
                 task = progress.add_task("[cyan]Auto delay...", total=delay)
                 for i in range(delay):
                     await asyncio.sleep(1)
                     progress.update(task, advance=1)
-        console.print(f"[green]Gathering info for {os.path.basename(path)}")
+        console.print(f"[dim]Target:[/dim] [bold cyan]{os.path.basename(path)}[/bold cyan]")
         if meta['imghost'] is None or meta['imghost'] == '':
             # Ensure a default is always set, even if config default is missing
             meta['imghost'] = config['DEFAULT'].get('img_host_1', 'imgbox')
@@ -531,7 +574,7 @@ async def do_the_thing(base_dir):
                             skipped_files += 1
                             skipped_details.append((path, tracker))
                             continue
-                        if upload_success:
+                        if meta['upload']:
                             await tracker_class.upload(meta)
                             await client.add_to_client(meta, tracker_class.tracker)
                             successful_uploads += 1
@@ -547,7 +590,7 @@ async def do_the_thing(base_dir):
                             manual_tracker = manual_tracker.replace(" ", "").upper().strip()
                             tracker_class = tracker_class_map[manual_tracker](config=config)
                             if manual_tracker in tracker_data['api']:
-                                await common.unit3d_edit_desc(meta, tracker_class.tracker, tracker_class.signature)
+                                await common.unit3d_edit_desc(meta, tracker_class.tracker)
                             else:
                                 await tracker_class.edit_desc(meta)
                     url = await prep.package(meta)
@@ -569,7 +612,7 @@ async def do_the_thing(base_dir):
                     console.print("Uploading to AlphaRatio")               
                     if check_banned_group(tracker, ar.banned_groups, meta, skipped_details, path):
                         skipped_files += 1
-                        skipped_details.append((path, f"Banned group on {tracker_class.tracker}"))                
+                        skipped_details.append((path, f"Banned group on {ar.tracker}"))                
                         continue
                 console.print("[yellow]Searching for Existing Releases")
                 if await ar.validate_credentials(meta):
@@ -602,7 +645,7 @@ async def do_the_thing(base_dir):
                     console.print("Uploading to BHD")
                     if check_banned_group("BHD", bhd.banned_groups, meta, skipped_details, path):
                         skipped_files += 1
-                        skipped_details.append((path, f"Banned group on {tracker_class.tracker}")) 
+                        skipped_details.append((path, f"Banned group on {bhd.tracker}")) 
                         continue
                     dupes = await bhd.search_existing(meta)
                     dupes = await common.filter_dupes(dupes, meta)
@@ -660,7 +703,7 @@ async def do_the_thing(base_dir):
                             console.print("[yellow]Searching for Dupes")
                             dupes = thr.search_existing(session, meta.get('imdb_id'))
                             dupes = await common.filter_dupes(dupes, meta)
-                            meta, skipped = dupe_check(dupes, meta)
+                            meta, skipped = dupe_check(dupes, meta, config, skipped_details, path)
                             if skipped:
                                 skipped_files += 1
                                 skipped_details.append((path, tracker))
@@ -670,7 +713,7 @@ async def do_the_thing(base_dir):
                                 await client.add_to_client(meta, "THR")
                                 successful_uploads += 1
                     except:
-                        console.print(traceback.print_exc())
+                        log.info("Error uploading to THR", exc_info=True)
 
             if tracker == "PTP":
                 # Auto-upload by default (unless debug mode without unattended flag)
@@ -691,9 +734,9 @@ async def do_the_thing(base_dir):
                             else:
                                 print("Invalid IMDB id. Please try again.")
                     ptp = tracker_class_map[tracker](config=config)
-                    if check_banned_group(tracker_class.tracker, tracker_class.banned_groups, meta, skipped_details, path):
+                    if check_banned_group(ptp.tracker, ptp.banned_groups, meta, skipped_details, path):
                         skipped_files += 1
-                        skipped_details.append((path, f"Banned group on {tracker_class.tracker}"))                                          
+                        skipped_details.append((path, f"Banned group on {ptp.tracker}"))                                          
                         continue
                     try:
                         console.print("[yellow]Searching for Group ID")
@@ -723,7 +766,7 @@ async def do_the_thing(base_dir):
                             console.print("[yellow]Searching for Existing Releases")
                             dupes = await ptp.search_existing(groupID, meta)
                             dupes = await common.filter_dupes(dupes, meta)
-                            meta, skipped = dupe_check(dupes, meta)
+                            meta, skipped = dupe_check(dupes, meta, config, skipped_details, path)
                             if skipped:
                                 skipped_files += 1
                                 skipped_details.append((path, tracker))
@@ -737,7 +780,7 @@ async def do_the_thing(base_dir):
                             await client.add_to_client(meta, "PTP")
                             successful_uploads += 1
                     except:
-                        console.print(traceback.print_exc())
+                        log.info("Error uploading to PTP", exc_info=True)
 
             if tracker == "TL":
                 tracker_class = tracker_class_map[tracker](config=config)
@@ -776,8 +819,9 @@ async def do_the_thing(base_dir):
             f"Processed [bold bright_magenta]{total_files}[/bold bright_magenta] Unique Uploads\n"
             f"Successful Uploads: [bold green]{successful_uploads}[/bold green]\n"
             f"Failed Uploads: [bold red]{skipped_files}[/bold red]",
-            title="Upload Summary",
-            border_style="bold cyan"
+            title="[bold]SESSION REPORT[/bold]",
+            border_style="bold cyan",
+            box=box.HEAVY
         ))
 
     # Handle skipped files
@@ -817,8 +861,9 @@ async def do_the_thing(base_dir):
 
             reason_panel = Panel(
                 renderable=Group(*combined_renderable),
-                title=reason_text,
-                border_style=reason_style
+                title=f"[bold]{reason_text}[/bold]",
+                border_style=reason_style,
+                box=box.DOUBLE
             )
 
             console.print(reason_panel)
@@ -843,8 +888,9 @@ async def do_the_thing(base_dir):
 
         reason_panel = Panel(
             renderable=Group(*combined_renderable),
-            title="TMDb ID not found",
-            border_style="bold red"
+            title="[bold]MISSING TMDB ID[/bold]",
+            border_style="bold red",
+            box=box.DOUBLE
         )
 
         console.print(reason_panel)
@@ -852,8 +898,8 @@ async def do_the_thing(base_dir):
 def get_confirmation(meta):
     ddebug = meta.get('deep_debug')
     if meta['debug'] or ddebug:
-        console.print("[bold red]DEBUG: True")
-    console.print(f"Prep material saved to {meta['base_dir']}/tmp/{meta['uuid']}")
+        console.print(Panel("[bold red]DEBUG MODE ACTIVE[/bold red]", box=box.SIMPLE, border_style="red"))
+    console.print(f"[dim]Artifacts:[/dim] {meta['base_dir']}/tmp/{meta['uuid']}")
     console.print()
 
     if meta['is_music']:
@@ -882,7 +928,7 @@ def get_confirmation(meta):
     if int(meta.get('mal_id', 0)) != 0:
         db_info.append(f"MAL : https://myanimelist.net/anime/{meta['mal_id']}")
 
-    console.print(Panel("\n".join(db_info), title="Database Info", border_style="bold yellow"))
+    console.print(Panel("\n".join(db_info), title="[bold]DATABASE INFO[/bold]", border_style="bold yellow", box=box.DOUBLE))
     console.print()
     if int(meta.get('freeleech', '0')) != 0:
         console.print(f"[bold]Freeleech[/bold]: {meta['freeleech']}")
@@ -895,9 +941,9 @@ def get_confirmation(meta):
     else:
         res = meta['resolution']
 
-    console.print(Text(f" {res} / {meta['type']}{tag}", style="bold"))
+    console.print(Panel(Text(f"{res} / {meta['type']}{tag}", style="bold center"), title="[bold]RELEASE INFO[/bold]", border_style="green", box=box.ROUNDED))
     if meta.get('personalrelease', False):
-        console.print("[bright_magenta]Personal Release!")
+        console.print(Align.center("[bold bright_magenta]★ PERSONAL RELEASE ★[/bold bright_magenta]"))
     console.print()
     
     # Auto-proceed by default (unless debug mode is on and unattended is explicitly false)
@@ -905,8 +951,8 @@ def get_confirmation(meta):
     if meta.get('debug', False) and not meta.get('unattended', False):
         get_missing(meta)
         ring_the_bell = "\a" if config['DEFAULT'].get("sfx_on_prompt", True) is True else "" # \a rings the bell
-        console.print(f"[bold yellow]Is this correct?{ring_the_bell}") 
-        console.print(f"[bold]Name[/bold]: {meta['name']}")
+        console.print(f"[bold yellow]VERIFICATION REQUIRED{ring_the_bell}[/bold yellow]") 
+        console.print(Panel(f"[bold]{meta['name']}[/bold]", title="Release Name", border_style="bold cyan"))
         confirm = Confirm.ask(" Correct?")
     else:
         console.print(f"[bold]Name[/bold]: {meta['name']}")
@@ -920,18 +966,19 @@ def dupe_check(dupes, meta, config, skipped_details, path):
         return meta, False  # False indicates not skipped
     
     if not dupes:
-        console.print("[green]No dupes found")
+        console.print("[bold green]✓ No duplicates found[/bold green]")
         meta['upload'] = True   
         return meta, False  # False indicates not skipped
 
     table = Table(
-        title="Are these dupes?",
+        title="[bold]POTENTIAL DUPLICATES[/bold]",
         title_justify="center",
         show_header=True,
-        header_style="bold underline",
+        header_style="bold cyan",
         expand=True,
         show_lines=False,
-        box=None
+        box=box.SIMPLE,
+        border_style="dim"
     )
 
     table.add_column("Name")
@@ -963,7 +1010,7 @@ def dupe_check(dupes, meta, config, skipped_details, path):
 
     def handle_similarity(similarity, meta):
         if similarity == 1.0:
-            console.info(f"[red]Found exact name match. Aborting..")
+            console.print(f"[red]Found exact name match. Aborting..")
             meta['upload'] = False
             return meta, True  # True indicates skipped
         elif meta['unattended']:
@@ -996,7 +1043,7 @@ def dupe_check(dupes, meta, config, skipped_details, path):
         if meta_size is None:
             meta_size = extract_size_from_torrent(meta['base_dir'], meta['uuid'])
 
-        log.dinfo(f"Comparing {name} with size {size} bytes to {meta['clean_name']} with size {meta_size} bytes")
+        log.info(f"Comparing {name} with size {size} bytes to {meta['clean_name']} with size {meta_size} bytes")
 
         # Define a maximum size tolerance to catch abnormally huge differences
         max_tolerance = config['AUTO'].get('max_size_tolerance', 25) / 100  # Default to 25%
@@ -1010,31 +1057,31 @@ def dupe_check(dupes, meta, config, skipped_details, path):
 
         elif abs(meta_size - size) > max_tolerance * meta_size:
             # Abnormally huge size difference
-            log.dinfo("Size difference exceeds max tolerance (%.2f%%): %d bytes.", max_tolerance * 100, abs(meta_size - size))
+            log.info("Size difference exceeds max tolerance (%.2f%%): %d bytes.", max_tolerance * 100, abs(meta_size - size))
 
         elif abs(meta_size - size) <= size_tolerance * meta_size:
             # Size is within reasonable tolerance
-            log.dinfo(f"Size difference within tolerance: {abs(meta_size - size)} bytes.")
+            log.info(f"Size difference within tolerance: {abs(meta_size - size)} bytes.")
             cleaned_dupe_name = preprocess_string(name)
             similarity = SequenceMatcher(None, cleaned_meta_name, cleaned_dupe_name).ratio()
 
             if similarity >= similarity_threshold:
-                log.dinfo(f"[yellow]Close size match ({abs(meta_size - size)} bytes difference) with {similarity * 100:.2f}% name similarity.")
+                log.info(f"[yellow]Close size match ({abs(meta_size - size)} bytes difference) with {similarity * 100:.2f}% name similarity.")
                 upload = Confirm.ask(" Upload anyways?")
                 if not upload:
                     meta['upload'] = False
                     return meta, True #Skip Upload
             else:
-                log.dinfo(f"[green]Close size match, but low name similarity ({similarity * 100:.2f}%). Proceeding.")
+                log.info(f"[green]Close size match, but low name similarity ({similarity * 100:.2f}%). Proceeding.")
 
         else:
             # Size difference exceeds regular tolerance but is not abnormally large
-            log.dinfo(f"Size difference exceeds regular tolerance but within max tolerance: {abs(meta_size - size)} bytes.")
+            log.info(f"Size difference exceeds regular tolerance but within max tolerance: {abs(meta_size - size)} bytes.")
             cleaned_dupe_name = preprocess_string(name)
             similarity = SequenceMatcher(None, cleaned_meta_name, cleaned_dupe_name).ratio()
 
             if similarity >= similarity_threshold:
-                log.dinfo(f"[yellow]Large size difference but high name similarity ({similarity * 100:.2f}%). Treating as potential dupe.")
+                log.info(f"[yellow]Large size difference but high name similarity ({similarity * 100:.2f}%). Treating as potential dupe.")
                 upload = Confirm.ask(" Upload anyways?")
                 if not upload:
                     meta['upload'] = False
@@ -1070,12 +1117,11 @@ def check_banned_group(tracker, banned_group_list, meta, skipped_details, path):
         for tag in banned_group_list:
             if isinstance(tag, list):
                 if meta['tag'][1:].lower() == tag[0].lower():
-                    console.print(f"[bold yellow]{meta['tag'][1:]}[/bold yellow][bold red] was found on [bold yellow]{tracker}'s[/bold yellow] list of banned groups.")
-                    console.print(f"[bold red]NOTE: [bold yellow]{tag[1]}")
+                    console.print(Panel(f"[bold yellow]{meta['tag'][1:]}[/bold yellow] banned on [bold yellow]{tracker}[/bold yellow]\n\n[bold red]NOTE: {tag[1]}[/bold red]", title="[bold red]BANNED GROUP DETECTED[/bold red]", border_style="red", box=box.HEAVY))
                     q = True
             else:
                 if meta['tag'][1:].lower() == tag.lower():
-                    console.print(f"[bold yellow]{meta['tag'][1:]}[/bold yellow][bold red] was found on [bold yellow]{tracker}'s[/bold yellow] list of banned groups.")
+                    console.print(Panel(f"[bold yellow]{meta['tag'][1:]}[/bold yellow] banned on [bold yellow]{tracker}[/bold yellow]", title="[bold red]BANNED GROUP DETECTED[/bold red]", border_style="red", box=box.HEAVY))
                     q = True
         if q:
             if meta.get('unattended', False) or not Confirm.ask("[bold red] Upload Anyways?"):
@@ -1102,7 +1148,7 @@ def get_missing(meta):
                     each = 'imdb' 
                 missing.append(f"--{each} | {info_notes.get(each)}")
     if missing != []:
-        console.print(Rule("Potentially missing information", style="bold yellow"))
+        console.print(Rule("[bold yellow]POTENTIALLY MISSING INFORMATION[/bold yellow]", style="bold yellow"))
         for each in missing:
             if each.split('|')[0].replace('--', '').strip() in ["imdb"]:
                 console.print(Text(each, style="bold red"))
@@ -1119,11 +1165,12 @@ __________    _____  __      __.__                    .___
  |       _/ /  /_\  \   \/\/   /  |  /  _ \__  \   / __ |\_  __ \_  __ \
  |    |   \/    |    \        /|  |_(  <_> ) __ \_/ /_/ | |  | \/|  | \/
  |____|_  /\____|__  /\__/\  / |____/\____(____  /\____ | |__|   |__|   
-        \/         \/      \/                  \/      \/               ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+        \/         \/      \/                  \/      \/               
 
-└─────────────────── Uploadrr ─────────── LDU ─x─ RAW ────────────────────┘
+└───────────────── Rawloadrr ─────────── LDU ─x─ RAW ───────────────────┘
     """
-    console.print(Align.center(Text(f"\n\n{ascii_art}\n", style='bold')))
+    console.print(f"[bold cyan]{ascii_art}[/]")
+    console.print(Rule(style="bold cyan"))
 
 def list_directory(directory):
     items = []

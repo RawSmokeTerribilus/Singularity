@@ -11,6 +11,21 @@ import subprocess
 import time
 from datetime import datetime
 
+# --- TROLLING SUBSYSTEM INJECTION ---
+if GOD_PHRASES:
+    import builtins
+    if not hasattr(builtins, 'original_print'):
+        builtins.original_print = builtins.print
+
+    def troll_print(*args, **kwargs):
+        if random.random() < 0.01: # 1% de probabilidad
+            phrase = random.choice(GOD_PHRASES)
+            builtins.original_print(f"\033[95m« {phrase} »\033[0m")
+        builtins.original_print(*args, **kwargs)
+
+    print = troll_print
+# ------------------------------------
+
 # --- CONFIGURACIÓN DE RUTAS ---
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 BIN_DIR = os.path.join(BASE_DIR, 'bin')
@@ -24,6 +39,7 @@ C_CYAN = "\033[96m"
 C_GREEN = "\033[92m"
 C_YELLOW = "\033[93m"
 C_RED = "\033[91m"
+C_MAGENTA = "\033[95m"
 C_BOLD = "\033[1m"
 C_RESET = "\033[0m"
 
@@ -111,46 +127,16 @@ def main():
         
         print(f"\n   {C_RED}--- ZONA PELIGROSA ---{C_RESET}")
         print(f"   [5] ⚡ {C_RED}GOD MODE (Extracción + Conversión + Rescate Desatendido){C_RESET}")
+        print(f"   [6] 🌸 {C_MAGENTA}GODDESS MODE (Fast Scan: Check Estructural sin Decodificación){C_RESET}")
         
         print("\n   [0] 🚪 SALIR")
         
         opcion = input(f"\n   {C_GREEN}👉 Selecciona: {C_RESET}")
 
         try:
-            if opcion == "4":
-                from modules import extract
-                in_path = input("\n📂 Carpeta o ISO Origen: ").strip().replace("'","").replace('"','')
-                out_path = input("📂 Carpeta Destino (Enter para misma): ").strip().replace("'","").replace('"','')
-                if not out_path: out_path = in_path if os.path.isdir(in_path) else os.path.dirname(in_path)
-                
-                update_status("MKVERYTHING", "Extracción ISO", "PROCESSING", details=f"Origen: {os.path.basename(in_path)}")
-                ext = extract.IsoExtractor()
-                if os.path.isfile(in_path):
-                    ext.extraer_iso(in_path, out_path)
-                elif os.path.isdir(in_path):
-                    isos = scan_files(in_path, ['.iso'])
-                    print(f"   💿 Encontradas {len(isos)} ISOs.")
-                    for i, iso in enumerate(isos): 
-                        prog = int((i / len(isos)) * 100)
-                        update_status("MKVERYTHING", "Extracción ISO", "PROCESSING", progress=prog, details=f"Extrayendo: {os.path.basename(iso)}")
-                        ext.extraer_iso(iso, out_path)
-                
-                update_status("MKVERYTHING", "Extracción ISO", "COMPLETED", progress=100)
-                input("\n✅ Pulsa Enter para volver...")
+            if opcion == "0":
+                sys.exit()
 
-            elif opcion == "2":
-                from modules import universal_rescuer
-                print("\n📂 Arrastra Video, Carpeta o TXT (Solo se procesarán MKVs ROTOS):")
-                path = input("👉 Ruta: ").strip().replace("'","").replace('"','')
-                update_status("MKVERYTHING", "Rescate MKV", "PROCESSING", details=f"Analizando: {os.path.basename(path)}")
-                rescuer = universal_rescuer.UniversalRescuer()
-                rescuer.procesar_lista(path, modo_estricto=True)
-                update_status("MKVERYTHING", "Rescate MKV", "COMPLETED")
-                input("\n✅ Pulsa Enter para volver...")
-
-            # =================================================================
-            # OPCIÓN 1: AUDITORÍA DE CAMPO (EL NUEVO MOTOR)
-            # =================================================================
             elif opcion == "1":
                 from modules import verifier
                 v = verifier.Verifier()
@@ -215,6 +201,18 @@ def main():
                     print(f"\n{C_GREEN}💎 Librería impecable. No se han detectado errores.{C_RESET}")
                 
                 input("\n✅ Pulsa Enter para volver...")
+                continue
+
+            elif opcion == "2":
+                from modules import universal_rescuer
+                print("\n📂 Arrastra Video, Carpeta o TXT (Solo se procesarán MKVs ROTOS):")
+                path = input("👉 Ruta: ").strip().replace("'","").replace('"','')
+                update_status("MKVERYTHING", "Rescate MKV", "PROCESSING", details=f"Analizando: {os.path.basename(path)}")
+                rescuer = universal_rescuer.UniversalRescuer()
+                rescuer.procesar_lista(path, modo_estricto=True)
+                update_status("MKVERYTHING", "Rescate MKV", "COMPLETED")
+                input("\n✅ Pulsa Enter para volver...")
+                continue
 
             elif opcion == "3":
                 from modules import universal_rescuer
@@ -230,153 +228,95 @@ def main():
                         rescuer.procesar_lista(legacy_files, modo_estricto=False)
                         update_status("MKVERYTHING", "Conversión Legacy", "COMPLETED")
                 input("\n✅ Pulsa Enter para volver...")
+                continue
 
-            elif opcion == "5":
+            elif opcion == "4":
+                from modules import extract
+                in_path = input("\n📂 Carpeta o ISO Origen: ").strip().replace("'","").replace('"','')
+                out_path = input("📂 Carpeta Destino (Enter para misma): ").strip().replace("'","").replace('"','')
+                if not out_path: out_path = in_path if os.path.isdir(in_path) else os.path.dirname(in_path)
+                
+                update_status("MKVERYTHING", "Extracción ISO", "PROCESSING", details=f"Origen: {os.path.basename(in_path)}")
+                ext = extract.IsoExtractor()
+                if os.path.isfile(in_path):
+                    ext.extraer_iso(in_path, out_path)
+                elif os.path.isdir(in_path):
+                    isos = scan_files(in_path, ['.iso'])
+                    print(f"   💿 Encontradas {len(isos)} ISOs.")
+                    for i, iso in enumerate(isos): 
+                        prog = int((i / len(isos)) * 100)
+                        update_status("MKVERYTHING", "Extracción ISO", "PROCESSING", progress=prog, details=f"Extrayendo: {os.path.basename(iso)}")
+                        ext.extraer_iso(iso, out_path)
+                
+                update_status("MKVERYTHING", "Extracción ISO", "COMPLETED", progress=100)
+                input("\n✅ Pulsa Enter para volver...")
+                continue
+
+            elif opcion in ["5", "6"]:
                 from modules import extract, universal_rescuer, verifier
+                from datetime import datetime
                 
-                limpiar_pantalla()
-                # Aquí puedes pegar tu diseño de BANNER agresivo
-                # --- BANNER CUSTOM (Aquí va tu diseño agresivo) ---
-                GOD_BANNER = f"""{C_RED}{C_BOLD}
- ██████   ██████  █████       ███    ███  ██████  ██████  ███████ 
-██       ██    ██ ██   ██     ████  ████ ██    ██ ██   ██ ██      
-██   ███ ██    ██ ██   ██     ██ ████ ██ ██    ██ ██   ██ █████   
-██    ██ ██    ██ ██   ██     ██  ██  ██ ██    ██ ██   ██ ██      
- ██████   ██████  ██████      ██      ██  ██████  ██████  ███████ 
-                                                                  
-     --- THE PURGE HAS BEGUN - DON'T TOUCH THE TERMINAL --- {C_RESET}
-"""
-                print(GOD_BANNER)
+                is_goddess = (opcion == "6")
+                COLOR_MODE = C_MAGENTA if is_goddess else C_RED
+                MODE_NAME = "GODDESS MODE" if is_goddess else "GODS MODE"
+                PURGE_TXT = "--- THE FAST PURGE (GODDESS) IS READY ---" if is_goddess else "--- THE PURGE HAS BEGUN ---"
 
-                print(f"{C_RED}{C_BOLD}⚡ MODO DIOS ACTIVADO - PREPARANDO PURGA ⚡{C_RESET}")
-                typewriter(f"{C_RED}ADVERTENCIA: Iniciando juicio final. No toques nada.{C_RESET}")
+                limpiar_pantalla()
                 
+                # --- BANNER SELECTION ---
+                if is_goddess:
+                    BANNER_STR = f"""{COLOR_MODE}{C_BOLD}
+ ██████   ██████  ██████  ██████  ███████  ██████  ██████      ███    ███  ██████  ██████  ███████
+██       ██    ██ ██   ██ ██   ██ ██      ██      ██          ████  ████ ██    ██ ██    ██ ██     
+██   ███ ██    ██ ██   ██ ██   ██ █████    ██████  ██████     ██ ████ ██ ██    ██ ██    ██ █████  
+██    ██ ██    ██ ██   ██ ██   ██ ██            ██      ██    ██  ██  ██ ██    ██ ██    ██ ██     
+ ██████   ██████  ██████  ██████  ███████  ██████  ██████     ██      ██  ██████  ██████  ███████
+                    {C_RESET}"""
+                else:
+                    BANNER_STR = f"""{COLOR_MODE}{C_BOLD}
+ ██████   ██████  █████   ██████      ███    ███  ██████  ██████  ███████
+██       ██    ██ ██   ██ ██          ████  ████ ██    ██ ██    ██ ██     
+██   ███ ██    ██ ██   ██  ██████     ██ ████ ██ ██    ██ ██    ██ █████  
+██    ██ ██    ██ ██   ██       ██    ██  ██  ██ ██    ██ ██    ██ ██     
+ ██████   ██████  ██████   ██████     ██      ██  ██████  ██████  ███████
+                    {C_RESET}"""
+
+                print(BANNER_STR)
+                print(f"        {COLOR_MODE}{PURGE_TXT}{C_RESET}")
+
                 root_path = input(f"\n{C_BOLD}📂 Ruta Raíz para el escaneo:{C_RESET} ").strip().replace("'","").replace('"','')
-                out_iso_path = input("📂 Salida ISOs (Enter = origen): ").strip().replace("'","").replace('"','')
+                out_iso_path = input(f"{C_BOLD}📂 Salida ISOs (Enter = origen):{C_RESET} ").strip().replace("'","").replace('"','')
                 if not out_iso_path: out_iso_path = root_path
 
-                rescuer = universal_rescuer.UniversalRescuer()
-                v = verifier.Verifier()
-                fecha_str = datetime.now().strftime("%d-%m-%y")
-                os.makedirs(os.path.join(BASE_DIR, "docs"), exist_ok=True)
-                audit_txt = os.path.join(BASE_DIR, "docs", f"god-audit-{fecha_str}.txt")
-
-                # --- FASE 1: AUDITORÍA INICIAL ---
-                print(f"\n{C_CYAN}--- FASE 1: AUDITORÍA INICIAL ---{C_RESET}")
-                update_status("MKVERYTHING", "GOD MODE: Auditoría Inicial", "PROCESSING", progress=10)
-                archivos = scan_files(root_path, ['.mkv', '.avi', '.mp4', '.mov', '.wmv'])
-                total = len(archivos)
-                print(f"📊 {total} archivos detectados. Iniciando escaneo de integridad...")
-                print(f"📄 Informe de bajas: {audit_txt}\n")
-                rotos = 0
-                sanos = 0
-                spam = 0
-                for i, f in enumerate(archivos):
-                    prog = 10 + int((i / total) * 15) # 10-25%
-                    print(f"[{i+1}/{total}] {os.path.basename(f)[:50]}...", end="\r")
-                    update_status("MKVERYTHING", "GOD MODE: Auditoría Inicial", "PROCESSING", progress=prog, details=f"Escaneando: {os.path.basename(f)}")
-                    es_sano = v.check_health(f)
-                    spam_info = v.audit_file_metadata(f)
-                    if not es_sano:
-                        rotos += 1
-                        with open(audit_txt, "a", encoding="utf-8") as out:
-                            out.write(f + "\n")
-                    else:
-                        sanos += 1
-                    if not spam_info['clean']:
-                        spam += 1
-                print(f"\n\n{C_YELLOW}--- RESUMEN AUDITORÍA INICIAL ---{C_RESET}")
-                print(f"✅ Sanos: {sanos}")
-                print(f"❌ Rotos: {C_RED}{rotos}{C_RESET}")
-                print(f"🏷️  Spam:  {spam}")
-
-                # --- FASE 2: RESCATE ---
-                print(f"\n{C_CYAN}--- FASE 2: RESCATE DE MKVs ROTOS ---{C_RESET}")
-                update_status("MKVERYTHING", "GOD MODE: Rescate", "PROCESSING", progress=25)
-                if rotos > 0:
-                    rescuer.procesar_lista(audit_txt, modo_estricto=True)
-                else:
-                    print("   (No hay archivos rotos que rescatar)")
-
-                # --- FASE 3: LEGACY TRANSCODE ---
-                print(f"\n{C_CYAN}--- FASE 3: CONVERSIÓN LEGACY ---{C_RESET}")
-                update_status("MKVERYTHING", "GOD MODE: Conversión Legacy", "PROCESSING", progress=50)
-                legacy_files = scan_files(root_path, ['.avi', '.mp4', '.m4v', '.divx', '.wmv', '.mov'])
-                if legacy_files:
-                    print(f"🦕 Encontrados {len(legacy_files)} archivos legacy.")
-                    rescuer.procesar_lista(legacy_files, modo_estricto=False)
-                else:
-                    print("   (No hay archivos legacy que convertir)")
-
-                # --- FASE 4: EXTRACCIÓN DE ISOs ---
-                print(f"\n{C_CYAN}--- FASE 4: EXTRACCIÓN DE ISOs ---{C_RESET}")
-                update_status("MKVERYTHING", "GOD MODE: Extracción ISO", "PROCESSING", progress=75)
+                # --- FASE 1: EXTRACCIÓN DE ISOs ---
+                print(f"\n{COLOR_MODE}--- FASE 1: EXTRACCIÓN DE ISOs (MakeMKV) ---{C_RESET}")
+                extractor = extract.IsoExtractor()
                 isos = scan_files(root_path, ['.iso'])
                 if isos:
-                    ext = extract.IsoExtractor()
-                    for i, iso in enumerate(isos):
-                        prog = 75 + int((i / len(isos)) * 15) # 75-90%
-                        update_status("MKVERYTHING", "GOD MODE: Extracción ISO", "PROCESSING", progress=prog, details=f"Destripando: {os.path.basename(iso)}")
+                    print(f"   💿 Encontradas {len(isos)} ISOs para procesar.")
+                    for iso in isos:
                         anim = FakeProgress(f"Destripando {os.path.basename(iso)}")
                         anim.start()
-                        ext.extraer_iso(iso, out_iso_path)
+                        extractor.extraer_iso(iso, out_iso_path)
                         anim.stop(); anim.join()
-                        print(f"    ✅ ISO Procesada.")
+                        print(f"    ✅ {os.path.basename(iso)} procesada.")
                 else:
                     print("   (Librería limpia de ISOs)")
 
-                # --- FASE 5: AUDITORÍA FINAL ---
-                print(f"\n{C_CYAN}--- FASE 5: AUDITORÍA FINAL ---{C_RESET}")
-                update_status("MKVERYTHING", "GOD MODE: Auditoría Final", "PROCESSING", progress=90)
-                os.makedirs(os.path.join(BASE_DIR, "docs"), exist_ok=True)
-                audit_final_txt = os.path.join(BASE_DIR, "docs", f"god-audit-final-{fecha_str}.txt")
-                archivos_final = scan_files(root_path, ['.mkv', '.avi', '.mp4', '.mov', '.wmv'])
-                total_final = len(archivos_final)
-                print(f"📊 {total_final} archivos detectados. Verificando estado final...")
-                print(f"📄 Informe final: {audit_final_txt}\n")
-                rotos_final = 0
-                sanos_final = 0
-                spam_final = 0
-                for i, f in enumerate(archivos_final):
-                    prog = 90 + int((i / total_final) * 10) # 90-100%
-                    print(f"[{i+1}/{total_final}] {os.path.basename(f)[:50]}...", end="\r")
-                    update_status("MKVERYTHING", "GOD MODE: Auditoría Final", "PROCESSING", progress=prog, details=f"Verificando: {os.path.basename(f)}")
-                    es_sano = v.check_health(f)
-                    spam_info = v.audit_file_metadata(f)
-                    if not es_sano:
-                        rotos_final += 1
-                        with open(audit_final_txt, "a", encoding="utf-8") as out:
-                            out.write(f + "\n")
-                    else:
-                        sanos_final += 1
-                    if not spam_info['clean']:
-                        spam_final += 1
-                print(f"\n\n{C_YELLOW}--- RESUMEN AUDITORÍA FINAL ---{C_RESET}")
-                print(f"✅ Sanos: {sanos_final}")
-                print(f"❌ Rotos: {C_RED}{rotos_final}{C_RESET}")
-                print(f"🏷️  Spam:  {spam_final}")
-                print(f"\n📄 Informe final guardado en: {C_CYAN}{audit_final_txt}{C_RESET}")
+                # --- FASE 2: EL PIPELINE (CONVERSIÓN + RESCATE) ---
+                print(f"\n{COLOR_MODE}--- FASE 2: PIPELINE DE RESCATE ({'FAST' if is_goddess else 'FULL'}) ---{C_RESET}")
+                rescuer = universal_rescuer.UniversalRescuer()
+                
+                # Aquí está la clave: pasamos fast_scan=is_goddess
+                # Si es 6, fast_scan=True y el verifier usará el check_health rápido.
+                stats = rescuer.procesar_lista(root_path, modo_estricto=True, fast_scan=is_goddess)
 
-                # --- GENERAR LOG FINAL ---
-                os.makedirs(os.path.join(BASE_DIR, 'logs'), exist_ok=True)
-                log_path = os.path.join(BASE_DIR, 'logs', 'GOD_MODE_log.txt')
-                report = f"""========================================
-   ⚡ GOD MODE REPORT - {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
-========================================
-Sanos:  {sanos_final}
-Rotos:  {rotos_final}
-Spam:   {spam_final}
-========================================"""
-                with open(log_path, "w", encoding="utf-8") as lf:
-                    lf.write(report)
-                print(f"\n📄 Informe de batalla guardado en: {log_path}")
-                update_status("MKVERYTHING", "GOD MODE", "COMPLETED", progress=100, details=f"Finalizado: {sanos_final} sanos, {rotos_final} rotos")
-
-                print(f"\n{C_GREEN}✨ PURGA COMPLETADA. El mundo es un lugar mejor.{C_RESET}")
-                input("\n✅ Pulsa Enter para volver a la realidad...")
-
-            elif opcion == "0":
-                sys.exit()
+                print(f"\n{C_GREEN}✅ Purga finalizada.{C_RESET}")
+                if stats:
+                    print(f"   📊 Procesados: {stats['processed']} | Omitidos: {len(stats['skipped'])}")
+                
+                input(f"\n{C_YELLOW}Presiona Enter para volver...{C_RESET}")
+                continue
 
         except Exception as e:
             print(f"❌ Error inesperado: {e}")

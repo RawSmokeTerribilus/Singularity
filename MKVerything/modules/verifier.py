@@ -52,15 +52,15 @@ class Verifier:
         return ""
 
     # =========================================================================
-    # DIAGNÓSTICO DE SALUD (ESCRUPULOSO)
+    # DIAGNÓSTICO DE SALUD
     # =========================================================================
 
-    def check_health(self, filepath):
+    def check_health(self, filepath, fast_mode=False):  # <--- Adición del flag
         """
-        AUDITORÍA COMPLETA DE INTEGRIDAD:
+        AUDITORÍA DE INTEGRIDAD:
         1. Estructural (mkvmerge -J).
         2. Metadatos (ffprobe).
-        3. Decodificación FULL (ffmpeg null scan).
+        3. Decodificación FULL (Solo si fast_mode es False).
         """
         # 1. Prueba Estructural MKV
         if filepath.lower().endswith(".mkv"):
@@ -83,10 +83,12 @@ class Verifier:
             if tracks['video'] == 0: return False
         except: return False
 
-        # 3. PRUEBA DE FUEGO: Decodificación Completa (Sin límite de tiempo)
+        # --- PULICIÓN DIOSA: Salto de decodificación ---
+        if fast_mode:
+            return True
+
+        # 3. PRUEBA DE FUEGO: Decodificación Completa
         try:
-            # -xerror: detiene el proceso al primer error de decodificación
-            # -f null -: no genera salida, solo procesa el chorro de datos
             cmd_decode = ["ffmpeg", "-v", "error", "-xerror", "-i", filepath, "-f", "null", "-"]
             subprocess.run(cmd_decode, check=True, stderr=subprocess.PIPE)
         except subprocess.CalledProcessError:

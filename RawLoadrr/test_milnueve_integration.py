@@ -165,21 +165,38 @@ async def test_config():
 
 
 async def test_upload_py():
-    """Test that upload.py has MILNU in tracker list"""
-    print("\n📋 Testing upload.py...")
+    """Test that trackers_registry.json contains MILNU and that upload.py loads it dynamically"""
+    print("\n📋 Testing tracker registry (trackers_registry.json)...")
+    import json, os
+    registry_candidates = [
+        os.path.join(os.path.dirname(__file__), 'src', 'trackers', 'trackers_registry.json'),
+        os.path.join('src', 'trackers', 'trackers_registry.json'),
+    ]
     try:
-        # This would require importing upload.py which might have side effects
-        # So we just check file content instead
-        with open('upload.py', 'r') as f:
-            content = f.read()
-            assert "'MILNU'" in content, "MILNU not found in upload.py"
-            assert "'api': ['ACM', 'AITHER'," in content, "tracker_data not found"
-        
-        print("  ✓ MILNU in upload.py tracker list")
-        print("✅ upload.py: OK")
+        registry_path = next(p for p in registry_candidates if os.path.isfile(p))
+        with open(registry_path, 'r') as f:
+            registry = json.load(f)
+        assert 'MILNU' in registry, "MILNU not found in trackers_registry.json"
+        assert registry['MILNU'] == 'api', f"MILNU type should be 'api', got '{registry['MILNU']}'"
+
+        upload_py_path = next(
+            (p for p in [
+                os.path.join(os.path.dirname(__file__), 'upload.py'),
+                'upload.py',
+            ] if os.path.isfile(p)), None
+        )
+        assert upload_py_path, "upload.py not found"
+        with open(upload_py_path, 'r') as f:
+            upload_content = f.read()
+        assert '_load_tracker_registry' in upload_content, "Dynamic loader not found in upload.py"
+        assert 'trackers_registry.json' in upload_content, "Registry path reference not found in upload.py"
+
+        print("  ✓ MILNU in trackers_registry.json (type=api)")
+        print("  ✓ upload.py uses dynamic _load_tracker_registry()")
+        print("✅ Tracker registry: OK")
         return True
     except Exception as e:
-        print(f"❌ upload.py: FAILED - {e}")
+        print(f"❌ Tracker registry: FAILED - {e}")
         return False
 
 

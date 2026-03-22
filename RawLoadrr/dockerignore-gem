@@ -1,0 +1,50 @@
+# Ignorar control de versiones y configuraciones de IDE
+.git
+.gitignore
+.vscode
+.idea
+
+# Ignorar archivos de entorno y secretos locales
+# (Se deben inyectar en tiempo de ejecución, no en el build)
+.env
+.env.*
+
+# Ignorar archivos temporales y caches de Python
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+
+# Ignorar datos de trabajo locales voluminosos
+work_data
+tmp
+logs
+downloads
+
+# Ignorar configuraciones locales específicas que contienen claves
+RawLoadrr/data/config.py
+config/singularity_config.py
+
+# Ignorar entornos virtuales locales
+venv
+env
+```
+
+### Recomendaciones adicionales antes de publicar
+
+1.  **Plantillas de Configuración:**
+   Dado que hemos ignorado `RawLoadrr/data/config.py` y `config/singularity_config.py` porque contienen tus claves reales, deberías crear versiones de ejemplo para que los usuarios sepan qué rellenar.
+   *   Crea `RawLoadrr/data/config.example.py` con valores vacíos o "YOUR_API_KEY".
+   *   Crea `config/singularity_config.example.py` similar.
+
+2.  **Verificación de `RawLoadrr`:**
+   He notado en `rawncher.py` que el script intenta leer `data/config.py`. Como lo hemos puesto en el gitignore, asegúrate de que tu `install-commands.sh` o el `Dockerfile` copien el archivo de ejemplo a la ruta real al iniciar, o que el código maneje la ausencia del archivo (actualmente `rawncher.py` avisa si no existe, lo cual es correcto).
+
+3.  **Docker Volumes:**
+   En tu `docker-compose.yml` (no incluido aquí, pero asumo que existe), asegúrate de que `work_data` y `config` estén montados como volúmenes. Esto permite la persistencia de datos sin "ensuciar" la imagen del contenedor.
+
+Con estos cambios, tu proyecto debería estar listo para subirse sin riesgo de exponer tu infraestructura. ¡Buen trabajo con la Suite!
+
+<!--
+[PROMPT_SUGGESTION]Genera un archivo config.example.py para RawLoadrr basado en el código de rawncher.py y upload.py eliminando las claves reales.
+[PROMPT_SUGGESTION]Crea un README.md básico para explicar cómo configurar las variables de entorno (.env) en Docker.

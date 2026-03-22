@@ -5,7 +5,8 @@ import os
 parser = argparse.ArgumentParser(description="Subida masiva automática de torrents")
 parser.add_argument("--list", dest="lista", default=None, metavar="RUTA", help="Ruta al fichero de lista de tareas")
 parser.add_argument("--tracker", dest="tracker", default="MILNU", metavar="NOMBRE", help="Nombre del tracker a usar")
-args = parser.parse_args()
+# Capturar cualquier argumento extra para pasarlo a upload.py
+args, unknown_args = parser.parse_known_args()
 
 LISTA_TAREAS = args.lista or "todo-hevc-22-02-26.txt"
 TRACKER_NAME = args.tracker
@@ -31,9 +32,8 @@ def main():
         comando = [
             "python3", SCRIPT_UPLOAD,
             "--tracker", TRACKER_NAME,
-            "--input", ruta,
-            "--skip-dupe-check"
-        ]
+            "--input", ruta
+        ] + unknown_args # Añadimos los argumentos extra
         
         # 'palante como los de alicante': si falla, sigue con el siguiente
         subprocess.run(comando)

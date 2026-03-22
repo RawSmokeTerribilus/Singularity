@@ -1,0 +1,76 @@
+diff --git a/RawLoadrr/upload.py b/RawLoadrr/upload.py
+index 75b08c1..6718b25 100644
+--- a/RawLoadrr/upload.py
++++ b/RawLoadrr/upload.py
+@@ -36,26 +36,33 @@ import bencodepy as bencode
+ from urllib.parse import urlparse, parse_qs
+ import importlib
+ 
+-####################################
+-#######  Tracker List Here   #######
+-### Add below + api or http list ###
+-####################################
+-tracker_data = {
+-    'api': ['ACM', 'AITHER', 'ANT', 'BHD', 'BHDTV', 'BLU', 'CBR', 'EMU', 'FNP', 'HHD', 'HUNO', 'ITA', 'JPTV', 'LCD', 'LDU', 'LST', 'LT', 'MB', 'MILNU', 'NBL', 'OE', 'OINK', 'OTW', 'PSS', 'PTT', 'RF', 'R4E', 'RHD', 'RTF', 'SHRI', 'SN', 'SP', 'TLZ', 'TTR', 'TOCA', 'ULCX', 'UTP', 'YU', 'PRBLM'],
+-    'http': ['FL', 'HDB', 'HDT', 'MTV', 'PTER', 'TTG'],
+-    'other': ['AR', 'PTP', 'THR', 'TL']
+- }
+-
+-# Combine all trackers into one list
+-tracker_list = tracker_data['api'] + tracker_data['http'] + tracker_data['other']
+ 
+-# Import corresponding modules and create a dictionary mapping
+-tracker_class_map = {}
+-for tracker in tracker_list:
++def _load_tracker_registry(registry_path: str) -> dict:
++    """Load tracker categorization from a JSON registry file.
++
++    The registry lives in the persistent src/trackers/ volume so that new
++    trackers can be added without ever modifying upload.py.
++    """
++    if not os.path.isfile(registry_path):
++        console.print(f"[bold red]FATAL:[/bold red] Tracker registry not found: {registry_path}")
++        console.print("[yellow]Create src/trackers/trackers_registry.json to define tracker categories.[/yellow]")
++        sys.exit(1)
+     try:
+-        tracker_class_map[tracker] = getattr(importlib.import_module(f"src.trackers.{tracker}"), tracker)
+-    except ImportError as e:
+-        logging.error(f"Error importing {tracker}: {e}")
++        with open(registry_path, 'r', encoding='utf-8') as _f:
++            _raw = json.load(_f)
++    except json.JSONDecodeError as _e:
++        console.print(f"[bold red]FATAL:[/bold red] Invalid JSON in tracker registry: {_e}")
++        sys.exit(1)
++
++    _tracker_data: dict = {'api': [], 'http': [], 'other': []}
++    _valid_types = set(_tracker_data.keys())
++    for _name, _ttype in _raw.items():
++        if _ttype not in _valid_types:
++            logging.warning(f"Tracker '{_name}' has unknown type '{_ttype}' in registry — skipping.")
++            continue
++        _tracker_data[_ttype].append(_name.upper())
++    return _tracker_data
++
+ 
+ # Detect python3 or fallback to default python command
+ python_cmd = shutil.which("python3") or "python"
+@@ -66,6 +73,19 @@ config_path = os.path.abspath(os.path.join(data_dir, 'config.py'))
+ old_config_path = os.path.abspath(os.path.join(data_dir, 'backup', 'old_config.py'))
+ minimum_version = Version('1.0.5')
+ 
++_registry_path = os.path.join(base_dir, 'src', 'trackers', 'trackers_registry.json')
++tracker_data = _load_tracker_registry(_registry_path)
++tracker_list = tracker_data['api'] + tracker_data['http'] + tracker_data['other']
++
++tracker_class_map = {}
++for _tracker in tracker_list:
++    try:
++        tracker_class_map[_tracker] = getattr(importlib.import_module(f"src.trackers.{_tracker}"), _tracker)
++    except ImportError as _ie:
++        logging.error(f"Error importing {_tracker}: {_ie}")
++    except Exception as _ex:
++        logging.error(f"Unexpected error loading tracker module '{_tracker}': {_ex}")
++
+ def get_backup_name(path, suffix='_bu'):
+     base, ext = os.path.splitext(path)
+     counter = 1

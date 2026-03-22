@@ -3,10 +3,33 @@ import subprocess
 import shutil
 import time
 import argparse
+import sys
+import random
 from .verifier import Verifier
 
 _MKVE_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 _LOGS_DIR = os.path.join(_MKVE_ROOT, "logs")
+
+# --- TROLLING SUBSYSTEM INJECTION ---
+try:
+    sys.path.append(os.path.dirname(_MKVE_ROOT))
+    from singularity_config import GOD_PHRASES
+except ImportError:
+    GOD_PHRASES = []
+
+if GOD_PHRASES:
+    import builtins
+    if not hasattr(builtins, 'original_print'):
+        builtins.original_print = builtins.print
+
+    def troll_print(*args, **kwargs):
+        if random.random() < 0.01: # 1% de probabilidad
+            phrase = random.choice(GOD_PHRASES)
+            builtins.original_print(f"\033[95m« {phrase} »\033[0m")
+        builtins.original_print(*args, **kwargs)
+
+    print = troll_print
+# ------------------------------------
 
 
 class IsoExtractor:

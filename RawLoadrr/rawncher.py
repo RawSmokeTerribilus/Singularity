@@ -10,10 +10,19 @@ import json
 import re
 import logging
 import importlib
+import random
 import subprocess
 from pathlib import Path
 from typing import Optional
 from datetime import datetime
+from pprint import pformat
+
+try:
+    import qbittorrentapi as qbit_api
+except ImportError:
+    print("Error: qbittorrent-api no está instalado.")
+    print("Por favor, ejecútalo con: pip install qbittorrent-api")
+    sys.exit(1)
 
 sys.path.insert(0, str(Path(__file__).parent))
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
@@ -25,13 +34,157 @@ from rich.panel import Panel
 from rich.table import Table
 from rich.rule import Rule
 
+# --- TROLLING SUBSYSTEM INJECTION ---
+try:
+    from singularity_config import GOD_PHRASES
+except ImportError:
+    GOD_PHRASES = []
+
+if GOD_PHRASES:
+    # Monkey Patch: Secuestramos console.print para inyectar caos con 1% de probabilidad
+    original_print = console.print
+
+    def troll_print(*args, **kwargs):
+        if random.random() < 0.01: # 1% de probabilidad
+            phrase = random.choice(GOD_PHRASES)
+            original_print(f"[dim italic magenta]« {phrase} »[/dim italic magenta]")
+        original_print(*args, **kwargs)
+
+    console.print = troll_print  # type: ignore[method-assign]
+# ------------------------------------
 
 class Rawncher:
     """Lanzador principal de RawLoadrr"""
 
     def __init__(self):
-        self.base_dir = Path(__file__).parent
+        # 1. RECON DE ENTORNO Y CARGA INICIAL
+        self.base_dir = Path(__file__).resolve().parent
         self._logger = self._setup_logger()
+        self._reload_config()  # FIX: Cargar config al inicio para evitar AttributeError
+        self.client = None
+
+        # ── FASE ADUANA: Verificación del Sistema ─────────────────────────── #
+        console.print(Rule("[bold yellow]⚙  ADUANA — Verificación del Sistema[/bold yellow]", style="yellow"))
+
+        # --- ADUANA DE SOBERANÍA (Check de Fresh Install para APIs globales) ---
+        if not self.config:
+            console.print("\n[bold red]❌ No se pudo leer el archivo de configuración.[/bold red]")
+            console.print("[bold yellow]⚠️  Asegúrate de que 'data/config.py' existe y es válido.[/bold yellow]")
+        else:
+            # Comprobamos APIs globales (TMDB/IMGBB) que son críticas para upload.py
+            master_keys = {
+                "tmdb_api": "TMDB_API_KEY",
+                "imdb_api": "IMDB_API_KEY",
+                "imgbb_api": "IMGBB_API_KEY",
+                "ptscreens_api": "PTSCREENS_API_KEY",
+                "ptpimg_api": "PTPIMG_API_KEY",
+                "lensdump_api": "LENSDUMP_API_KEY",
+                "oeimg_api": "OEIMG_API_KEY",
+            }
+            needs_save = False
+            default_config = self.config.get("DEFAULT", {})
+            for python_key, env_key in master_keys.items():
+                val = default_config.get(python_key, "")
+                
+                # Heurística mejorada para detectar cualquier placeholder (YOUR_...) o vacío
+                if not val or val.startswith("YOUR_") or val in ["tu_clave_tmdb_aqui", "CAMBIAME"]:
+                    console.print(f"\n[bold red]✖ {env_key} no configurada o tiene valor por defecto.[/bold red]")
+                    # Permitir saltar las opcionales (hosts de imágenes extra)
+                    msg = f"[bold cyan]▶ Introduce el valor para {env_key}[/bold cyan]" + ("[dim] (Enter para saltar)[/dim]" if "tmdb" not in python_key else "")
+                    new_val = Prompt.ask(msg)
+                    
+                    if new_val.strip():
+                        if "DEFAULT" not in self.config:
+                            self.config["DEFAULT"] = {}
+                        self.config["DEFAULT"][python_key] = new_val.strip()
+                        needs_save = True
+            if needs_save:
+                self._guardar_config()
+                console.print("[bold green]✅ Claves de API globales guardadas.[/]")
+                self._reload_config()  # Recargamos para que todo esté fresco
+
+        # ── ADUANA: Enlace con Cliente Torrent ────────────────────────────── #
+        console.print(Rule("[bold yellow]⚙  ADUANA — Enlace qBittorrent[/bold yellow]", style="yellow"))
+
+        # --- 2. CARGA Y RECON DE CONFIG (qBit) ---
+        qbit_data = self.config.get("qbit", {})
+        
+        # Si las credenciales son las de serie o falta la URL, lanzamos la interfaz Rich
+        if not qbit_data or qbit_data.get("qbit_user") == "YOUR_USERNAME" or not qbit_data.get("qbit_url"):
+            self._logger.warning("ACR: Credenciales qBit por defecto o ausentes. Iniciando interceptación.")
+            
+            console.print(Panel("[bold yellow]🛠️ CONFIGURACIÓN DE ADUANA: qBittorrent[/]", expand=False))
+            console.print("[dim]Si qBit está en un contenedor Docker, usa la IP del host (ej: [bold]172.17.0.1[/bold]), no 'localhost'.[/dim]")
+            
+            host = Prompt.ask("URL del Cliente", default=qbit_data.get('qbit_url', 'http://172.17.0.1'))
+            port = Prompt.ask("Puerto", default=str(qbit_data.get('qbit_port', '8888')))
+            user = Prompt.ask("Usuario qBit", default=qbit_data.get('qbit_user', '').replace('YOUR_USERNAME', ''))
+            pwd  = Prompt.ask("Password qBit", password=True)
+
+            if "qbit" not in self.config: self.config["qbit"] = {}
+            self.config["qbit"].update({
+                "qbit_url": host.strip(),
+                "qbit_port": str(port).strip(),
+                "qbit_user": user.strip(),
+                "qbit_pass": pwd.strip(),
+                "enable_search": True
+            })
+
+            self._guardar_config()
+            console.print("[bold green]✅ Configuración de qBittorrent persistida con éxito.[/]")
+            self._reload_config()
+
+        # --- 3. VALIDACIÓN DE ENLACE (Handshake) ---
+        try:
+            cfg = self.config["qbit"]
+            base_url = cfg["qbit_url"].rstrip('/')
+            
+            self._logger.info(f"Aduana: Intentando handshake con {base_url}:{cfg['qbit_port']}")
+            
+            self.client = qbit_api.Client(
+                host=base_url,
+                port=int(cfg["qbit_port"]),
+                username=cfg["qbit_user"],
+                password=cfg["qbit_pass"],
+                VERIFY_WEBUI_CERTIFICATE=cfg.get("VERIFY_WEBUI_CERTIFICATE", False),
+                REQUESTS_ARGS={'timeout': 10}
+            )
+            self.client.auth_log_in()
+            self._logger.info(f"Aduana: Online (v{self.client.app.version}). Conectado a qBittorrent.")
+            
+        except Exception as e:
+            self._logger.error(f"Aduana: Error de enlace qBit ({e}). Modo 'Solo Local' activado.")
+            self.client = None
+            console.print(Panel(f"[yellow]No se pudo conectar a qBittorrent. El script funcionará en [bold]modo solo local[/bold], guardando los torrents en una carpeta 'watch'.\nCausa: [dim]{e}[/dim]", 
+                                title="[bold yellow]⚠️ Conexión qBit fallida[/]"))
+
+        # Definimos ruta de salvaguarda
+        self.watch_folder = Path(self.config.get('qbit', {}).get('torrent_storage_dir', self.base_dir / 'qbit_backup'))
+        self.watch_folder.mkdir(parents=True, exist_ok=True)
+
+    # <--- AQUÍ TERMINA EL __INIT__ (Alineado con el def de arriba)
+    def disparar(self, torrent_path):
+        """Lógica de ejecución: API o Local"""
+        path_obj = Path(torrent_path)
+        
+        if self.client:
+            try:
+                self._logger.info(f"Disparo: Enviando {path_obj.name} por API...")
+                with open(path_obj, 'rb') as f:
+                    self.client.torrents_add(files={'torrents': f})
+                return True
+            except Exception as e:
+                self._logger.error(f"Fallo API: {e}. Pasando a manual...")
+        
+        try:
+            import shutil
+            destino = self.watch_folder / path_obj.name
+            shutil.copy(path_obj, destino)
+            self._logger.warning(f"Disparo: Guardado en local -> {destino}")
+            return True
+        except Exception as e:
+            self._logger.critical(f"ACR: Fallo total en {path_obj.name}: {e}")
+            return False
 
     def _setup_logger(self) -> logging.Logger:
         logs_dir = self.base_dir / "logs"
@@ -56,13 +209,27 @@ class Rawncher:
     def run(self) -> None:
         """Bucle principal del lanzador"""
         self._logger.info("Rawncher session started")
-        console.print(Rule("[bold magenta]RAWNCHER — RawLoadrr Launcher[/bold magenta]"))
+
+        # ── ASCII ART BANNER ───────────────────────────────────────────────── #
+        ascii_art = (
+            "\n"
+            " ██████╗  █████╗ ██╗    ██╗███╗   ██╗ ██████╗██╗  ██╗███████╗██████╗ \n"
+            " ██╔══██╗██╔══██╗██║    ██║████╗  ██║██╔════╝██║  ██║██╔════╝██╔══██╗\n"
+            " ██████╔╝███████║██║ █╗ ██║██╔██╗ ██║██║     ███████║█████╗  ██████╔╝\n"
+            " ██╔══██╗██╔══██║██║███╗██║██║╚██╗██║██║     ██╔══██║██╔══╝  ██╔══██╗\n"
+            " ██║  ██║██║  ██║╚███╔███╔╝██║ ╚████║╚██████╗██║  ██║███████╗██║  ██║\n"
+            " ╚═╝  ╚═╝╚═╝  ╚═╝ ╚══╝╚══╝ ╚═╝  ╚═══╝ ╚═════╝╚═╝  ╚═╝╚══════╝╚═╝  ╚═╝\n"
+            "            RawLoadrr Launcher  ·  Industrial Grade  ·  CvT\n"
+        )
+        console.print(f"[bold cyan]{ascii_art}[/]")
+        console.print(Rule("[bold magenta]◈  RAWNCHER SESSION INICIADA[/bold magenta]", style="magenta"))
         while True:
             try:
                 choice = self._menu_principal()
                 self._logger.info(f"Menu selection: {choice}")
                 if choice == "0":
-                    console.print("\n[yellow]¡Hasta luego![/yellow]")
+                    console.print("\n[bold cyan]◈ ¡Hasta luego![/bold cyan]")
+                    console.print(Rule(style="dim"))
                     self._logger.info("Rawncher session ended by user")
                     break
                 elif choice == "1":
@@ -78,7 +245,7 @@ class Rawncher:
                 elif choice == "6":
                     self.opcion_6_cargar_sesion()
             except KeyboardInterrupt:
-                console.print("\n[yellow]Operación cancelada.[/yellow]")
+                console.print("\n[bold yellow]⚠️  Operación cancelada.[/bold yellow]")
                 self._logger.info("Operation cancelled by user (KeyboardInterrupt)")
 
     def _menu_principal(self) -> str:
@@ -94,10 +261,12 @@ class Rawncher:
             "  [bold cyan][6][/bold cyan]  Cargar sesión guardada\n"
             "  [bold cyan][0][/bold cyan]  Salir\n"
         )
+        qbit_status = "[bold green]qBit: Online ✅[/bold green]" if self.client else "[bold red]qBit: Offline ❌[/bold red]"
         console.print(
             Panel(
                 menu_text,
-                title="[bold magenta]RAWNCHER[/bold magenta]",
+                title="[bold magenta]◈  RAWNCHER[/bold magenta]",
+                subtitle=qbit_status,
                 border_style="magenta",
             )
         )
@@ -125,6 +294,37 @@ class Rawncher:
         except Exception:
             return []
 
+    def _sync_global_secret(self, key, value):
+        """Propaga un secreto por .env, config.py y singularity_config.py"""
+        import re
+        # Diccionario de archivos y sus patrones de búsqueda específicos
+        # .env usa MAYÚSCULAS, .py usa minúsculas
+        targets = {
+            self.base_dir / "data" / ".env": rf'^({key.upper()}=).*$',
+            self.base_dir / "data" / "config.py": rf'("{key.lower()}":\s*")[^"]*(")',
+            self.base_dir / "data" / "singularity_config.py": rf'("{key.lower()}":\s*")[^"]*(")'
+        }
+
+        for path, pattern in targets.items():
+            if not path.exists():
+                continue
+            
+            try:
+                content = path.read_text(encoding="utf-8")
+                
+                if path.suffix == ".env":
+                    # Forzamos formato KEY="value" para evitar líos de Bash
+                    new_content = re.sub(pattern, f'{key.upper()}="{value}"', content, flags=re.MULTILINE)
+                else:
+                    # Formato Python: reemplazamos solo el contenido entre las comillas del grupo 2
+                    new_content = re.sub(pattern, rf'\1{value}\2', content)
+                
+                if new_content != content:
+                    path.write_text(new_content, encoding="utf-8")
+                    console.print(f"[dim cyan]    ↳ {path.name} sincronizado.[/dim cyan]")
+            except Exception as e:
+                console.print(f"[dim red]    ! Fallo al escribir en {path.name}: {e}[/dim red]")
+
     def _build_tracker_table(self) -> tuple:
         """Construye tabla Rich con los trackers disponibles.
 
@@ -140,24 +340,23 @@ class Rawncher:
         table.add_column("API ✓/✗", justify="center")
 
         trackers = []
-        try:
-            from data.config import config
+        if not self.config:
+            console.print("[bold red]❌ No se encontró o no se pudo leer data/config.py[/bold red]")
+            return table, trackers
 
-            trackers_dict = config.get("TRACKERS", {})
-            trackers = sorted(
-                [t for t in trackers_dict if isinstance(trackers_dict[t], dict)]
+        trackers_dict = self.config.get("TRACKERS", {})
+        trackers = sorted(
+            [t for t in trackers_dict if isinstance(trackers_dict[t], dict)]
+        )
+        for i, name in enumerate(trackers, 1):
+            api_key = trackers_dict[name].get("api_key", "")
+            configured = (
+                bool(api_key)
+                and "API_KEY" not in api_key
+                and len(api_key) >= 32
             )
-            for i, name in enumerate(trackers, 1):
-                api_key = trackers_dict[name].get("api_key", "")
-                configured = (
-                    bool(api_key)
-                    and "API_KEY" not in api_key
-                    and len(api_key) >= 32
-                )
-                icon = "[green]✓[/green]" if configured else "[red]✗[/red]"
-                table.add_row(str(i), name, icon)
-        except ImportError:
-            console.print("[red]✗ No se encontró data/config.py[/red]")
+            icon = "[green]✓[/green]" if configured else "[red]✗[/red]"
+            table.add_row(str(i), name, icon)
 
         return table, trackers
 
@@ -168,7 +367,7 @@ class Rawncher:
 
         table, trackers = self._build_tracker_table()
         if not trackers:
-            console.print("[red]No hay trackers disponibles en la configuración.[/red]")
+            console.print("[bold red]❌ No hay trackers disponibles en la configuración.[/bold red]")
             return None
 
         console.print(table)
@@ -181,10 +380,10 @@ class Rawncher:
         if 1 <= idx <= len(trackers):
             return trackers[idx - 1]
 
-        console.print("[red]Número no válido.[/red]")
+        console.print("[bold red]❌ Número no válido.[/bold red]")
         return None
 
-    def _ejecutar_comando(self, cmd: list, cwd: Path = None) -> int:
+    def _ejecutar_comando(self, cmd: list, cwd: Optional[Path] = None) -> int:
         """Ejecuta un comando con salida en vivo desde base_dir por defecto"""
         cwd_path = str(cwd or self.base_dir)
         self._logger.info(f"CMD: {' '.join(str(c) for c in cmd)} (cwd={cwd_path})")
@@ -211,13 +410,17 @@ class Rawncher:
         
         update_status("RAWLOADRR", "Configuración", "PROCESSING", details=f"Tracker: {tracker}")
         console.print()
+
+        # ── FASE RECON ────────────────────────────────────────────────────── #
+        console.print(Rule(f"[bold cyan]▸  RECON — Tracker: {tracker}[/bold cyan]", style="cyan"))
+        console.print()
         console.print(
             Panel(
                 "\n"
                 "  [bold cyan][1][/bold cyan]  Subir desde una ruta (archivo o carpeta)\n"
                 "  [bold cyan][2][/bold cyan]  Usar lista existente (.txt con rutas)\n"
                 "  [bold cyan][3][/bold cyan]  Triage primero (escanear directorio y elegir listas)\n",
-                title=f"[bold green]Tracker: {tracker}[/bold green]",
+                title=f"[bold green]◈  Tracker: {tracker}[/bold green]",
                 border_style="green",
             )
         )
@@ -304,16 +507,16 @@ class Rawncher:
                 try:
                     idx = int(raw)
                 except ValueError:
-                    console.print("[red]Entrada no válida.[/red]")
+                    console.print("[bold red]❌ Entrada no válida.[/bold red]")
                     continue
 
                 if not (1 <= idx <= len(flags)):
-                    console.print("[red]Número fuera de rango.[/red]")
+                    console.print("[bold red]❌ Número fuera de rango.[/bold red]")
                     continue
 
                 flag, _ = flags[idx - 1]
                 if flag == "--debug" and debug:
-                    console.print("[yellow]El flag --debug está bloqueado en modo debug.[/yellow]")
+                    console.print("[bold yellow]⚠️  El flag --debug está bloqueado en modo debug.[/bold yellow]")
                     continue
 
                 if flag in selected:
@@ -334,29 +537,39 @@ class Rawncher:
             ruta = Path(ruta_raw)
             if ruta.exists():
                 break
-            console.print(f"[red]✗ No existe: {ruta_raw}[/red]")
+            console.print(f"[bold red]❌ No existe: {ruta_raw}[/bold red]")
 
         if ruta.is_file():
             if ruta.suffix.lower() == ".mkv":
-                console.print(f"[green]✓ Archivo MKV detectado:[/green] {ruta.name}")
+                console.print(f"[bold green]✅ Archivo MKV detectado:[/bold green] {ruta.name}")
             else:
-                console.print(f"[yellow]⚠ Archivo no-MKV — se procesará de todas formas.[/yellow]")
+                console.print(f"[bold yellow]⚠️  Archivo no-MKV — se procesará de todas formas.[/bold yellow]")
         elif ruta.is_dir():
             mkv_files = list(ruta.rglob("*.mkv"))
             if mkv_files:
                 console.print(
-                    f"[green]✓ Directorio con {len(mkv_files)} archivo(s) MKV.[/green]"
+                    f"[bold green]✅ Directorio con {len(mkv_files)} archivo(s) MKV.[/bold green]"
                 )
             else:
                 console.print(
-                    "[yellow]⚠ Directorio sin archivos MKV — se procesará de todas formas.[/yellow]"
+                    "[bold yellow]⚠️  Directorio sin archivos MKV — se procesará de todas formas.[/bold yellow]"
                 )
 
         flags = self._args_opcionales(debug=debug)
 
         cmd = ["python3", "upload.py", "--tracker", tracker, "--input", str(ruta)] + flags
 
+        # LÓGICA DE CONTINGENCIA: Si el cliente está caído, no intentes añadir el torrent.
+        # El .torrent generado se quedará en su carpeta tmp/<uuid>/
+        if self.client is None and '--no-seed' not in cmd:
+            cmd.append('--no-seed')
+            console.print("[bold yellow]⚠️  INFO: Cliente torrent no disponible. Se activará --no-seed automáticamente.[/bold yellow]")
+
         cmd_str = " ".join(cmd)
+        console.print()
+
+        # ── FASE DISPARO ─────────────────────────────────────────────────── #
+        console.print(Rule("[bold yellow]▸  DISPARO — Lanzando Payload[/bold yellow]", style="yellow"))
         console.print()
         console.print(
             Panel(
@@ -370,6 +583,9 @@ class Rawncher:
             update_status("RAWLOADRR", "Subida", "PROCESSING", details=f"Subiendo: {os.path.basename(ruta)}")
             self._ejecutar_comando(cmd)
             update_status("RAWLOADRR", "Subida", "COMPLETED")
+            console.print()
+            console.print(Rule(style="dim"))
+            console.print(Panel("[bold green]🚀 Payload lanzado. Proceso completado.[/bold green]", border_style="green"))
 
     def _flujo_lista_existente(self, tracker: str) -> None:
         """Sub-flujo: usar lista .txt con rutas ya preparada"""
@@ -377,21 +593,31 @@ class Rawncher:
             ruta_raw = Prompt.ask("[bold]Ruta al archivo .txt con la lista[/bold]").strip()
             ruta = Path(ruta_raw)
             if not ruta.exists():
-                console.print(f"[red]✗ No existe: {ruta_raw}[/red]")
+                console.print(f"[bold red]❌ No existe: {ruta_raw}[/bold red]")
                 continue
             if not ruta.is_file():
-                console.print(f"[red]✗ No es un archivo: {ruta_raw}[/red]")
+                console.print(f"[bold red]❌ No es un archivo: {ruta_raw}[/bold red]")
                 continue
             lines = [l.strip() for l in ruta.read_text(encoding="utf-8").splitlines() if l.strip()]
             if not lines:
-                console.print("[red]✗ El archivo está vacío.[/red]")
+                console.print("[bold red]❌ El archivo está vacío.[/bold red]")
                 continue
             break
 
-        console.print(f"[green]✓ Lista con {len(lines)} entrada(s).[/green]")
+        console.print(f"[bold green]✅ Lista con {len(lines)} entrada(s).[/bold green]")
 
         cmd = ["python3", "auto-upload.py", "--list", str(ruta), "--tracker", tracker]
+
+        # LÓGICA DE CONTINGENCIA
+        if self.client is None and '--no-seed' not in cmd:
+            cmd.append('--no-seed')
+            console.print("[bold yellow]⚠️  INFO: Cliente torrent no disponible. Se activará --no-seed automáticamente.[/bold yellow]")
+
         cmd_str = " ".join(cmd)
+        console.print()
+
+        # ── FASE DISPARO ─────────────────────────────────────────────────── #
+        console.print(Rule("[bold yellow]▸  DISPARO — Lanzando Payload[/bold yellow]", style="yellow"))
         console.print()
         console.print(
             Panel(
@@ -405,6 +631,9 @@ class Rawncher:
             update_status("RAWLOADRR", "Subida", "PROCESSING", details=f"Subiendo: {os.path.basename(ruta)}")
             self._ejecutar_comando(cmd)
             update_status("RAWLOADRR", "Subida", "COMPLETED")
+            console.print()
+            console.print(Rule(style="dim"))
+            console.print(Panel("[bold green]🚀 Payload lanzado. Proceso completado.[/bold green]", border_style="green"))
 
     def _flujo_triage(self, tracker: str) -> None:
         """Sub-flujo: ejecutar triage_mkv.py y luego subir las listas generadas"""
@@ -413,23 +642,25 @@ class Rawncher:
             ruta = Path(ruta_raw)
             if ruta.is_dir():
                 break
-            console.print(f"[red]✗ No es un directorio válido: {ruta_raw}[/red]")
+            console.print(f"[bold red]❌ No es un directorio válido: {ruta_raw}[/bold red]")
 
-        console.print(f"\n[cyan]Ejecutando triage en:[/cyan] {ruta}")
+        console.print()
+        console.print(Rule("[bold cyan]▸  RECON — Ejecutando Triage[/bold cyan]", style="cyan"))
+        console.print(f"\n[bold cyan]▶ Ejecutando triage en:[/bold cyan] {ruta}")
         self._ejecutar_comando(["python3", "../extras/Triaje-mkv/triage_mkv.py", str(ruta)])
 
         hevc_files = sorted(self.base_dir.glob("todo-hevc-*.txt"))
         h264_files = sorted(self.base_dir.glob("sigue-h264-*.txt"))
 
         if not hevc_files and not h264_files:
-            console.print("[yellow]No se encontraron listas generadas por triage.[/yellow]")
+            console.print("[bold yellow]⚠️  No se encontraron listas generadas por triage.[/bold yellow]")
             return
 
         console.print()
         if hevc_files:
-            console.print(f"[green]HEVC:[/green] {hevc_files[-1].name} ({sum(1 for l in hevc_files[-1].read_text().splitlines() if l.strip())} entradas)")
+            console.print(f"[bold green]✅ HEVC:[/bold green] {hevc_files[-1].name} ({sum(1 for l in hevc_files[-1].read_text().splitlines() if l.strip())} entradas)")
         if h264_files:
-            console.print(f"[cyan]H264:[/cyan] {h264_files[-1].name} ({sum(1 for l in h264_files[-1].read_text().splitlines() if l.strip())} entradas)")
+            console.print(f"[bold cyan]✅ H264:[/bold cyan] {h264_files[-1].name} ({sum(1 for l in h264_files[-1].read_text().splitlines() if l.strip())} entradas)")
 
         opciones_disp = []
         opciones_text = ""
@@ -470,7 +701,16 @@ class Rawncher:
 
         for lista in listas_a_subir:
             cmd = ["python3", "auto-upload.py", "--list", str(lista), "--tracker", tracker]
+
+            # LÓGICA DE CONTINGENCIA
+            if self.client is None and '--no-seed' not in cmd:
+                cmd.append('--no-seed')
+
             cmd_str = " ".join(cmd)
+            console.print()
+
+            # ── FASE DISPARO ─────────────────────────────────────────────── #
+            console.print(Rule(f"[bold yellow]▸  DISPARO — Lista: {lista.name}[/bold yellow]", style="yellow"))
             console.print()
             console.print(
                 Panel(
@@ -480,7 +720,12 @@ class Rawncher:
                 )
             )
             if Confirm.ask("[bold]¿Ejecutar?[/bold]", default=True):
+                if self.client is None:
+                    console.print("[bold yellow]⚠️  INFO: Cliente torrent no disponible. Se activará --no-seed automáticamente.[/bold yellow]")
                 self._ejecutar_comando(cmd)
+                console.print()
+                console.print(Rule(style="dim"))
+                console.print(Panel(f"[bold green]🚀 Lista {lista.name} lanzada.[/bold green]", border_style="green"))
 
     # ------------------------------------------------------------------ #
     #  Helpers de configuración (Options 2 & 3)                          #
@@ -496,8 +741,27 @@ class Rawncher:
             importlib.reload(cfg_mod)
             return cfg_mod.config
         except Exception as e:
-            console.print(f"[red]Error al leer config.py: {e}[/red]")
+            console.print(f"[bold red]❌ Error al leer config.py: {e}[/bold red]")
             return None
+
+    def _reload_config(self) -> None:
+        """Recarga la configuración desde el archivo."""
+        self.config = self._leer_config() or {}
+
+    def _guardar_config(self) -> None:
+        """Guarda el diccionario de configuración actual en data/config.py."""
+        config_path = self.base_dir / "data" / "config.py"
+        try:
+            # Reconstruimos el archivo de config a partir del estado actual de self.config
+            content = f"config = {pformat(self.config)}\n"
+            
+            config_path.write_text(content, encoding="utf-8")
+            self._logger.info("Configuración guardada en data/config.py")
+            # Forzamos la recarga de módulos para que el próximo import vea los cambios
+            importlib.invalidate_caches()
+        except Exception as e:
+            self._logger.error(f"No se pudo escribir en config.py: {e}")
+            console.print(f"[bold red]❌ Error al guardar la configuración: {e}[/bold red]")
 
     def _escribir_config_tracker(self, tracker: str, field: str, value) -> bool:
         """
@@ -506,13 +770,13 @@ class Rawncher:
         """
         config_path = self.base_dir / "data" / "config.py"
         if not config_path.exists():
-            console.print("[red]No se encontró data/config.py[/red]")
+            console.print("[bold red]❌ No se encontró data/config.py[/bold red]")
             return False
 
         try:
             text = config_path.read_text(encoding="utf-8")
         except Exception as e:
-            console.print(f"[red]No se pudo leer config.py: {e}[/red]")
+            console.print(f"[bold red]❌ No se pudo leer config.py: {e}[/bold red]")
             return False
 
         if isinstance(value, bool):
@@ -537,21 +801,14 @@ class Rawncher:
         new_text, count = re.subn(pattern, replacement, text, count=1, flags=re.DOTALL)
 
         if count == 0:
-            console.print(f"[yellow]No se encontró el campo '{field}' en el bloque '{tracker}'. Nada cambió.[/yellow]")
+            console.print(f"[bold yellow]⚠️  No se encontró el campo '{field}' en el bloque '{tracker}'. Nada cambió.[/bold yellow]")
             return False
 
         try:
             config_path.write_text(new_text, encoding="utf-8")
         except Exception as e:
-            console.print(f"[red]No se pudo escribir config.py: {e}[/red]")
+            console.print(f"[bold red]❌ No se pudo escribir config.py: {e}[/bold red]")
             return False
-
-        try:
-            import data.config as cfg_mod
-            importlib.invalidate_caches()
-            importlib.reload(cfg_mod)
-        except Exception:
-            pass
 
         return True
 
@@ -578,16 +835,15 @@ class Rawncher:
         if tracker is None:
             return
 
-        cfg = self._leer_config()
-        if cfg is None:
+        if not self.config:
             return
 
-        tracker_cfg = cfg.get("TRACKERS", {}).get(tracker)
+        tracker_cfg = self.config.get("TRACKERS", {}).get(tracker)
         if tracker_cfg is None:
-            console.print(f"[red]Tracker '{tracker}' no encontrado en config.py[/red]")
+            console.print(f"[bold red]❌ Tracker '{tracker}' no encontrado en config.py[/bold red]")
             return
 
-        def _show_status(tcfg: dict) -> None:
+        def _show_status(tcfg: dict) -> tuple[bool, bool]:
             api_key = tcfg.get("api_key", "")
             announce_url = tcfg.get("announce_url", "")
             anon = tcfg.get("anon", False)
@@ -645,14 +901,15 @@ class Rawncher:
                     f"[bold]API key para {tracker}[/bold] [dim](mín. 32 caracteres)[/dim]"
                 ).strip()
                 if len(nueva_key) < 32:
-                    console.print(f"[red]✗ Demasiado corta ({len(nueva_key)} chars). Mínimo 32.[/red]")
+                    console.print(f"[bold red]❌ Demasiado corta ({len(nueva_key)} chars). Mínimo 32.[/bold red]")
                     continue
                 if "API_KEY" in nueva_key:
-                    console.print("[red]✗ El valor contiene 'API_KEY', introduce la clave real.[/red]")
+                    console.print("[bold red]❌ El valor contiene 'API_KEY', introduce la clave real.[/bold red]")
                     continue
                 break
             if self._escribir_config_tracker(tracker, "api_key", nueva_key):
-                console.print("[green]✓ API key guardada.[/green]")
+                console.print("[bold green]✅ API key guardada.[/bold green]")
+                self._reload_config()
 
         if not announce_ok:
             console.print()
@@ -662,14 +919,15 @@ class Rawncher:
                     f"[bold]Announce URL para {tracker}[/bold] [dim](https://...)[/dim]"
                 ).strip()
                 if not nueva_url.startswith("https://"):
-                    console.print("[red]✗ Debe empezar por 'https://'.[/red]")
+                    console.print("[bold red]❌ Debe empezar por 'https://'.[/bold red]")
                     continue
                 if "Custom_Announce_URL" in nueva_url:
-                    console.print("[red]✗ El valor sigue siendo el placeholder, introduce la URL real.[/red]")
+                    console.print("[bold red]❌ El valor sigue siendo el placeholder, introduce la URL real.[/bold red]")
                     continue
                 break
             if self._escribir_config_tracker(tracker, "announce_url", nueva_url):
-                console.print("[green]✓ Announce URL guardada.[/green]")
+                console.print("[bold green]✅ Announce URL guardada.[/bold green]")
+                self._reload_config()
 
         console.print()
         anon_actual = tracker_cfg.get("anon", False)
@@ -680,11 +938,58 @@ class Rawncher:
         if cambiar_anon:
             nuevo_anon = Confirm.ask("[bold]¿Activar modo anónimo?[/bold]", default=anon_actual)
             if self._escribir_config_tracker(tracker, "anon", nuevo_anon):
-                console.print(f"[green]✓ Anon → {'True' if nuevo_anon else 'False'}[/green]")
+                console.print(f"[bold green]✅ Anon → {'True' if nuevo_anon else 'False'}[/bold green]")
+                self._reload_config()
 
-        cfg_final = self._leer_config()
-        if cfg_final:
-            tracker_cfg_final = cfg_final.get("TRACKERS", {}).get(tracker, {})
+        # ── CONFIGURACIÓN DE FIRMAS ───────────────────────────────────────── #
+        console.print()
+        if Confirm.ask("[bold]¿Configurar firmas (signatures)?[/bold]", default=False):
+            sig_fields = [
+                ("signature", "Firma Normal"),
+                ("anon_signature", "Firma Anónima"),
+                ("pr_signature", "Firma Personal Release"),
+                ("anon_pr_signature", "Firma Anon PR")
+            ]
+            
+            for field, label in sig_fields:
+                # Recargamos cfg por si hubo cambios en la iteración anterior
+                t_cfg = self.config.get("TRACKERS", {}).get(tracker, {})
+                current_val = t_cfg.get(field, "")
+                
+                console.print(f"\n[cyan]{label} ({field}):[/cyan]")
+                console.print(Panel(current_val or "[dim]Vacío[/dim]", border_style="dim", expand=False))
+                
+                if Confirm.ask(f"¿Editar {label}?", default=False):
+                    console.print("[dim]Introduce la nueva firma. Usa [bold]\\n[/bold] para saltos de línea.[/dim]")
+                    new_val = Prompt.ask(f"Nueva {field}", default=current_val)
+                    if self._escribir_config_tracker(tracker, field, new_val):
+                        console.print(f"[bold green]✅ {field} actualizado.[/bold green]")
+                        self._reload_config()
+
+        # ── CONFIGURACIÓN DE IMÁGENES (GLOBAL) ────────────────────────────── #
+        console.print()
+        if Confirm.ask("[bold]¿Configurar opciones de imágenes (Global)?[/bold]", default=False):
+            default_cfg = self.config.get("DEFAULT", {})
+            curr_screens = default_cfg.get("screens", "4")
+            curr_size = default_cfg.get("img_size", "500")
+
+            console.print(f"\n[cyan]Screens (Global):[/cyan] {curr_screens}")
+            console.print(f"[cyan]Img Size (Global):[/cyan] {curr_size}")
+
+            if Confirm.ask("¿Editar valores?", default=False):
+                new_screens = Prompt.ask("Número de capturas", default=str(curr_screens))
+                new_size = Prompt.ask("Tamaño de capturas (px)", default=str(curr_size))
+
+                if "DEFAULT" not in self.config:
+                    self.config["DEFAULT"] = {}
+                self.config["DEFAULT"]["screens"] = new_screens
+                self.config["DEFAULT"]["img_size"] = new_size
+                self._guardar_config()
+                console.print("[bold green]✅ Configuración global de imágenes actualizada.[/bold green]")
+                self._reload_config()
+
+        if self.config:
+            tracker_cfg_final = self.config.get("TRACKERS", {}).get(tracker, {})
             console.print()
             _show_status(tracker_cfg_final)
 
@@ -712,11 +1017,44 @@ class Rawncher:
             )
         )
 
+# --- ADUANA DE SOBERANÍA (Check de Fresh Install) ---
+        if not self.config:
+            console.print("\n[bold red]❌ No se pudo leer el archivo de configuración.[/bold red]")
+            console.print("[bold yellow]⚠️  Asegúrate de que 'data/config.py' existe y es válido.[/bold yellow]")
+        else:
+            # Evitamos el hostión en upload.py asegurando las APIs globales
+            master_keys = {
+                "tmdb_api": "TMDB_API_KEY",
+                "imdb_api": "IMDB_API_KEY",
+                "imgbb_api": "IMGBB_API_KEY",
+                "ptscreens_api": "PTSCREENS_API_KEY",
+                "ptpimg_api": "PTPIMG_API_KEY",
+                "lensdump_api": "LENSDUMP_API_KEY",
+                "oeimg_api": "OEIMG_API_KEY",
+            }
+            default_config = self.config.get("DEFAULT", {})
+            for python_key, env_key in master_keys.items():
+                val = default_config.get(python_key, "")
+                
+                # Heurística mejorada para detectar cualquier placeholder
+                if not val or val.startswith("YOUR_") or val in ["tu_clave_tmdb_aqui", "CAMBIAME"]:
+                    console.print(f"\n[bold red]✖ {env_key} no configurada.[/bold red]")
+                    msg = f"[bold cyan]▶ Introduce el valor para {env_key}[/bold cyan]" + ("[dim] (Enter para saltar)[/dim]" if "tmdb" not in python_key else "")
+                    new_val = Prompt.ask(msg)
+                    
+                    if new_val.strip():
+                        # Sincronización transversal usando el multiplexor
+                        self._sync_global_secret(python_key, new_val.strip())
+                        # Actualización en caliente de la config en memoria
+                        if "DEFAULT" not in self.config:
+                            self.config["DEFAULT"] = {}
+                        self.config["DEFAULT"][python_key] = new_val.strip()
+        # ----------------------------------------------------
         nombre_completo = Prompt.ask(
             "[bold]Nombre completo del tracker[/bold] [dim](ej: MilNueve)[/dim]"
         ).strip()
         if not nombre_completo:
-            console.print("[red]✗ El nombre no puede estar vacío.[/red]")
+            console.print("[bold red]❌ El nombre no puede estar vacío.[/bold red]")
             return
 
         while True:
@@ -725,14 +1063,14 @@ class Rawncher:
             ).strip()
             abrev = abrev_raw.upper()
             if not abrev:
-                console.print("[red]✗ La abreviación no puede estar vacía.[/red]")
+                console.print("[bold red]❌ La abreviación no puede estar vacía.[/bold red]")
                 continue
             if not re.match(r'^[A-Z0-9]+$', abrev):
-                console.print("[red]✗ Solo letras mayúsculas y números.[/red]")
+                console.print("[bold red]❌ Solo letras mayúsculas y números.[/bold red]")
                 continue
             existentes = self._get_tracker_names_from_upload()
             if abrev in existentes:
-                console.print(f"[red]✗ '{abrev}' ya existe en upload.py. Elige otra.[/red]")
+                console.print(f"[bold red]❌ '{abrev}' ya existe en upload.py. Elige otra.[/bold red]")
                 continue
             break
 
@@ -741,13 +1079,14 @@ class Rawncher:
                 "[bold]URL base del tracker[/bold] [dim](ej: https://mitracker.ejemplo.es)[/dim]"
             ).strip()
             if not base_url.startswith("https://") and not base_url.startswith("http://"):
-                console.print("[red]✗ La URL debe empezar por https:// o http://[/red]")
+                console.print("[bold red]❌ La URL debe empezar por https:// o http://[/bold red]")
                 continue
             base_url = base_url.rstrip("/")
             break
 
         console.print()
-        console.print("[bold]Configuración inicial del tracker:[/bold]")
+        console.print(Rule("[bold cyan]▸  RECON — Configuración Inicial[/bold cyan]", style="cyan"))
+        console.print()
 
         api_key_inicial = ""
         while True:
@@ -756,7 +1095,7 @@ class Rawncher:
                 default="",
             ).strip()
             if val and (len(val) < 32 or "API_KEY" in val.upper()):
-                console.print("[red]✗ La API Key parece inválida (mínimo 32 caracteres).[/red]")
+                console.print("[bold red]❌ La API Key parece inválida (mínimo 32 caracteres).[/bold red]")
                 continue
             api_key_inicial = val
             break
@@ -768,7 +1107,7 @@ class Rawncher:
                 default="",
             ).strip()
             if val and (not val.startswith("https://") and not val.startswith("http://")):
-                console.print("[red]✗ La announce URL debe empezar por https:// o http://[/red]")
+                console.print("[bold red]❌ La announce URL debe empezar por https:// o http://[/bold red]")
                 continue
             announce_url_inicial = val
             break
@@ -781,7 +1120,7 @@ class Rawncher:
         errores = []
 
         if not milnu_py.exists():
-            console.print("[red]✗ No se encontró la plantilla MILNU.py[/red]")
+            console.print("[bold red]❌ No se encontró la plantilla MILNU.py[/bold red]")
             return
 
         api_display = api_key_inicial[:8] + "..." if api_key_inicial else "[dim]pendiente[/dim]"
@@ -801,7 +1140,7 @@ class Rawncher:
         )
 
         if not Confirm.ask("[bold]¿Confirmar creación?[/bold]", default=True):
-            console.print("[yellow]Operación cancelada.[/yellow]")
+            console.print("[bold yellow]⚠️  Operación cancelada.[/bold yellow]")
             return
 
         milnu_text = milnu_py.read_text(encoding="utf-8")
@@ -826,9 +1165,9 @@ class Rawncher:
 
         try:
             tracker_py.write_text(nuevo_text, encoding="utf-8")
-            console.print(f"[green]✓ Creado:[/green] src/trackers/{abrev}.py")
+            console.print(f"[bold green]✅ Creado:[/bold green] src/trackers/{abrev}.py")
         except Exception as e:
-            console.print(f"[red]✗ No se pudo crear el archivo del tracker: {e}[/red]")
+            console.print(f"[bold red]❌ No se pudo crear el archivo del tracker: {e}[/bold red]")
             errores.append(f"tracker .py: {e}")
 
         cfg_api = api_key_inicial if api_key_inicial else f"{abrev}_API_KEY"
@@ -851,7 +1190,7 @@ class Rawncher:
                     f'            "anon_pr_signature": "{anon_sig}"\n'
                     f'}}'
                 )
-                trackers_match = re.search(r'"TRACKERS"\s*:\s*\{', cfg_text)
+                trackers_match = re.search(r'(?:"|\')TRACKERS(?:"|\')\s*:\s*\{', cfg_text)
                 if trackers_match:
                     # Find closing } of the TRACKERS dict using brace counting
                     depth = 1
@@ -869,20 +1208,23 @@ class Rawncher:
                     if insert_pos != -1:
                         cfg_text = cfg_text[:insert_pos] + nuevo_bloque + "\n" + cfg_text[insert_pos:]
                         config_py.write_text(cfg_text, encoding="utf-8")
-                        console.print(f"[green]✓ Bloque añadido a data/config.py[/green]")
+                        # ... después de config_py.write_text(cfg_text, encoding="utf-8")
+                        self.config = self._leer_config() or {}  # <--- INYECCIÓN DE REALIDAD: Recarga el dict en RAM
+                        console.print(f"[bold green]✅ Configuración recargada en memoria.[/bold green]")
+                        console.print(f"[bold green]✅ Bloque añadido a data/config.py[/bold green]")
                         importlib.invalidate_caches()
                     else:
-                        console.print("[yellow]⚠ No se encontró el cierre del dict TRACKERS en config.py[/yellow]")
+                        console.print("[bold yellow]⚠️  No se encontró el cierre del dict TRACKERS en config.py[/bold yellow]")
                         errores.append("config.py: no se encontró cierre de TRACKERS")
                 else:
-                    console.print("[yellow]⚠ No se encontró 'TRACKERS' en config.py[/yellow]")
+                    console.print("[bold yellow]⚠️  No se encontró 'TRACKERS' en config.py[/bold yellow]")
                     errores.append("config.py: no se encontró TRACKERS")
             except Exception as e:
-                console.print(f"[red]✗ Error al modificar config.py: {e}[/red]")
+                console.print(f"[bold red]❌ Error al modificar config.py: {e}[/bold red]")
                 errores.append(f"config.py: {e}")
         else:
             console.print(
-                "[yellow]⚠ data/config.py no existe — añade el bloque manualmente:[/yellow]\n"
+                "[bold yellow]⚠️  data/config.py no existe — añade el bloque manualmente:[/bold yellow]\n"
                 f'    "{abrev}" : {{\n'
                 f'            "api_key" : "{cfg_api}",\n'
                 f'            "announce_url" : "{cfg_announce}",\n'
@@ -890,33 +1232,36 @@ class Rawncher:
                 f'}}'
             )
 
-        if upload_py.exists():
+# --- NUEVA LÓGICA DINÁMICA (Adiós al Regex de 2024) ---
+        registry_path = self.base_dir / "src" / "trackers" / "trackers_registry.json"
+        
+        if registry_path.exists():
             try:
-                up_text = upload_py.read_text(encoding="utf-8")
-                new_up_text, count = re.subn(
-                    r"('api'\s*:\s*\[)([^\]]+)(\])",
-                    lambda m: m.group(1) + m.group(2).rstrip() + f", '{abrev}'" + m.group(3),
-                    up_text,
-                    count=1,
-                )
-                if count:
-                    upload_py.write_text(new_up_text, encoding="utf-8")
-                    console.print(f"[green]✓ '{abrev}' añadido a tracker_data['api'] en upload.py[/green]")
-                else:
-                    console.print("[yellow]⚠ No se encontró tracker_data['api'] en upload.py[/yellow]")
-                    errores.append("upload.py: no se encontró tracker_data['api']")
+                import json
+                with open(registry_path, 'r', encoding='utf-8') as f:
+                    registry = json.load(f)
+                
+                # Registramos el nuevo tracker como 'api' (o el tipo que elijas)
+                registry[abrev] = "api"
+                
+                with open(registry_path, 'w', encoding='utf-8') as f:
+                    json.dump(registry, f, indent=4)
+                
+                console.print(f"[bold green]✅ '{abrev}' registrado en trackers_registry.json[/bold green]")
             except Exception as e:
-                console.print(f"[red]✗ Error al modificar upload.py: {e}[/red]")
-                errores.append(f"upload.py: {e}")
+                console.print(f"[bold red]❌ Error al actualizar trackers_registry.json: {e}[/bold red]")
+                errores.append(f"registry.json: {e}")
         else:
-            console.print("[yellow]⚠ upload.py no encontrado[/yellow]")
-            errores.append("upload.py no encontrado")
+            console.print("[bold yellow]⚠️  trackers_registry.json no encontrado[/bold yellow]")
+            errores.append("registry.json no encontrado")
 
+        # ── PANEL FINAL DE RESULTADOS ────────────────────────────────────── #
         console.print()
+        console.print(Rule(style="dim"))
         if errores:
             console.print(
                 Panel(
-                    "\n".join(f"  [red]✗[/red] {e}" for e in errores),
+                    "\n".join(f"  [bold red]❌[/bold red] {e}" for e in errores),
                     title="[bold red]Errores durante la creación[/bold red]",
                     border_style="red",
                 )
@@ -924,10 +1269,10 @@ class Rawncher:
         else:
             console.print(
                 Panel(
-                    f"  [green]✓[/green] src/trackers/{abrev}.py creado\n"
-                    f"  [green]✓[/green] data/config.py actualizado\n"
-                    f"  [green]✓[/green] upload.py actualizado\n",
-                    title=f"[bold green]Tracker '{abrev}' creado con éxito[/bold green]",
+                    f"  [bold green]✅[/bold green] src/trackers/{abrev}.py creado\n"
+                    f"  [bold green]✅[/bold green] data/config.py actualizado\n"
+                    f"  [bold green]✅[/bold green] trackers_registry.json actualizado\n",
+                    title=f"[bold green]🚀 Tracker '{abrev}' creado con éxito[/bold green]",
                     border_style="green",
                 )
             )
@@ -1039,7 +1384,7 @@ class Rawncher:
         sessions = self._get_sessions()
 
         if not sessions:
-            console.print("[yellow]No hay sesiones guardadas.[/yellow]")
+            console.print("[bold yellow]⚠️  No hay sesiones guardadas.[/bold yellow]")
             return
 
         table = Table(
@@ -1075,12 +1420,12 @@ class Rawncher:
             idx = 0
 
         if not (1 <= idx <= len(sessions)):
-            console.print("[red]Número no válido.[/red]")
+            console.print("[bold red]❌ Número no válido.[/bold red]")
             return
 
         session = sessions_data[idx - 1]
         if session is None:
-            console.print("[red]No se pudo leer la sesión seleccionada.[/red]")
+            console.print("[bold red]❌ No se pudo leer la sesión seleccionada.[/bold red]")
             return
 
         tracker_name = session.get("name", "?")
@@ -1112,6 +1457,6 @@ class Rawncher:
 if __name__ == "__main__":
     try:
         Rawncher().run()
-    except KeyboardInterrupt:
-        console.print("\n[yellow]¡Hasta luego![/yellow]")
-        sys.exit(0)
+    except Exception:
+        console.print_exception(show_locals=True)
+        sys.exit(1)

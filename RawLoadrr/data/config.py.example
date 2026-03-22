@@ -492,7 +492,7 @@ config = {
             "qbit_port": "8888",
             "qbit_user": "YOUR_USERNAME",
             "qbit_pass": "YOUR_PASSWORD",
-            "torrent_storage_dir": "/app/temp/qbit_backup",
+            "torrent_storage_dir": "/app/RawLoadrr/tmp/qbit_backup",
             "content_layout": "Original",
             "VERIFY_WEBUI_CERTIFICATE": False
     },
@@ -512,7 +512,7 @@ config = {
             "transmission_url": "http://localhost:9091",
             "transmission_user": "YOUR_USERNAME",
             "transmission_pass": "YOUR_PASSWORD",
-            "torrent_storage_dir": "/app/temp/transmission_watch",
+            "torrent_storage_dir": "/app/RawLoadrr/tmp/transmission_watch",
             "enable_search": True
     },
     "watch": {

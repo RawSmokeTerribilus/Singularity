@@ -12,6 +12,12 @@ import subprocess
 from datetime import datetime
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).parent.parent.parent))
+try:
+    from core.status_manager import update_status
+except ImportError:
+    def update_status(*args, **kwargs): pass
+
 HEVC_CODECS = {'hevc', 'h265', 'x265'}
 LEGACY_CODECS = {'h264', 'x264', 'mpeg2', 'mpeg1', 'vp8', 'vp9', 'av1'}
 
@@ -94,40 +100,53 @@ def scan_directory(root_path):
     return todo_hevc, sigue_h264
 
 def main():
+    update_status("EXTRA", "Triage MKV", "ONLINE", details="Iniciando análisis de codecs...")
+
     # Obtener ruta desde argumentos o usar la actual
     root_path = sys.argv[1] if len(sys.argv) > 1 else os.getcwd()
     
     # Validar que la ruta existe
     if not os.path.isdir(root_path):
         print(f"❌ Error: '{root_path}' no es un directorio válido")
+        update_status("EXTRA", "Triage MKV", "ERROR", details=f"Ruta inválida: {root_path}")
         sys.exit(1)
     
-    # Ejecutar análisis
-    todo_hevc, sigue_h264 = scan_directory(root_path)
-    
-    # Generar nombre de archivos con fecha
-    date_str = get_date_string()
-    file_hevc = f"todo-hevc-{date_str}.txt"
-    file_h264 = f"sigue-h264-{date_str}.txt"
-    
-    # Guardar listas
-    with open(file_hevc, 'w') as f:
-        for path in sorted(todo_hevc):
-            f.write(path + '\n')
-    
-    with open(file_h264, 'w') as f:
-        for path in sorted(sigue_h264):
-            f.write(path + '\n')
-    
-    # Resumen
-    print(f"\n{'='*60}")
-    print(f"📊 Resultado del análisis")
-    print(f"{'='*60}")
-    print(f"✅ Carpetas 100% HEVC: {len(todo_hevc)}")
-    print(f"   Guardadas en: {file_hevc}")
-    print(f"\n⏳ Carpetas con H264/Legacy: {len(sigue_h264)}")
-    print(f"   Guardadas en: {file_h264}")
-    print(f"{'='*60}\n")
+    try:
+        update_status("EXTRA", "Triage MKV", "ONLINE", details=f"Escaneando: {root_path}")
+
+        # Ejecutar análisis
+        todo_hevc, sigue_h264 = scan_directory(root_path)
+        
+        # Generar nombre de archivos con fecha
+        date_str = get_date_string()
+        file_hevc = f"todo-hevc-{date_str}.txt"
+        file_h264 = f"sigue-h264-{date_str}.txt"
+        
+        # Guardar listas
+        with open(file_hevc, 'w') as f:
+            for path in sorted(todo_hevc):
+                f.write(path + '\n')
+        
+        with open(file_h264, 'w') as f:
+            for path in sorted(sigue_h264):
+                f.write(path + '\n')
+        
+        # Resumen
+        print(f"\n{'='*60}")
+        print(f"📊 Resultado del análisis")
+        print(f"{'='*60}")
+        print(f"✅ Carpetas 100% HEVC: {len(todo_hevc)}")
+        print(f"   Guardadas en: {file_hevc}")
+        print(f"\n⏳ Carpetas con H264/Legacy: {len(sigue_h264)}")
+        print(f"   Guardadas en: {file_h264}")
+        print(f"{'='*60}\n")
+
+        update_status("EXTRA", "Triage MKV", "FINISHED",
+                      details=f"HEVC: {len(todo_hevc)} carpetas | H264: {len(sigue_h264)} carpetas")
+
+    except Exception as _e:
+        update_status("EXTRA", "Triage MKV", "ERROR", details=f"Error inesperado: {_e}")
+        raise
 
 if __name__ == '__main__':
     main()

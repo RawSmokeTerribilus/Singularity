@@ -329,7 +329,7 @@ class COMMON():
             description, imagelist = bbcode.clean_unit3d_description(description, torrent_url)
             console.print(f"[green]Successfully grabbed description from {tracker}")
         except Exception:
-            console.print(traceback.print_exc())
+            log.info(f"Error parsing response from {tracker}", exc_info=True)
             console.print(f"[yellow]Invalid Response from {tracker} API.")
             
 
@@ -395,7 +395,8 @@ class COMMON():
             ptgen = f"[img]{meta.get('imdb_info', {}).get('cover', meta.get('cover', ''))}[/img]{ptgen}"
         except Exception:
             console.print_exception()
-            console.print(ptgen.text)
+            if hasattr(ptgen, 'text'):
+                console.print(ptgen.text)
             console.print("[bold red]There was an error getting the ptgen \nUploading without ptgen")
             return ""
         return ptgen
@@ -453,4 +454,3 @@ class COMMON():
             if allow and each not in new_dupes:
                 new_dupes[each] = dupes[each]
         return new_dupes
-

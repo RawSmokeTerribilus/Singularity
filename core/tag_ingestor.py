@@ -10,6 +10,10 @@ from rich.progress import Progress
 # Configuración de imports
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from singularity_config import RADARR_URL, RADARR_API_KEY, SONARR_URL, SONARR_API_KEY
+try:
+    from core.status_manager import update_status
+except ImportError:
+    def update_status(*args, **kwargs): pass
 
 console = Console()
 
@@ -54,33 +58,43 @@ def fetch_data():
     return all_found
 
 def main():
+    update_status("EXTRA", "Tag Ingestor", "ONLINE", details="Iniciando consulta a Radarr/Sonarr...")
+
     console.print("[bold magenta]=== Singularity Tag Ingestor v2.0 ===[/bold magenta]\n")
     
-    tags_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '../RawLoadrr/data/tags.json'))
-    with open(tags_path, 'r') as f:
-        tags = json.load(f)
+    try:
+        tags_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '../RawLoadrr/data/tags.json'))
+        with open(tags_path, 'r') as f:
+            tags = json.load(f)
 
-    new_data = fetch_data()
-    
-    table = Table(title="Nuevos Grupos Detectados")
-    table.add_column("Grupo", style="green")
-    table.add_column("Tipo", style="cyan")
-    table.add_column("Estado", style="yellow")
+        new_data = fetch_data()
+        
+        table = Table(title="Nuevos Grupos Detectados")
+        table.add_column("Grupo", style="green")
+        table.add_column("Tipo", style="cyan")
+        table.add_column("Estado", style="yellow")
 
-    added = 0
-    for g, t in new_data.items():
-        if g not in tags:
-            tags[g] = {"type": t}
-            table.add_row(g, t, "NUEVO")
-            added += 1
-    
-    if added > 0:
-        console.print(table)
-        with open(tags_path, 'w') as f:
-            json.dump(tags, f, indent=4)
-        console.print(f"\n[bold green]✓ ¡Éxito! {added} grupos reales añadidos.[/bold green]")
-    else:
-        console.print("\n[yellow]No se han encontrado grupos nuevos (o todos eran basura).[/yellow]")
+        added = 0
+        for g, t in new_data.items():
+            if g not in tags:
+                tags[g] = {"type": t}
+                table.add_row(g, t, "NUEVO")
+                added += 1
+        
+        if added > 0:
+            console.print(table)
+            with open(tags_path, 'w') as f:
+                json.dump(tags, f, indent=4)
+            console.print(f"\n[bold green]✓ ¡Éxito! {added} grupos reales añadidos.[/bold green]")
+        else:
+            console.print("\n[yellow]No se han encontrado grupos nuevos (o todos eran basura).[/yellow]")
+
+        update_status("EXTRA", "Tag Ingestor", "FINISHED",
+                      details=f"Proceso completado. {added} grupos nuevos añadidos.")
+
+    except Exception as _e:
+        update_status("EXTRA", "Tag Ingestor", "ERROR", details=f"Error inesperado: {_e}")
+        raise
 
 if __name__ == "__main__":
     main()

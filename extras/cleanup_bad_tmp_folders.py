@@ -8,8 +8,8 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
 # Rutas relativas a la raíz del proyecto
 TMP_DIR = PROJECT_ROOT / "RawLoadrr" / "tmp"
-LEFTOVER_FILE = PROJECT_ROOT / "leftover_pixhost_dirs.txt"
-CLEAN_VS_BAD_FILE = PROJECT_ROOT / "clean_vs_bad_descriptions.txt"
+LEFTOVER_FILE = PROJECT_ROOT / "work_data" / "reports" / "leftover_pixhost_dirs.txt"
+CLEAN_VS_BAD_FILE = PROJECT_ROOT / "work_data" / "reports" / "clean_vs_bad_descriptions.txt"
 
 def cleanup_folder(folder_path):
     folder = Path(folder_path)
@@ -78,7 +78,7 @@ def main():
     print(f"\nSummary:")
     print(f"Successfully cleaned: {success_count}")
     print(f"Failed: {fail_count}")
-    print("\nNote: meta.json and [MILNU]* files have been removed. BASE.torrent and images preserved.")
+    print("\nNote: meta.json and [OLDTRK]* files have been removed. BASE.torrent and images preserved.")
 
 if __name__ == "__main__":
     main()

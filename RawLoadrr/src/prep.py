@@ -3912,29 +3912,58 @@ class Prep():
             ia = Cinemagoer()
             info = ia.get_movie(imdbID)
             ia.update(info, ['technical'])        
+            
             imdb_info['title'] = info.get('title')
             imdb_info['year'] = info.get('year')
-            imdb_info['aka'] = info.get('original title', info.get('localized title', imdb_info['title'])).replace(' - IMDb', '')
+            
+            # --- BLINDAJE AKA ---
+            raw_aka = info.get('original title') or info.get('localized title') or imdb_info.get('title') or ""
+            if isinstance(raw_aka, (list, tuple)):
+                raw_aka = raw_aka[0] if raw_aka else ""
+            imdb_info['aka'] = str(raw_aka).replace(' - IMDb', '').replace('"', '')
+            
             imdb_info['type'] = info.get('kind')
             imdb_info['imdbID'] = info.get('imdbID')
-            imdb_info['runtime'] = info.get('runtimes', ['0'])[0]
-            imdb_info['cover'] = info.get('full-size cover url', '').replace(".jpg", "._V1_FMjpg_UX750_.jpg")
-            imdb_info['plot'] = info.get('plot', [''])[0]
-            imdb_info['genres'] = ', '.join(info.get('genres', ''))
+            
+            # --- BLINDAJE RUNTIME ---
+            rt = info.get('runtimes')
+            imdb_info['runtime'] = rt[0] if rt and isinstance(rt, list) else '0'
+            
+            # --- BLINDAJE COVER ---
+            cvr = info.get('full-size cover url')
+            imdb_info['cover'] = str(cvr).replace(".jpg", "._V1_FMjpg_UX750_.jpg") if cvr else ''
+            
+            # --- BLINDAJE PLOT ---
+            plt = info.get('plot')
+            imdb_info['plot'] = plt[0] if plt and isinstance(plt, list) else (plt if isinstance(plt, str) else '')
+            
+            # --- BLINDAJE GENRES ---
+            gnr = info.get('genres')
+            imdb_info['genres'] = ', '.join(gnr) if gnr and isinstance(gnr, list) else ''
+            
             imdb_info['soundmix'] = info.get('sound mix')
-            imdb_info['countries_of_origin'] = info.get('countries', [])
-            imdb_info['original_language'] = info.get('language codes')
-            if isinstance(imdb_info['original_language'], list):
-                if len(imdb_info['original_language']) > 1:
-                    imdb_info['original_language'] = None
-                elif len(imdb_info['original_language']) == 1:
-                    imdb_info['original_language'] = imdb_info['original_language'][0]        
-            if imdb_info['cover'] == '':
+            
+            # --- BLINDAJE COUNTRIES ---
+            co = info.get('countries')
+            imdb_info['countries_of_origin'] = co if co and isinstance(co, list) else []
+            
+            # --- BLINDAJE LENGUAJE ---
+            lc = info.get('language codes')
+            if isinstance(lc, list) and len(lc) == 1:
+                imdb_info['original_language'] = lc[0]
+            else:
+                imdb_info['original_language'] = None        
+            
+            if not imdb_info['cover']:
                 imdb_info['cover'] = meta.get('poster', '')
-            if len(info.get('directors', [])) >= 1:
+                
+            # --- BLINDAJE DIRECTORES ---
+            dirs = info.get('directors')
+            if dirs and isinstance(dirs, list):
                 imdb_info['directors'] = []
-                for director in info.get('directors'):
-                    imdb_info['directors'].append(f"nm{director.getID()}")
+                for director in dirs:
+                    if hasattr(director, 'getID'):
+                        imdb_info['directors'].append(f"nm{director.getID()}")
         else:
             imdb_info = {
                 'title' : meta['title'],

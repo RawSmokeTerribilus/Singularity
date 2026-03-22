@@ -1,0 +1,64 @@
+# --- Python & Runtime ---
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+.pytest_cache/
+.coverage
+
+# --- Virtual Environments ---
+venv/
+env/
+ENV/
+
+# --- Environment & Secrets (CRÍTICO) ---
+.env
+.env.*
+!.env.example
+
+# --- RaW_Suite Specifics ---
+# Directorio de trabajo con logs, reportes y temporales
+work_data/
+tmp/
+logs/
+
+# Archivos de configuración que contienen API Keys
+RawLoadrr/data/config.py
+config/singularity_config.py
+config/mass_config.py
+
+# Sesiones y Cachés de CSI/RawLoadrr
+extras/CSI/tracker_index.json
+extras/CSI/backups.log
+RawLoadrr/data/cookies.txt
+RawLoadrr/tmp/
+
+# Listas generadas por Triage/Singularity
+todo-hevc-*.txt
+sigue-h264-*.txt
+todo-all-*.txt
+
+# --- OS Specific ---
+.DS_Store
+Thumbs.db
+
+# --- IDEs ---
+.vscode/
+.idea/
+*.swp
