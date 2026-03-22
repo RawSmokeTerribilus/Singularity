@@ -25,6 +25,7 @@ init-structure.txt
 Executive_resume.md
 docs/
 mkdocs.yml
+**/*.bkp
 
 # --- SCRIPTS DE CONTROL DEL HOST ---
 .dockerignore
@@ -35,3 +36,4 @@ makefile
 # Bloqueo de la carpeta de archivados del Mass Editor
 extras/MASS-EDITION-UNIT3D/archive/
 **/MASS-EDITION-UNIT3D/archive/
+**/*.tsv
