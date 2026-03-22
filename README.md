@@ -227,7 +227,7 @@ Recuperando el rigor visual de RHEL y la estética Commodore:
          Aislamiento de bloques de arte informativo. Prohibida la deformación 
          del arte por refactorizaciones automáticas de agentes de IA.
 ===============================================================================
-[ FIN DEL REPORTE - OPERACIÓN GREEN LIGHT ]
+ [ FIN DEL REPORTE - OPERACIÓN GREEN LIGHT ]
 ===============================================================================
 ---
 
@@ -241,11 +241,11 @@ Recuperando el rigor visual de RHEL y la estética Commodore:
 - [ ] **MOZ_X11_EGL Validation**: ¿Necesaria en tu setup específico? (PENDING_RECON)
 - [ ] **Cross-Filesystem Atomicidad**: Implementar `shutil.move + fsync` si TEMP_RESCUE y destino en FS diferentes.
 - [ ] **Mass Transcode Paralelismo**: Multiprocessing (4 procesos) con VA-API compartida.
-- [-] **Reporte de Fallidos**: Guardar CSV de archivos irrecuperables (actualmente solo .txt).
-- [-] **Heurística de Main Feature**: En `extract.py`, mejorar la selección del título principal cruzando tamaño y duración.
-- [-] **Sincronización Chaos-Maker / Verifier**: Ajustar algoritmos para detectar sabotaje incluso en archivos pequeños.
+- [ ] **Reporte de Fallidos**: Guardar CSV de archivos irrecuperables (actualmente solo .txt).
+- [ ] **Heurística de Main Feature**: En `extract.py`, mejorar la selección del título principal cruzando tamaño y duración.
+- [ ] **Sincronización Chaos-Maker / Verifier**: Ajustar algoritmos para detectar sabotaje incluso en archivos pequeños.
 - [x] **Modo 'Fast-Pass' en God Mode**: Flag para saltar health check profundo cuando confianza en origen es absoluta.
 - [x] **Editor de Torrents General**: Menú interactivo para pedir URL y cookie en lugar de variables hardcodeadas.
-- [-] **Remover Privileged Mode**: Ajustar permisos docker a lo estrictamente necesario tras testing.
+- [ ] **Remover Privileged Mode**: Ajustar permisos docker a lo estrictamente necesario tras testing.
 - [x] **FIX Trackers Creation**: URL integrada en nuevo .py de tracker debería auto-detectar, no hardcodear Milnueve.
 - [x] **Improve Trackers Edition**: Aplicar lógica de cambio de API, base URL y announce automáticamente.
