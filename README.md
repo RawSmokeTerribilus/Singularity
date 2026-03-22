@@ -37,14 +37,19 @@ Dentro encontrarás todo el conocimiento técnico del Tanque:
 ---
 
 ## 🧬 Filosofía: "Zero Loss & Maximum Resiliencia"
-En Singularity, **no confiamos en los metadatos**. Confiamos en la realidad del bitstream.
+En Singularity, **no confiamos en los metadatos**. Confiamos en la realidad del bitstream. Cada archivo se procesa en una **carrera corta en NVMe** (`FAST_WORK_DIR`) para no contaminar almacenamiento masivo.
 
 ### El Algoritmo de 4 Capas (Verifier)
 Antes de que un archivo sea considerado "válido" o sustituya a un original, pasa por nuestra auditoría forense:
-1.  **Capa 1: Estructura (mkvmerge)** — Verificamos que el contenedor Matroska sea válido y no esté truncado.
-2.  **Capa 2: Stream Integrity (ffprobe)** — Comprobamos que todos los streams (video, audio, subs) sean legibles y tengan metadatos coherentes.
-3.  **Capa 3: Bitstream Scan (ffmpeg -f null)** — La prueba de fuego. Decodificamos el archivo completo en busca de errores de bitstream. Si FFmpeg no puede leerlo, el archivo no existe para nosotros.
-4.  **Capa 4: Auditoría de Ratio** — Comparamos duración y tamaño frente al original para asegurar que no ha habido una pérdida de calidad no deseada.
+1.  **Capa 1: Estructura (mkvmerge)** — Validamos que el contenedor Matroska sea íntegro y no esté truncado.
+2.  **Capa 2: Stream Integrity (ffprobe)** — Comprobamos que todos los streams (video, audio, subs) sean legibles y tengan metadatos sensatos.
+3.  **Capa 3: Bitstream Scan (ffmpeg -f null)** — La prueba de fuego. Decodificamos el archivo completo buscando errores. Si FFmpeg falla, sabemos exactamente dónde y por qué.
+4.  **Capa 4: Coherencia de Ratio** — Comparamos duración y tamaño frente al original. Si cambió demasiado (>3x o <0.3x), marcamos para revisión.
+
+### Reemplazo Atómico (Safety First)
+- Proceso en `TEMP_RESCUE`, validación en 4 capas, luego `os.replace()` atómico al original
+- Si la validación falla, el temp se borra y se reintentan niveles posteriores
+- **Original jamás es tocado** hasta que el nuevo archivo es 100% validado
 
 ---
 
@@ -133,24 +138,68 @@ Monitoriza todo tu imperio P2P en tiempo real. El Dashboard consume un JSON así
 
 ---
 
-## 🚀 Últimos Cambios (v1.4.0)
+## 🚀 Últimos Cambios (v1.6.0 — "RawrRR! This is a Major Update!")
 
-- **Fix Crítico en RawLoadrr**: Corregido un `AttributeError` en `src/prep.py` que causaba que muchos lanzamientos (especialmente Anime) fallaran al detectar episodios si el valor era devuelto como entero por `guessit`.
-- **Mejora en Parsing Español**: Optimización de la detección de palabras clave españolas (`Cap`, `Cap.`, `Temp`) para una mejor integración con bibliotecas no estandarizadas.
-- **Forensic Stability**: Mejorada la resiliencia de MKVerything ante archivos con duraciones inconsistentes detectadas por FFmpeg.
-- **Arr Integration Docs**: Actualización de la documentación para reflejar el papel de la suite en el stack automatizado.
+### 🔨 Forja de VapourSynth: Aceleración de Hardware + Rescate de Contenedores Rotos
+**Nueva capacidad: Nivel 3 (VapourSynth + L-SMASH + HW)**
+- Compiladas desde código fuente: **zimg**, **VapourSynth R73**, **L-SMASH**, **L-SMASH-Works** (plugin compilado)
+- El plugin L-SMASH permite "cateterizar" archivos con contenedores extremadamente dañados, leyendo streams directamente a bajo nivel
+- Resultado: Ficheros que `ffmpeg` rechazaría completamente ahora se rescatan con la máxima calidad
+- **Dockerfile completamente reconstruido** incluyendo drivers VA-API (AMD RADV, Intel non-free)
+
+### 🖥️ HardwareAgent: Detección Automática de GPU
+- Detección inteligente: NVIDIA (h264_nvenc) → AMD (h264_vaapi) → Intel (h264_qsv) → CPU (libx264) con fallback automático
+- Validación en tiempo de ejecución: Si el driver VA-API falla, fallback transparente a CPU sin errores
+- Argumento exacto por plataforma: `-preset p4 -tune hq` para NVIDIA, `-vaapi_device /dev/dri/renderD128` para AMD
+
+### 🪜 La Escalera de Resiliencia: 4 Niveles de Rescate
+**Nueva arquitectura UniversalRescuer:**
+1. **Nivel 3**: VapourSynth + L-SMASH + GPU (el cirujano endovascular)
+2. **Nivel 2**: Remux Médico con `aresample=async=1` (para audio desincronizado)
+3. **Nivel 1**: Re-Encode Bruto + Fallback CPU automático (si "Could not write header" detectado)
+4. **Nivel 0**: Salvaguarda (`REQUIRES_MANUAL_REVIEW` si todo falla)
+
+### ⚡ Mass Transcode (Herramienta Oculta)
+- Batch processing de 50+ archivos sin intervención manual
+- 2 intentos automáticos: AMD VA-API → CPU libx264
+- Fallback transparente si la cabecera está corrompida
+- Ruta: `/app/logs/rutas_host.txt` → `python3 mass_transcode.py`
+
+### 📁 FAST_WORK_DIR: Procesamiento en NVMe
+- Todos los temporales ahora van a `/app/RawLoadrr/tmp/TEMP_RESCUE` (rápido, SSD/NVMe)
+- Reduce I/O de disco masivo (almacenamiento externo queda libre para destino)
+- Patrón **Write-Validate-Replace**: Atomicidad garantizada mediante `os.replace()` + 4-capa Verifier
+
+### 📚 Documentación Completa (9 Documentos Técnicos)
+- Nueva wiki en `docs (updating)/` con 2,164 líneas de documentación sincronizada
+- Guías para troubleshooting, mass_transcode, arquitectura HW, garantías de atomicidad
+- Todas las rutas y comandos validados contra código fuente
+
+### 🔐 Patología Multimedia: 6 Tipos de "Pudrición" Documentados
+- Corrupción de Cabecera → Nivel 3/2
+- Desincronización Audio → Nivel 2
+- Subtítulos Dañados → SRT conversion automática
+- Aspect Ratio Roto (WinX) → Fix automático con `-metadata:s:v:0 sar=1/1`
+- Stream Extra Corrupto → `-ignore_unknown -map_metadata -1`
+- Interleave Error → `-fflags +genpts`
 
 ---
 
 ## 📝 TODO / Próximos Pasos
-- [x] **Fix Episode Detection**: Corregir crash en el parsing de episodios cuando `guessit` devuelve enteros.
-- [x] **Refactorización de Scripts de Mantenimiento**: Migrar los valores hardcodeados (cookies, URLs) de los scripts en `extras/MASS-EDITION-UNIT3D/` a un archivo de configuración centralizado (`singularity_config.py`).
-- [x] **Mejora de la Gestión de Secretos**: Implementar soporte nativo para variables de entorno en todas las herramientas de la suite.
-- [x] **Improve Dashboard**: Implementar no solo singularity, también los demás procesos individuales.
-- [ ] **Heurística de Main Feature**: En `extract.py`, mejorar la selección del título principal cruzando el tamaño de archivo con la duración detectada en el escaneo previo de `analyzer.py` para evitar falsos positivos en discos con extras pesados.
-- [ ] **Sincronización Chaos-Maker / Verifier**: Ajustar los algoritmos de inyección de ruido para que el Verificador pueda detectar patrones de sabotaje incluso en archivos pequeños, asegurando que la auditoría sea infalible ante el Chaos-Maker.
-- [ ] **Modo 'Fast-Pass' en God Mode**: Implementar un flag para saltar el `health_check` profundo en Singularity/God Mode para casos donde la confianza en el origen sea absoluta o se busque velocidad extrema.
-- [ ] **Hacer editor de torrents general**: Actualmente la url se pasa de variable desde el pipeline completo, la cookie también. sin embargo debería de pedirla en el menú interactivo.
-- [ ] **Quitar privileged mode**: El contenedor actualmente se ejecuta como root, por motivos de infraestructura. Ajsutar los permisos a los elementos extrictamente necesarios tras acabar la fase de test.
-- [ ] **FIX trackers creation**: Actualmente la url que se integra en el archivo de tracker nuevo .py de src se crea con la url de milnueve. esto es una putada que obliga a modificarlo a mano desde el contendor.
-- [ ] **Improve trackers edition**: El huevón no aplica la lógica de cambio de api, base url o announce.
+- [x] **VapourSynth Forge**: Compilación desde fuente de VapourSynth R73 + L-SMASH-Works.
+- [x] **Hardware Acceleration**: Detección automática de GPU (NVIDIA, AMD, Intel) con fallback a CPU.
+- [x] **Escalera de Resiliencia (4 Niveles)**: Nivel 3 (VapourSynth), Nivel 2 (Remux), Nivel 1 (Re-Encode + Fallback), Nivel 0 (Salvaguarda).
+- [x] **FAST_WORK_DIR**: Procesamiento en NVMe con atomicidad garantizada.
+- [x] **Mass Transcode**: Herramienta oculta para batch processing sin intervención.
+- [x] **Documentación Técnica Completa**: 9 documentos (2,164 líneas) sincronizados con código.
+- [ ] **MOZ_X11_EGL Validation**: ¿Necesaria en tu setup específico? (PENDING_RECON)
+- [ ] **Cross-Filesystem Atomicidad**: Implementar `shutil.move + fsync` si TEMP_RESCUE y destino en FS diferentes.
+- [ ] **Mass Transcode Paralelismo**: Multiprocessing (4 procesos) con VA-API compartida.
+- [ ] **Reporte de Fallidos**: Guardar CSV de archivos irrecuperables.
+- [ ] **Heurística de Main Feature**: En `extract.py`, mejorar la selección del título principal cruzando tamaño y duración.
+- [ ] **Sincronización Chaos-Maker / Verifier**: Ajustar algoritmos para detectar sabotaje incluso en archivos pequeños.
+- [ ] **Modo 'Fast-Pass' en God Mode**: Flag para saltar health check profundo cuando confianza en origen es absoluta.
+- [ ] **Editor de Torrents General**: Menú interactivo para pedir URL y cookie en lugar de variables hardcodeadas.
+- [ ] **Remover Privileged Mode**: Ajustar permisos docker a lo estrictamente necesario tras testing.
+- [ ] **FIX Trackers Creation**: URL integrada en nuevo .py de tracker debería auto-detectar, no hardcodear Milnueve.
+- [ ] **Improve Trackers Edition**: Aplicar lógica de cambio de API, base URL y announce automáticamente.
