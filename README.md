@@ -159,11 +159,10 @@ Monitoriza todo tu imperio P2P en tiempo real. El Dashboard consume un JSON así
 3. **Nivel 1**: Re-Encode Bruto + Fallback CPU automático (si "Could not write header" detectado)
 4. **Nivel 0**: Salvaguarda (`REQUIRES_MANUAL_REVIEW` si todo falla)
 
-### ⚡ Mass Transcode (Herramienta Oculta)
-- Batch processing de 50+ archivos sin intervención manual
-- 2 intentos automáticos: AMD VA-API → CPU libx264
-- Fallback transparente si la cabecera está corrompida
-- Ruta: `/app/logs/rutas_host.txt` → `python3 mass_transcode.py`
+### ⚡ Nuevo Dashboard web
+- soporta multiproceso, puedes monitorizar varios terminales ejecutando procesos distintos de la suite
+- widgets desplegables que muestran estado detallado
+- opción de limpieza del dash desde menú del terminal
 
 ### 📁 FAST_WORK_DIR: Procesamiento en NVMe
 - Todos los temporales ahora van a `/app/RawLoadrr/tmp/TEMP_RESCUE` (rápido, SSD/NVMe)
@@ -183,6 +182,53 @@ Monitoriza todo tu imperio P2P en tiempo real. El Dashboard consume un JSON así
 - Stream Extra Corrupto → `-ignore_unknown -map_metadata -1`
 - Interleave Error → `-fflags +genpts`
 
+### 🛠️ PERSISTENCIA: CONFIGURACIÓN DINÁMICA "GUERRILLA"
+-------------------------------------------------------------------------------
+Gestión de suministros y credenciales in-situ (TTY-Ready):
+- Nivel 3: INTERCEPTACIÓN RICH
+         Detección de valores 'default'. Disparo de Setup Interactivo con 
+         máscaras de seguridad para passwords (no-leak policy).
+- Nivel 2: AUTO-RECON DE RED
+         Sugerencia inteligente de Gateway (172.17.0.1) para saltar la trampa 
+         del localhost (127.0.0.1) dentro de contenedores RHEL 9.
+- Nivel 1: INYECCIÓN DIRECTA (PERSISTENCIA)
+         Escritura inmediata en '/app/RawLoadrr/data/config.py'. Soporte nativo 
+         para montajes de volumen con contexto SELinux (:z).
+- Nivel 0: HARD-LINK DE ESTABILIDAD
+         Mantenimiento de montajes para 'make' y 'docker-compose', asegurando 
+         que la configuración sobreviva a reinicios del daemon o del host.
+---
+### 🚀 EJECUCIÓN: EL LANZADOR RAWNCHER (1200+ LOC)
+-------------------------------------------------------------------------------
+Jerarquía de procesamiento atómico para transcodificación y despacho:
+- Nivel 3: RECON DE ENTORNO
+         Resolución de rutas reales vía 'Path.resolve()'. Protección total 
+         contra symlinks rotos o mapeos inconsistentes en el host.
+- Nivel 2: INICIALIZACIÓN SEGURA
+         Prevención de 'AttributeError' mediante instanciación temprana de 
+         'self.config' y 'self._logger'. El cimiento del objeto es sagrado.
+- Nivel 1: DISPARO DE PRECISIÓN
+         El método '.disparar()' actúa como interruptor diferencial: decide 
+         la ruta de salida (API o Disco) según el estado real de la Aduana.
+- Nivel 0: TRAZABILIDAD ACR (ALERTA CRÍTICA / RECON)
+         Registro industrial de eventos con marcas de éxito (✅) y diagnósticos 
+         detallados para debugging post-mortem.
+---
+### 🎨 UX/UI: INTERFAZ INDUSTRIAL DE TERMINAL
+-------------------------------------------------------------------------------
+Recuperando el rigor visual de RHEL y la estética Commodore:
+- Nivel 2: MARCOS DE PROCESO
+         Encapsulación de fases (ADUANA/RECON/DISPARO) en 'rich.Panel' con 
+         bordes de grado militar (heavy/double).
+- Nivel 1: SEMÁFORO VISUAL
+         Código de colores estandarizado: 
+         [VERDE: Éxito] | [ROJO: Fallo Crítico] | [AMARILLO: Recon/Manual].
+- Nivel 0: BLINDAJE ASCII
+         Aislamiento de bloques de arte informativo. Prohibida la deformación 
+         del arte por refactorizaciones automáticas de agentes de IA.
+===============================================================================
+[ FIN DEL REPORTE - OPERACIÓN GREEN LIGHT ]
+===============================================================================
 ---
 
 ## 📝 TODO / Próximos Pasos
@@ -195,11 +241,11 @@ Monitoriza todo tu imperio P2P en tiempo real. El Dashboard consume un JSON así
 - [ ] **MOZ_X11_EGL Validation**: ¿Necesaria en tu setup específico? (PENDING_RECON)
 - [ ] **Cross-Filesystem Atomicidad**: Implementar `shutil.move + fsync` si TEMP_RESCUE y destino en FS diferentes.
 - [ ] **Mass Transcode Paralelismo**: Multiprocessing (4 procesos) con VA-API compartida.
-- [ ] **Reporte de Fallidos**: Guardar CSV de archivos irrecuperables.
-- [ ] **Heurística de Main Feature**: En `extract.py`, mejorar la selección del título principal cruzando tamaño y duración.
-- [ ] **Sincronización Chaos-Maker / Verifier**: Ajustar algoritmos para detectar sabotaje incluso en archivos pequeños.
-- [ ] **Modo 'Fast-Pass' en God Mode**: Flag para saltar health check profundo cuando confianza en origen es absoluta.
-- [ ] **Editor de Torrents General**: Menú interactivo para pedir URL y cookie en lugar de variables hardcodeadas.
-- [ ] **Remover Privileged Mode**: Ajustar permisos docker a lo estrictamente necesario tras testing.
-- [ ] **FIX Trackers Creation**: URL integrada en nuevo .py de tracker debería auto-detectar, no hardcodear Milnueve.
-- [ ] **Improve Trackers Edition**: Aplicar lógica de cambio de API, base URL y announce automáticamente.
+- [-] **Reporte de Fallidos**: Guardar CSV de archivos irrecuperables (actualmente solo .txt).
+- [-] **Heurística de Main Feature**: En `extract.py`, mejorar la selección del título principal cruzando tamaño y duración.
+- [-] **Sincronización Chaos-Maker / Verifier**: Ajustar algoritmos para detectar sabotaje incluso en archivos pequeños.
+- [x] **Modo 'Fast-Pass' en God Mode**: Flag para saltar health check profundo cuando confianza en origen es absoluta.
+- [x] **Editor de Torrents General**: Menú interactivo para pedir URL y cookie en lugar de variables hardcodeadas.
+- [-] **Remover Privileged Mode**: Ajustar permisos docker a lo estrictamente necesario tras testing.
+- [x] **FIX Trackers Creation**: URL integrada en nuevo .py de tracker debería auto-detectar, no hardcodear Milnueve.
+- [x] **Improve Trackers Edition**: Aplicar lógica de cambio de API, base URL y announce automáticamente.
