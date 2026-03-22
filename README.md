@@ -246,3 +246,13 @@ Recuperando el rigor visual de RHEL y la estética Commodore:
 - [ ] **Remover Privileged Mode**: Ajustar permisos docker a lo estrictamente necesario tras testing.
 - [x] **FIX Trackers Creation**: URL integrada en nuevo .py de tracker debería auto-detectar, no hardcodear Milnueve.
 - [x] **Improve Trackers Edition**: Aplicar lógica de cambio de API, base URL y announce automáticamente.
+
+---
+🐍 Python (código puro)          34,761 líneas
+📚 Documentación (MD)             5,100 líneas  
+🔧 Scripts (SH/PS1/BAT)          12,991 líneas
+⚙️  Configuración (YAML/JSON)     2,068 líneas
+📄 Datos/Logs (TXT/TSV)           3,517 líneas
+────────────────────────────────────────────────
+                    TOTAL        58,437 líneas
+---

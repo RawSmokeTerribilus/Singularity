@@ -20,16 +20,21 @@ theme:
 
 nav:
   - Inicio: index.md
-  - Instalación y Configuración: setup.md
-  - Singularity Mode: singularity_mode.md
-  - Módulos Principales:
+  - Instalación: setup.md
+  - Singularity: singularity_mode.md
+  - Módulos:
       - MKVerything: mkverything.md
       - RawLoadrr: rawloadrr.md
-      - UNIT3D Orchestrator: unit3d_orchestrator.md
-  - Dashboard Web: dashboard.md
-  - Utilidades Extras: extras.md
-  - Notas Técnicas: technical_notes.md
-  - Wiki RawLoadrr (ES):
+      - UNIT3D Orch: unit3d_orchestrator.md
+  - Mass Editor:
+      - Inicio: unit3d_mass_edition/index.md
+      - Pipeline (4 Fases): unit3d_mass_edition/pipeline.md
+      - Workflows: unit3d_mass_edition/workflows.md
+      - Setup & Seguridad: unit3d_mass_edition/setup_y_seguridad.md
+  - Dashboard: dashboard.md
+  - Utilidades: extras.md
+  - Notas: technical_notes.md
+  - RawLoadrr:
       - Inicio: rawloadrr_wiki/Home.md
       - Guía de Argumentos: rawloadrr_wiki/Arguments-User-Guide.md
       - Configuración Completa: rawloadrr_wiki/Full-Config-Guide.md
@@ -37,7 +42,7 @@ nav:
       - Edición Masiva: rawloadrr_wiki/Mass-Edition.md
       - Grupos Prohibidos: rawloadrr_wiki/Banned-Groups.md
       - Contenidos Prohibidos: rawloadrr_wiki/Content-Bans.md
-  - Wiki MKVerything (ES):
+  - MKVerything:
       - Inicio: mkverything_wiki/Home.md
       - Auditoría de Binarios: mkverything_wiki/Binary-Audit.md
       - Arquitectura: mkverything_wiki/Architecture.md
