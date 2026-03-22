@@ -645,10 +645,21 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#escalamiento-de-rescate" class="md-nav__link">
+  <a href="#i-auditoria-forense-en-4-capas-verifier" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Escalamiento de Rescate
+        I. Auditoría Forense en 4 Capas (Verifier)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#ii-la-escalera-de-resiliencia-universal-rescuer" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        II. La Escalera de Resiliencia (Universal Rescuer)
       
     </span>
   </a>
@@ -1367,10 +1378,21 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#escalamiento-de-rescate" class="md-nav__link">
+  <a href="#i-auditoria-forense-en-4-capas-verifier" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Escalamiento de Rescate
+        I. Auditoría Forense en 4 Capas (Verifier)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#ii-la-escalera-de-resiliencia-universal-rescuer" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        II. La Escalera de Resiliencia (Universal Rescuer)
       
     </span>
   </a>
@@ -1462,54 +1484,103 @@
 </ol>
 <p>Para procesar una biblioteca completa de forma desatendida, selecciona la <strong>Opción [5] (God Mode)</strong> dentro del Launcher.</p>
 <h2 id="funcionamiento-interno-the-guts">⚙️ Funcionamiento Interno (The Guts)</h2>
-<p>El núcleo de MKVerything es su <strong>algoritmo de verificación en 4 capas</strong> y su <strong>motor de rescate recursivo</strong>:</p>
-<pre class="mermaid"><code>graph TD
-    Start[Entrada de Medios] --&gt; Audit[Auditoría Forense 4-Capas]
-
-    subgraph Verifier [Algoritmo Verifier]
-        Audit --&gt; C1[C1: Estructura mkvmerge]
-        C1 --&gt; C2[C2: Streams ffprobe]
-        C2 --&gt; C3[C3: Bitstream Scan ffmpeg]
-        C3 --&gt; C4[C4: Ratio Size/Dur]
-    end
-
-    C4 --&gt;|Todo OK| Success[Archivo Validado]
-    C1 --&gt;|Fallo| Rescue[Escalado de Rescate]
-    C2 --&gt;|Fallo| Rescue
-    C3 --&gt;|Fallo| Rescue
-    C4 --&gt;|Fallo| Rescue
-
-    subgraph Engine [Universal Rescuer]
-        Rescue --&gt; L1[L1: Remux Bit-Copy]
-        L1 --&gt; L2[L2: Stream Cleaning]
-        L2 --&gt; L3[L3: Audio Re-encode]
-        L3 --&gt; L4[L4: Full Video Encode libx264]
-    end
-
-    L1 --&gt; Audit
-    L2 --&gt; Audit
-    L3 --&gt; Audit
-    L4 --&gt; Audit
-
-    Success --&gt; Final[Sustitución Segura y Registro]</code></pre>
+<p>El núcleo de MKVerything son dos subsistemas independientes:</p>
+<h3 id="i-auditoria-forense-en-4-capas-verifier">I. Auditoría Forense en 4 Capas (Verifier)</h3>
+<p>Antes de procesar cualquier archivo, se ejecuta un algoritmo de verificación en 4 capas:</p>
 <ol>
-<li><strong>Capa 1 (Estructura):</strong> Usa <code>mkvmerge</code> para validar que el contenedor es íntegro. Si falla, intenta un remux directo.</li>
-<li><strong>Capa 2 (Metadatos):</strong> Usa <code>ffprobe</code> para verificar que los streams de audio/video/subs son legibles.</li>
-<li><strong>Capa 3 (Decodificación):</strong> Realiza un escaneo nulo con <code>ffmpeg</code> (<code>-f null -</code>). Si hay errores de bitstream, el archivo se marca para rescate.</li>
-<li><strong>Capa 4 (Comparación):</strong> Tras procesar, compara el tamaño y duración con el original para evitar "falsos positivos".</li>
+<li><strong>Capa 1 (Estructura):</strong> <code>mkvmerge -I</code> valida que el contenedor MKV es íntegro.</li>
+<li><strong>Capa 2 (Streams):</strong> <code>ffprobe</code> verifica que cada stream (audio, video, subs) es legible.</li>
+<li><strong>Capa 3 (Decodificación):</strong> <code>ffmpeg -f null -</code> ejecuta un escaneo nulo completo. Si hay errores de bitstream, el archivo falla aquí.</li>
+<li><strong>Capa 4 (Coherencia):</strong> Se comparan size/duration con el original para detectar "falsos positivos".</li>
 </ol>
-<h3 id="escalamiento-de-rescate">Escalamiento de Rescate</h3>
-<p>Si un archivo falla las pruebas de integridad, MKVerything escala automáticamente:
-*   <strong>Nivel 1:</strong> Intento de remux simple (bit-copy).
-*   <strong>Nivel 2:</strong> Limpieza de streams (elimina pistas corruptas, subtítulos rotos).
-*   <strong>Nivel 3:</strong> Re-encodado de audio (si el video es apto pero el audio falla).
-*   <strong>Nivel 4:</strong> Re-encodado completo (libx264/AAC como último recurso).</p>
+<p><strong>Si pasa todas las capas</strong> → Archivo validado. <strong>Si falla cualquiera</strong> → Escalada a Universal Rescuer.</p>
+<h3 id="ii-la-escalera-de-resiliencia-universal-rescuer">II. La Escalera de Resiliencia (Universal Rescuer)</h3>
+<p>Si un archivo falla en Verifier, <code>Universal Rescuer</code> lo procesa en paralelo/NVMe (<code>FAST_WORK_DIR = /app/RawLoadrr/tmp/TEMP_RESCUE</code>) y prueba <strong>4 niveles de rescate en orden decreciente de sofisticación</strong>:</p>
+<pre class="mermaid"><code>graph TD
+    Input[Archivo Fallido] --&gt; L3{Nivel 3:&lt;br/&gt;VapourSynth+HW}
+
+    L3 --&gt;|✅ Éxito| Success[MKV Rescatado]
+    L3 --&gt;|❌ Fallo| L2{Nivel 2:&lt;br/&gt;Remux Médico}
+
+    L2 --&gt;|✅ Éxito| Success
+    L2 --&gt;|❌ Fallo| L1{Nivel 1:&lt;br/&gt;Re-Encode Bruto}
+
+    L1 --&gt;|✅ Éxito| Success
+    L1 --&gt;|❌ Fallo| L0[Nivel 0:&lt;br/&gt;Salvaguarda]
+
+    L0 --&gt; Manual[REQUIRES_MANUAL_REVIEW]
+    Success --&gt; Validate[Re-Validar con Verifier]
+    Validate --&gt;|✅| Replace[Reemplazar Original&lt;br/&gt;Atómicamente]</code></pre>
+<ul>
+<li>
+<p><strong>Nivel 3 (VapourSynth + Hardware): El Cirujano Endovascular</strong></p>
+<ul>
+<li><strong>Ubicación del código:</strong> <code>universal_rescuer.py:execute_strategy(level=3)</code></li>
+<li><strong>Dependencias forjadas:</strong> VapourSynth R73, L-SMASH-Works (compilado desde fuente), zimg</li>
+<li><strong>Lógica:</strong> Genera un script VapourSynth que utiliza <code>core.lsmas.LWLibavSource()</code> para "cateterizar" el archivo a bajo nivel, evitando rechazos por corrupción de contenedor. La salida va a <code>vspipe -c y4m | ffmpeg</code> con argumentos HW del <code>HardwareAgent</code>.</li>
+<li><strong>Cuándo actúa:</strong> Especialista en "trauma estructural" (contenedores dañados pero streams viables).</li>
+<li><strong>Duración:</strong> ~30-60% más rápido que re-encod completo.</li>
+</ul>
+</li>
+<li>
+<p><strong>Nivel 2 (Remux Médico): El Cirujano de Pistas</strong></p>
+<ul>
+<li><strong>Ubicación del código:</strong> <code>universal_rescuer.py:execute_strategy(level=2)</code></li>
+<li><strong>Comando exacto:</strong>
+    <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>ffmpeg<span class="w"> </span>-hide_banner<span class="w"> </span>-y<span class="w"> </span>-fflags<span class="w"> </span>+genpts<span class="w"> </span>-i<span class="w"> </span>&lt;input&gt;<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="w">  </span>-map<span class="w"> </span><span class="m">0</span><span class="w"> </span>-c:v<span class="w"> </span>copy<span class="w"> </span>-c:a<span class="w"> </span>aac<span class="w"> </span>-af<span class="w"> </span><span class="nv">aresample</span><span class="o">=</span><span class="nv">async</span><span class="o">=</span><span class="m">1</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="w">  </span>-c:s<span class="w"> </span>srt<span class="w"> </span>&lt;output&gt;
+</code></pre></div></li>
+<li><strong>Qué hace:</strong> Copia el stream de video intacto, pero re-encodifica audio a AAC y subs a SRT. El flag <code>-fflags +genpts</code> regenera timestamps y <code>aresample=async=1</code> sincroniza el audio cuando hay desincronización.</li>
+<li><strong>Cuándo actúa:</strong> Video sano, pero audio/subs corruptos o en formatos raros (DTS, ASS inválido, etc.).</li>
+<li><strong>Duración:</strong> ~5-10% del tiempo de re-encod completo.</li>
+</ul>
+</li>
+<li>
+<p><strong>Nivel 1 (Re-Encode Bruto + Fallback Automático): La Fuerza Bruta Inteligente</strong></p>
+<ul>
+<li><strong>Ubicación del código:</strong> <code>universal_rescuer.py:execute_strategy(level=1)</code></li>
+<li><strong>Intento 1.1 (HW):</strong> Intenta H.264 con GPU (AMD VA-API, NVIDIA NVENC, Intel QSV, según <code>HardwareAgent</code>).<ul>
+<li><strong>Trigger de fallback:</strong> Si stderr contiene <code>"Could not write header"</code>, significa que el header está corrompido incluso en re-encod. Salta a fallback automáticamente.</li>
+<li><strong>Comando:</strong> <code>ffmpeg -hide_banner -y -i &lt;input&gt; -map 0 &lt;hw_args&gt; &lt;output&gt;</code></li>
+</ul>
+</li>
+<li><strong>Intento 1.2 (CPU Tank):</strong> Si HW falla por cualquier motivo, activa automáticamente:
+    <div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>ffmpeg<span class="w"> </span>-hide_banner<span class="w"> </span>-y<span class="w"> </span>-i<span class="w"> </span>&lt;input&gt;<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="w">  </span>-c:v<span class="w"> </span>libx264<span class="w"> </span>-preset<span class="w"> </span>fast<span class="w"> </span>-crf<span class="w"> </span><span class="m">22</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="w">  </span>-c:a<span class="w"> </span>aac<span class="w"> </span>-b:a<span class="w"> </span>128k<span class="w"> </span>-c:s<span class="w"> </span>srt<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="w">  </span>-map<span class="w"> </span><span class="m">0</span>:v:0<span class="w"> </span>-map<span class="w"> </span><span class="m">0</span>:a?<span class="w"> </span>-map<span class="w"> </span><span class="m">0</span>:s?<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="w">  </span>-ignore_unknown<span class="w"> </span>-map_metadata<span class="w"> </span>-1<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a><span class="w">  </span>-metadata:s:v:0<span class="w"> </span><span class="nv">sar</span><span class="o">=</span><span class="m">1</span>/1<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a><span class="w">  </span>-fflags<span class="w"> </span>+genpts+igndts+discardcorrupt<span class="w"> </span>&lt;output&gt;
+</code></pre></div><ul>
+<li><strong>Correcciones extras en CPU Tank:</strong><ul>
+<li><code>-metadata:s:v:0 sar=1/1</code>: Endereza aspect ratio corrompido por WinX/MediaPlayer.</li>
+<li><code>-fflags +discardcorrupt</code>: Descarta frames dañados en lugar de crashear.</li>
+<li><code>-ignore_unknown</code>: Ignora streams desconocidos.</li>
+</ul>
+</li>
+</ul>
+</li>
+<li><strong>Cuándo actúa:</strong> Stream de video dañado a nivel de datos.</li>
+<li><strong>Duración:</strong> ~1-4 horas según resolución y duración.</li>
+</ul>
+</li>
+<li>
+<p><strong>Nivel 0 (Salvaguarda): Rendición Táctica</strong></p>
+<ul>
+<li><strong>Ubicación del código:</strong> <code>universal_rescuer.py:transcodificar_archivo()</code> (final)</li>
+<li><strong>Acción:</strong> NO modifica el archivo original. Genera una línea en el log: <code>🛑 REQUIRES_MANUAL_REVIEW: &lt;ruta_origen&gt;</code></li>
+<li><strong>Cuándo actúa:</strong> Protege contra "garbage in = garbage out". Un archivo que falla todos los 3 niveles probablemente está irrecuperable o su formato es desconocido.</li>
+</ul>
+</li>
+</ul>
 <h2 id="configuracion-y-ajustes">🔧 Configuración y Ajustes</h2>
 <h3 id="personalizacion-de-spam">Personalización de SPAM</h3>
 <p>Puedes ajustar qué términos se consideran spam editando <code>singularity_config.py</code>:
-<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="n">SPAM_KEYWORDS</span> <span class="o">=</span> <span class="p">[</span>
-<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>    <span class="s2">&quot;rarbg&quot;</span><span class="p">,</span> <span class="s2">&quot;yify&quot;</span><span class="p">,</span> <span class="s2">&quot;ettv&quot;</span><span class="p">,</span> <span class="s2">&quot;www.&quot;</span><span class="p">,</span> <span class="s2">&quot;.com&quot;</span><span class="p">,</span> <span class="s2">&quot;torrent&quot;</span><span class="p">,</span> <span class="o">...</span>
-<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="p">]</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="n">SPAM_KEYWORDS</span> <span class="o">=</span> <span class="p">[</span>
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>    <span class="s2">&quot;rarbg&quot;</span><span class="p">,</span> <span class="s2">&quot;yify&quot;</span><span class="p">,</span> <span class="s2">&quot;ettv&quot;</span><span class="p">,</span> <span class="s2">&quot;www.&quot;</span><span class="p">,</span> <span class="s2">&quot;.com&quot;</span><span class="p">,</span> <span class="s2">&quot;torrent&quot;</span><span class="p">,</span> <span class="o">...</span>
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="p">]</span>
 </code></pre></div>
 MKVerything eliminará estos términos de los títulos de las pistas y comentarios globales durante el procesado.</p>
 <h3 id="resiliencia-y-seguridad">Resiliencia y Seguridad</h3>

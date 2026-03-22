@@ -1,0 +1,1813 @@
+
+<!doctype html>
+<html lang="es" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Automatización total para la gestión de medios y trackers UNIT3D">
+      
+      
+        <meta name="author" content="RaW Team">
+      
+      
+      
+      
+      
+        
+      
+      
+      <link rel="icon" href="../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.3">
+    
+    
+      
+        <title>Troubleshooting — Patología de "Pudrición" Multimedia - RaW Suite: Singularity</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="slate" data-md-color-primary="cyan" data-md-color-accent="cyan">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#troubleshooting-patologia-de-pudricion-multimedia" class="md-skip">
+          Saltar a contenido
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Cabecera">
+    <a href=".." title="RaW Suite: Singularity" class="md-header__button md-logo" aria-label="RaW Suite: Singularity" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            RaW Suite: Singularity
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Troubleshooting — Patología de "Pudrición" Multimedia
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="cyan" data-md-color-accent="cyan"  aria-hidden="true"  type="radio" name="__palette" id="__palette_0">
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-hidden="true"  type="radio" name="__palette" id="__palette_1">
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Búsqueda" placeholder="Búsqueda" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Buscar">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Limpiar" aria-label="Limpiar" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Inicializando búsqueda
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Pestañas" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href=".." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Inicio
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../setup/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Instalación y Configuración
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../singularity_mode/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Singularity Mode
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../mkverything/" class="md-tabs__link">
+          
+  
+  
+  Módulos Principales
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../dashboard/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Dashboard Web
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../extras/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Utilidades Extras
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../technical_notes/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Notas Técnicas
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../rawloadrr_wiki/Home/" class="md-tabs__link">
+          
+  
+  
+  Wiki RawLoadrr (ES)
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../mkverything_wiki/Home/" class="md-tabs__link">
+          
+  
+  
+  Wiki MKVerything (ES)
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navegación" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="RaW Suite: Singularity" class="md-nav__button md-logo" aria-label="RaW Suite: Singularity" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    RaW Suite: Singularity
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Inicio
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../setup/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Instalación y Configuración
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../singularity_mode/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Singularity Mode
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Módulos Principales
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Módulos Principales
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../mkverything/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    MKVerything
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../rawloadrr/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    RawLoadrr
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../unit3d_orchestrator/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    UNIT3D Orchestrator
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../dashboard/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dashboard Web
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../extras/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Utilidades Extras
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../technical_notes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Notas Técnicas
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8" >
+        
+          
+          <label class="md-nav__link" for="__nav_8" id="__nav_8_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Wiki RawLoadrr (ES)
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_8_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_8">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Wiki RawLoadrr (ES)
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../rawloadrr_wiki/Home/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Inicio
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../rawloadrr_wiki/Arguments-User-Guide/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Guía de Argumentos
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../rawloadrr_wiki/Full-Config-Guide/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuración Completa
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../rawloadrr_wiki/Interactive-Config/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuración Interactiva
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../rawloadrr_wiki/Mass-Edition/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Edición Masiva
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../rawloadrr_wiki/Banned-Groups/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Grupos Prohibidos
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../rawloadrr_wiki/Content-Bans/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Contenidos Prohibidos
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_9" >
+        
+          
+          <label class="md-nav__link" for="__nav_9" id="__nav_9_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Wiki MKVerything (ES)
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_9_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_9">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Wiki MKVerything (ES)
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../mkverything_wiki/Home/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Inicio
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../mkverything_wiki/Binary-Audit/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Auditoría de Binarios
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../mkverything_wiki/Architecture/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Arquitectura
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../mkverything_wiki/Modules-Guide/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Guía de Módulos
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../mkverything_wiki/Verifier-Deep-Dive/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Deep Dive Verificador
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Tabla de contenidos">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Tabla de contenidos
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#anatomia-de-la-pudricion-multimedia" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        🔍 Anatomía de la Pudrición Multimedia
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="🔍 Anatomía de la Pudrición Multimedia">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#tipos-principales" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Tipos Principales
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Tipos Principales">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#1-corrupcion-de-cabecera-header-corruption" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. Corrupción de Cabecera (Header Corruption)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2-desincronizacion-de-audio-audio-out-of-sync" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Desincronización de Audio (Audio Out of Sync)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#3-subtitulos-danados-o-en-formato-incompatible" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Subtítulos Dañados o en Formato Incompatible
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#4-aspect-ratio-roto-winxmediaplayer-corruption" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. Aspect Ratio Roto (WinX/MediaPlayer Corruption)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#5-stream-extra-corrupto-attachment-data-etc" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. Stream Extra Corrupto ("Attachment", "Data", etc.)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#6-interleave-error-pistas-desordenadas" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6. Interleave Error (Pistas Desordenadas)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#matriz-de-decision-que-nivel-funcionara" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        📊 Matriz de Decisión: ¿Qué Nivel Funcionará?
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#solucion-manual-cuando-nivel-0-no-rescata" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        🔧 Solución Manual: Cuando Nivel 0 No Rescata
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="🔧 Solución Manual: Cuando Nivel 0 No Rescata">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#opcion-a-forcekeyframes-corruption-discard" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Opción A: ForceKeyframes + Corruption Discard
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#opcion-b-extraccion-y-re-mux" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Opción B: Extracción y Re-Mux
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#opcion-c-aceptacion" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Opción C: Aceptación
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#logs-y-diagnostico" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        📝 Logs y Diagnóstico
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="📝 Logs y Diagnóstico">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#donde-buscar-errores" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Dónde Buscar Errores
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#lectura-de-error-tipica" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Lectura de Error Típica
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#checklist-antes-de-reportar-archivo-irrecuperable" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ✅ Checklist: Antes de Reportar "Archivo Irrecuperable"
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#proximas-mejoras-pending_recon" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        🎯 Próximas Mejoras (PENDING_RECON)
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="troubleshooting-patologia-de-pudricion-multimedia">Troubleshooting — Patología de "Pudrición" Multimedia</h1>
+<blockquote>
+<p><strong>"Cuando un archivo es más cadáver que video, aquí es donde vienen a morir en paz."</strong></p>
+</blockquote>
+<p>Esta guía detalla los <strong>errores típicos de corrupción ("pudrición")</strong> que encuentran los usuarios y <strong>cómo la Escalera de Resiliencia los mitiga automáticamente</strong>.</p>
+<hr />
+<h2 id="anatomia-de-la-pudricion-multimedia">🔍 Anatomía de la Pudrición Multimedia</h2>
+<h3 id="tipos-principales">Tipos Principales</h3>
+<h4 id="1-corrupcion-de-cabecera-header-corruption">1. <strong>Corrupción de Cabecera (Header Corruption)</strong></h4>
+<p><strong>Síntomas:</strong>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>ffmpeg error: &quot;Could not write header&quot;
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>ffmpeg error: &quot;Invalid data found&quot;
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>ffmpeg error: &quot;Unknown format&quot;
+</code></pre></div></p>
+<p><strong>Causa:</strong> El contador de frames, timestamps o metadatos de contenedor están dañados. Ocurre típicamente cuando:
+- El archivo se descargó incompleto
+- El antivirus escaneó y corrupted el archivo
+- Edición de WinX Media o Windows Media Player (escribe timestamps inválidos)</p>
+<p><strong>Cómo lo mitiga el sistema:</strong></p>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">Nivel</th>
+<th style="text-align: left;">Estrategia</th>
+<th style="text-align: left;">Resultado</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;"><strong>Nivel 3</strong></td>
+<td style="text-align: left;">L-SMASH bypassa el header del contenedor, lee el stream directamente a bajo nivel</td>
+<td style="text-align: left;">✅ Rescatado (si el stream en sí está OK)</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>Nivel 2</strong></td>
+<td style="text-align: left;"><code>ffmpeg -fflags +genpts</code> regenera los timestamps completos</td>
+<td style="text-align: left;">⚠️ Audio posiblemente desincronizado</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>Nivel 1</strong></td>
+<td style="text-align: left;">Re-encod completo: escribe un header nuevo desde cero</td>
+<td style="text-align: left;">✅ Rescatado pero más lento</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Código relevante:</strong>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="c1"># universal_rescuer.py - Nivel 1 detección</span>
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="n">fallback_trigger</span><span class="o">=</span><span class="s2">&quot;Could not write header&quot;</span>
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="k">if</span> <span class="n">result</span> <span class="o">==</span> <span class="s2">&quot;FALLBACK_TRIGGERED&quot;</span><span class="p">:</span>
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>    <span class="c1"># CPU tank con correcciones:</span>
+<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>    <span class="c1"># -metadata:s:v:0 sar=1/1: corrige aspect ratio roto por WinX</span>
+<a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>    <span class="c1"># -fflags +genpts: regenera PTS</span>
+</code></pre></div></p>
+<hr />
+<h4 id="2-desincronizacion-de-audio-audio-out-of-sync">2. <strong>Desincronización de Audio (Audio Out of Sync)</strong></h4>
+<p><strong>Síntomas:</strong>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>Los labios no coinciden con el audio
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>ffmpeg reports &quot;skipped samples&quot; durante decodificación
+</code></pre></div></p>
+<p><strong>Causa:</strong> El stream de video y audio tienen diferentes timestamps o frame rates:
+- El audio se editó pero el video no
+- DTS vs PTS mismatch
+- Contenedor con sellos de tiempo inválidos</p>
+<p><strong>Cómo lo mitiga:</strong></p>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">Nivel</th>
+<th style="text-align: left;">Estrategia</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;"><strong>Nivel 3</strong></td>
+<td style="text-align: left;">VapourSynth con LSMASH mantiene sincronización videonativa; luego ffmpeg re-sincroniza</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>Nivel 2</strong></td>
+<td style="text-align: left;"><code>aresample=async=1</code> resampling automático; <code>fflags +genpts</code> regenera PTS de sync point</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>Nivel 1 (CPU)</strong></td>
+<td style="text-align: left;">Copia el stream original, solo audio AAC re-encode a 128k (manteniendo PTS original)</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Código exacto (Nivel 2):</strong>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>ffmpeg<span class="w"> </span>-fflags<span class="w"> </span>+genpts<span class="w"> </span>-i<span class="w"> </span>input.mkv<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="w">  </span>-c:v<span class="w"> </span>copy<span class="w"> </span>-c:a<span class="w"> </span>aac<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="w">  </span>-af<span class="w"> </span><span class="nv">aresample</span><span class="o">=</span><span class="nv">async</span><span class="o">=</span><span class="m">1</span><span class="w"> </span><span class="se">\ </span><span class="w"> </span><span class="c1"># ← Resampling sincrónico</span>
+<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="w">  </span>-c:s<span class="w"> </span>srt<span class="w"> </span>output.mkv
+</code></pre></div></p>
+<hr />
+<h4 id="3-subtitulos-danados-o-en-formato-incompatible">3. <strong>Subtítulos Dañados o en Formato Incompatible</strong></h4>
+<p><strong>Síntomas:</strong>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>mkvmerge: UTF-8 validation error
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>ffmpeg: Invalid UTF-8 in subtitle
+<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>Subtítulos en SSA/ASS con errores de codificación
+</code></pre></div></p>
+<p><strong>Causa:</strong>
+- Subtítulos con encoding corrupto (CP1252 vs UTF-8 confundidos)
+- Formato ASS con etiquetas rotas
+- Subtítulos incrustados con bugs de mkvtoolnix antiguo</p>
+<p><strong>Cómo lo mitiga:</strong></p>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">Nivel</th>
+<th style="text-align: left;">Estrategia</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;"><strong>Nivel 3</strong></td>
+<td style="text-align: left;">Ignora subs, re-encoda solo video+audio</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>Nivel 2</strong></td>
+<td style="text-align: left;">Convierte a SRT puro (decodifica ASS a texto plano ASCII-safe)</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>Nivel 1</strong></td>
+<td style="text-align: left;"><code>-c:s srt</code> + <code>map 0:s?</code> intenta incluir subs, fallback a ignorarlas</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Nota:</strong> Nivel 2 es el especialista en subs rotos. Si llega a Nivel 1, probablemente los subs se pierden.</p>
+<hr />
+<h4 id="4-aspect-ratio-roto-winxmediaplayer-corruption">4. <strong>Aspect Ratio Roto (WinX/MediaPlayer Corruption)</strong></h4>
+<p><strong>Síntomas:</strong>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>Video estirado (4:3 mostrado como 16:9)
+<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>Video aplastado (16:9 mostrado como 4:3)
+<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>ffprobe muestra values SAR=&quot;0/1&quot; o inválidos
+</code></pre></div></p>
+<p><strong>Causa:</strong> Windows Media Player o WinX escriben metadatos inválidos de aspect ratio.</p>
+<p><strong>Cómo lo mitiga:</strong></p>
+<p><strong>Nivel 1 (CPU Tank específicamente):</strong>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>-metadata:s:v:0<span class="w"> </span><span class="nv">sar</span><span class="o">=</span><span class="m">1</span>/1<span class="w">  </span><span class="c1"># ← Resetea SAR a neutral (Fix WinX)</span>
+</code></pre></div></p>
+<p>Si llegas a Nivel 1 CPU, se aplica este fix automáticamente.</p>
+<p><strong>PENDING_RECON:</strong> ¿Debería aplicarse también en Nivel 2 o Nivel 3?</p>
+<hr />
+<h4 id="5-stream-extra-corrupto-attachment-data-etc">5. <strong>Stream Extra Corrupto ("Attachment", "Data", etc.)</strong></h4>
+<p><strong>Síntomas:</strong>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>ffmpeg: Unknown stream type @0xa (type 10)
+<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>ffmpeg: Stream index 10 not found
+<a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a>mkvmerge: Invalid codec ID
+</code></pre></div></p>
+<p><strong>Causa:</strong> El contenedor MKV tiene streams "attachment" (fuentes, imágenes, scripts) con codec inválido o corrupto.</p>
+<p><strong>Cómo lo mitiga:</strong></p>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">Nivel</th>
+<th style="text-align: left;">Estrategia</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;"><strong>Nivel 3</strong></td>
+<td style="text-align: left;"><code>-map 0:v -map 1:a? -map 1:s?</code> extrae solo V+A+S, ignora otros</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>Nivel 2</strong></td>
+<td style="text-align: left;"><code>-map 0</code> mapea TODO pero ffmpeg puede fallar en stream 10</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>Nivel 1</strong></td>
+<td style="text-align: left;"><code>-map 0:v:0 -map 0:a? -map_metadata -1</code> limpia metadatos y attachments</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Código:</strong>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="c1"># universal_rescuer.py - Nivel 1 fallback</span>
+<a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a><span class="s2">&quot;-map_metadata&quot;</span><span class="p">,</span> <span class="s2">&quot;-1&quot;</span><span class="p">,</span>
+<a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a><span class="s2">&quot;-ignore_unknown&quot;</span><span class="p">,</span>  <span class="c1"># ← Ignora streams desconocidos</span>
+</code></pre></div></p>
+<hr />
+<h4 id="6-interleave-error-pistas-desordenadas">6. <strong>Interleave Error (Pistas Desordenadas)</strong></h4>
+<p><strong>Síntomas:</strong>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>ffmpeg: Too many packets buffered for output stream
+<a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a>ffmpeg: DTS back values &lt; PTS
+</code></pre></div></p>
+<p><strong>Causa:</strong> El contenedor tiene frames/paquetes fuera de orden temporal. Ocurre en:
+- Edición manual with mkvmerge sin re-muxing
+- Archivos grabados en tiempo real con seekback
+- Corrupción parcial de índice</p>
+<p><strong>Cómo lo mitiga:</strong></p>
+<p><strong>Nivel 2:</strong>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>-fflags<span class="w"> </span>+genpts<span class="w">  </span><span class="c1"># ← Regenera PTS de cero</span>
+</code></pre></div></p>
+<p><strong>Nivel 1:</strong>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a>-max_interleave_delta<span class="w"> </span><span class="m">0</span><span class="w">  </span><span class="c1"># ← Desactiva el buffer de interleave en Mass Transcode</span>
+<a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a>-fflags<span class="w"> </span>+genpts+igndts+discardcorrupt
+</code></pre></div></p>
+<hr />
+<h2 id="matriz-de-decision-que-nivel-funcionara">📊 Matriz de Decisión: ¿Qué Nivel Funcionará?</h2>
+<p>Use esta tabla para <strong>predecir</strong> qué nivel de la Escalera reparará su archivo:</p>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">Síntoma</th>
+<th style="text-align: left;">Contenedor</th>
+<th style="text-align: left;">Video Stream</th>
+<th style="text-align: left;">Audio/Subs</th>
+<th style="text-align: left;">Nivel Probable</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;">"Could not write header"</td>
+<td style="text-align: left;">❌ Roto</td>
+<td style="text-align: left;">✅ OK</td>
+<td style="text-align: left;">✅ OK</td>
+<td style="text-align: left;"><strong>3 o 2</strong></td>
+</tr>
+<tr>
+<td style="text-align: left;">Desincronización audio</td>
+<td style="text-align: left;">✅ OK</td>
+<td style="text-align: left;">✅ OK</td>
+<td style="text-align: left;">⚠️ PTS roto</td>
+<td style="text-align: left;"><strong>2</strong></td>
+</tr>
+<tr>
+<td style="text-align: left;">Subs dañados/codificación</td>
+<td style="text-align: left;">✅ OK</td>
+<td style="text-align: left;">✅ OK</td>
+<td style="text-align: left;">❌ Roto</td>
+<td style="text-align: left;"><strong>2</strong></td>
+</tr>
+<tr>
+<td style="text-align: left;">Aspect ratio WinX</td>
+<td style="text-align: left;">✅ OK</td>
+<td style="text-align: left;">⚠️ SAR=0</td>
+<td style="text-align: left;">✅ OK</td>
+<td style="text-align: left;"><strong>1 (CPU)</strong></td>
+</tr>
+<tr>
+<td style="text-align: left;">Stream extra corrupto</td>
+<td style="text-align: left;">✅ OK</td>
+<td style="text-align: left;">✅ OK</td>
+<td style="text-align: left;">✅ OK</td>
+<td style="text-align: left;"><strong>1 o 2</strong></td>
+</tr>
+<tr>
+<td style="text-align: left;">Interleave error</td>
+<td style="text-align: left;">⚠️ Desordenado</td>
+<td style="text-align: left;">✅ OK</td>
+<td style="text-align: left;">✅ OK</td>
+<td style="text-align: left;"><strong>2 o 1</strong></td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>TODO ROTO</strong></td>
+<td style="text-align: left;">❌ ❌ ❌</td>
+<td style="text-align: left;">❌ ❌ ❌</td>
+<td style="text-align: left;">❌ ❌ ❌</td>
+<td style="text-align: left;"><strong>0 (Manual)</strong></td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="solucion-manual-cuando-nivel-0-no-rescata">🔧 Solución Manual: Cuando Nivel 0 No Rescata</h2>
+<p>Si todos los niveles fallan, tienes opciones manuales:</p>
+<h3 id="opcion-a-forcekeyframes-corruption-discard">Opción A: ForceKeyframes + Corruption Discard</h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a>ffmpeg<span class="w"> </span>-hide_banner<span class="w"> </span>-y<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a><span class="w">  </span>-fflags<span class="w"> </span>+bitexact+discardcorrupt<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-12-3" name="__codelineno-12-3" href="#__codelineno-12-3"></a><span class="w">  </span>-i<span class="w"> </span>corrupted.mkv<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-12-4" name="__codelineno-12-4" href="#__codelineno-12-4"></a><span class="w">  </span>-c:v<span class="w"> </span>libx265<span class="w"> </span>-preset<span class="w"> </span>ultrafast<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-12-5" name="__codelineno-12-5" href="#__codelineno-12-5"></a><span class="w">  </span>-c:a<span class="w"> </span>aac<span class="w"> </span>-b:a<span class="w"> </span>64k<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-12-6" name="__codelineno-12-6" href="#__codelineno-12-6"></a><span class="w">  </span>-max_muxing_queue_depth<span class="w"> </span><span class="m">1024</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-12-7" name="__codelineno-12-7" href="#__codelineno-12-7"></a><span class="w">  </span>rescue4.mkv
+</code></pre></div>
+<p><strong>Rationale:</strong> Desactiva validaciones estrictas y ignora frames corruptos. <strong>Resultado:</strong> Vídeo probablemente con artefactos o saltos, pero "jugable".</p>
+<h3 id="opcion-b-extraccion-y-re-mux">Opción B: Extracción y Re-Mux</h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a><span class="c1"># Extrae streams individuales</span>
+<a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a>ffmpeg<span class="w"> </span>-i<span class="w"> </span>corrupted.mkv<span class="w"> </span>-c:v<span class="w"> </span>copy<span class="w"> </span>stream_video.h264
+<a id="__codelineno-13-3" name="__codelineno-13-3" href="#__codelineno-13-3"></a>ffmpeg<span class="w"> </span>-i<span class="w"> </span>corrupted.mkv<span class="w"> </span>-c:a<span class="w"> </span>copy<span class="w"> </span>stream_audio.aac
+<a id="__codelineno-13-4" name="__codelineno-13-4" href="#__codelineno-13-4"></a>
+<a id="__codelineno-13-5" name="__codelineno-13-5" href="#__codelineno-13-5"></a><span class="c1"># Re-muxea en contenedor limpio</span>
+<a id="__codelineno-13-6" name="__codelineno-13-6" href="#__codelineno-13-6"></a>ffmpeg<span class="w"> </span>-i<span class="w"> </span>stream_video.h264<span class="w"> </span>-i<span class="w"> </span>stream_audio.aac<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-13-7" name="__codelineno-13-7" href="#__codelineno-13-7"></a><span class="w">  </span>-c<span class="w"> </span>copy<span class="w"> </span>-map<span class="w"> </span><span class="m">0</span>:v<span class="w"> </span>-map<span class="w"> </span><span class="m">1</span>:a<span class="w"> </span>output.mkv
+</code></pre></div>
+<p><strong>Rationale:</strong> Si el contenedor está roto pero los streams son OK, esto puede rescatarlos.</p>
+<h3 id="opcion-c-aceptacion">Opción C: Aceptación</h3>
+<p>Si nada funciona, el archivo probablemente está <strong>irrecuperable</strong>. Considera:
+- Descargarlo de nuevo desde el tracker original
+- Solicitar un reencod en el foro
+- Aceptar un downgrade de calidad (ej: source HDTV en lugar de remux)</p>
+<hr />
+<h2 id="logs-y-diagnostico">📝 Logs y Diagnóstico</h2>
+<h3 id="donde-buscar-errores">Dónde Buscar Errores</h3>
+<p><strong>UniversalRescuer:</strong>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a>/app/logs/rescue_process.log
+</code></pre></div>
+Línea por línea, con exactitud de qué comando falló y por qué.</p>
+<p><strong>Mass Transcode:</strong>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a>Stdout/Stderr en tiempo real (sin persistencia automática)
+</code></pre></div>
+Redirige manualmente si necesitas logging:
+<div class="highlight"><pre><span></span><code><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a>python3<span class="w"> </span>mass_transcode.py<span class="w"> </span>&gt;&gt;<span class="w"> </span>/app/logs/mass_transcode_<span class="k">$(</span>date<span class="w"> </span>+%s<span class="k">)</span>.log<span class="w"> </span><span class="m">2</span>&gt;<span class="p">&amp;</span><span class="m">1</span>
+</code></pre></div></p>
+<h3 id="lectura-de-error-tipica">Lectura de Error Típica</h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a>[2026-03-22 15:42:11] 💉 Procesando en NVMe: corrupted_s01e01.mkv
+<a id="__codelineno-17-2" name="__codelineno-17-2" href="#__codelineno-17-2"></a>[2026-03-22 15:42:11] 🪜 Intentando Nivel 3 (VapourSynth + HW)...
+<a id="__codelineno-17-3" name="__codelineno-17-3" href="#__codelineno-17-3"></a>[2026-03-22 15:47:22] ⚠️ Fallo técnico en Nivel 3 (VapourSynth + HW) (Código 1). Detalles a continuación.
+<a id="__codelineno-17-4" name="__codelineno-17-4" href="#__codelineno-17-4"></a>
+<a id="__codelineno-17-5" name="__codelineno-17-5" href="#__codelineno-17-5"></a>--- ERROR DETALLADO Nivel 3 ---
+<a id="__codelineno-17-6" name="__codelineno-17-6" href="#__codelineno-17-6"></a>Comando: vspipe -c y4m &quot;/app/RawLoadrr/tmp/TEMP_RESCUE/script.vpy&quot; - | ffmpeg ...
+<a id="__codelineno-17-7" name="__codelineno-17-7" href="#__codelineno-17-7"></a>error: cannot find /dev/dri/renderD128: Invalid argument
+</code></pre></div>
+<p><strong>Diagnóstico:</strong> La GPU AMD (renderD128) no está mapeada en el contenedor. Verifica que <code>docker-compose.yml</code> tiene:
+<div class="highlight"><pre><span></span><code><a id="__codelineno-18-1" name="__codelineno-18-1" href="#__codelineno-18-1"></a><span class="nt">devices</span><span class="p">:</span>
+<a id="__codelineno-18-2" name="__codelineno-18-2" href="#__codelineno-18-2"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/dev/dri:/dev/dri</span>
+</code></pre></div></p>
+<hr />
+<h2 id="checklist-antes-de-reportar-archivo-irrecuperable">✅ Checklist: Antes de Reportar "Archivo Irrecuperable"</h2>
+<ol>
+<li><strong>¿El archivo pasó Verifier correctamente?</strong> Si sí, probablemente NO necesita rescate.</li>
+<li><strong>¿Corriste God Mode?</strong> (MKVerything Launcher → Opción 5). Si no, el archivo no fue auditor procesado.</li>
+<li><strong>¿Verificaste los logs?</strong> <code>/app/logs/rescue_process.log</code> dirá exactamente qué falló.</li>
+<li><strong>¿El Nivel 0 reporta REQUIRES_MANUAL_REVIEW?</strong> Si no, quizás el rescate <em>sí funcionó</em> pero no te diste cuenta.</li>
+<li><strong>¿Reproduciste el archivo rescatado en VLC?</strong> 90% de "fallos" son falsos positivos; VLC "entiende" más que ffmpeg.</li>
+</ol>
+<hr />
+<h2 id="proximas-mejoras-pending_recon">🎯 Próximas Mejoras (PENDING_RECON)</h2>
+<ul>
+<li>¿Debería guardar un "reporte de pudrición" (CSV) listando qué archivos faiaron y por qué?</li>
+<li>¿Implementar un analizador automático de "viabilidad" antes de rescate (ej: si 90% del archivo está corrupto, no malgastes GPU)?</li>
+<li>¿Agregar Nivel 4 (AV1 ultra-robusto con ffmpeg natively)?</li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.tabs", "navigation.sections", "search.highlight", "content.code.copy"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copiado al portapapeles", "clipboard.copy": "Copiar al portapapeles", "search.result.more.one": "1 m\u00e1s en esta p\u00e1gina", "search.result.more.other": "# m\u00e1s en esta p\u00e1gina", "search.result.none": "No se encontraron documentos", "search.result.one": "1 documento encontrado", "search.result.other": "# documentos encontrados", "search.result.placeholder": "Teclee para comenzar b\u00fasqueda", "search.result.term.missing": "Falta", "select.version": "Seleccionar versi\u00f3n"}, "version": null}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>
