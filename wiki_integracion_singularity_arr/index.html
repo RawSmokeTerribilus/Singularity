@@ -1,0 +1,2672 @@
+
+<!doctype html>
+<html lang="es" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Automatización total para la gestión de medios y trackers UNIT3D">
+      
+      
+        <meta name="author" content="RaW Team">
+      
+      
+      
+        <link rel="prev" href="..">
+      
+      
+        <link rel="next" href="../setup/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.3">
+    
+    
+      
+        <title>Manual de Usuario - RaW Suite: Singularity</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="slate" data-md-color-primary="cyan" data-md-color-accent="cyan">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#integracion-de-singularity-con-el-ecosistema-arr" class="md-skip">
+          Saltar a contenido
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Cabecera">
+    <a href=".." title="RaW Suite: Singularity" class="md-header__button md-logo" aria-label="RaW Suite: Singularity" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            RaW Suite: Singularity
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Manual de Usuario
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="cyan" data-md-color-accent="cyan"  aria-hidden="true"  type="radio" name="__palette" id="__palette_0">
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-hidden="true"  type="radio" name="__palette" id="__palette_1">
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Búsqueda" placeholder="Búsqueda" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Buscar">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Limpiar" aria-label="Limpiar" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Inicializando búsqueda
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Pestañas" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href=".." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Inicio
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+    
+  
+  
+    <li class="md-tabs__item md-tabs__item--active">
+      <a href="./" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Manual de Usuario
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../setup/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Instalación
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../singularity_mode/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Singularity
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../mkverything/" class="md-tabs__link">
+          
+  
+  
+  Módulos
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../unit3d_mass_edition/" class="md-tabs__link">
+          
+  
+  
+  Mass Editor
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../dashboard/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Dashboard
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../extras/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Utilidades
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../technical_notes/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Notas
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../rawloadrr_wiki/Home/" class="md-tabs__link">
+          
+  
+  
+  RawLoadrr
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../mkverything_wiki/Home/" class="md-tabs__link">
+          
+  
+  
+  MKVerything
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navegación" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="RaW Suite: Singularity" class="md-nav__button md-logo" aria-label="RaW Suite: Singularity" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    RaW Suite: Singularity
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Inicio
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Manual de Usuario
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Manual de Usuario
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Tabla de contenidos">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Tabla de contenidos
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#el-flujo-maestro" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        El Flujo Maestro
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#dos-pipelines-una-suite" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Dos pipelines, una suite
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#s1-pre-ingesta-con-mkverything" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        S1: Pre-Ingesta con MKVerything
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="S1: Pre-Ingesta con MKVerything">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#como-lanzarlo" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Cómo lanzarlo
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#que-hace-el-god-mode-de-mkverything" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Qué hace el God Mode de MKVerything
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#s2-rescate-de-archivos-fallidos-por-tdarr" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        S2: Rescate de Archivos Fallidos por Tdarr
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="S2: Rescate de Archivos Fallidos por Tdarr">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#por-que-el-god-mode-y-no-la-opcion-de-rescate-simple" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Por qué el God Mode y no la opción de rescate simple
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#como-proceder" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Cómo proceder
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#s3-triaje-de-codec-separar-lo-terminado-de-lo-pendiente" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        S3: Triaje de Codec — Separar lo Terminado de lo Pendiente
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="S3: Triaje de Codec — Separar lo Terminado de lo Pendiente">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#como-lanzarlo-de-forma-independiente" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Cómo lanzarlo de forma independiente
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#que-genera" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Qué genera
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#el-pipeline-singularidad-de-s1-a-s5-de-un-tiron" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        El Pipeline SINGULARIDAD: De S1 a S5 de un Tirón
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#s4-sincronizacion-de-datos-locales-rawloadrr" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        S4: Sincronización de Datos Locales — RawLoadrr
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="S4: Sincronización de Datos Locales — RawLoadrr">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#como-lanzarlo-de-forma-independiente_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Cómo lanzarlo de forma independiente
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#flujo-de-subida-y-composicion-de-la-descripcion" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Flujo de subida y composición de la descripción
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#s5-actualizador-de-paginas-del-tracker-orquestador-unit3d" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        S5: Actualizador de Páginas del Tracker — Orquestador UNIT3D
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="S5: Actualizador de Páginas del Tracker — Orquestador UNIT3D">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#como-lanzarlo-de-forma-independiente_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Cómo lanzarlo de forma independiente
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#los-cuatro-scripts-que-se-ejecutan-en-secuencia" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Los cuatro scripts que se ejecutan en secuencia
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#s6-scraper-de-contenido-faltante-rawloadrr-con-tor" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        S6: Scraper de Contenido Faltante — RawLoadrr con Tor
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#el-radar-de-operaciones-dashboard" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        El Radar de Operaciones — Dashboard
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#puedo-confiar-esta-herramienta-con-mi-biblioteca" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ¿Puedo confiar esta herramienta con mi biblioteca?
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#instalacion-y-despliegue" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Instalación y Despliegue
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Instalación y Despliegue">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#requisitos-previos" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Requisitos Previos
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#para-frikis-drivers-vaapi-altamente-recomendado-en-linux" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Para Frikis: Drivers VAAPI (Altamente Recomendado en Linux)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#despliegue-en-linux" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Despliegue en Linux
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#despliegue-en-windows" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Despliegue en Windows
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#referencia-completa-del-makefile" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Referencia Completa del Makefile
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#nota-sobre-privileged-true-en-docker" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Nota sobre privileged: true en Docker
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#uso-cotidiano" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Uso Cotidiano
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#una-nota-final-sobre-el-tamano-de-la-imagen" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Una Nota Final sobre el Tamaño de la Imagen
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../setup/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Instalación
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../singularity_mode/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Singularity
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Módulos
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Módulos
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../mkverything/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    MKVerything
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../rawloadrr/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    RawLoadrr
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../unit3d_orchestrator/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    UNIT3D Orch
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Mass Editor
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Mass Editor
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../unit3d_mass_edition/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Inicio
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../unit3d_mass_edition/pipeline/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Pipeline (4 Fases)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../unit3d_mass_edition/workflows/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Workflows
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../unit3d_mass_edition/setup_y_seguridad/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Setup & Seguridad
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../dashboard/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dashboard
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../extras/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Utilidades
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../technical_notes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Notas
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_10" >
+        
+          
+          <label class="md-nav__link" for="__nav_10" id="__nav_10_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    RawLoadrr
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_10_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_10">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    RawLoadrr
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../rawloadrr_wiki/Home/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Inicio
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../rawloadrr_wiki/Arguments-User-Guide/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Guía de Argumentos
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../rawloadrr_wiki/Full-Config-Guide/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuración Completa
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../rawloadrr_wiki/Interactive-Config/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuración Interactiva
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../rawloadrr_wiki/Mass-Edition/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Edición Masiva
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../rawloadrr_wiki/Banned-Groups/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Grupos Prohibidos
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../rawloadrr_wiki/Content-Bans/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Contenidos Prohibidos
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_11" >
+        
+          
+          <label class="md-nav__link" for="__nav_11" id="__nav_11_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    MKVerything
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_11_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_11">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    MKVerything
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../mkverything_wiki/Home/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Inicio
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../mkverything_wiki/Binary-Audit/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Auditoría de Binarios
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../mkverything_wiki/Architecture/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Arquitectura
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../mkverything_wiki/Modules-Guide/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Guía de Módulos
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../mkverything_wiki/Verifier-Deep-Dive/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Deep Dive Verificador
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Tabla de contenidos">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Tabla de contenidos
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#el-flujo-maestro" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        El Flujo Maestro
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#dos-pipelines-una-suite" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Dos pipelines, una suite
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#s1-pre-ingesta-con-mkverything" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        S1: Pre-Ingesta con MKVerything
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="S1: Pre-Ingesta con MKVerything">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#como-lanzarlo" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Cómo lanzarlo
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#que-hace-el-god-mode-de-mkverything" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Qué hace el God Mode de MKVerything
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#s2-rescate-de-archivos-fallidos-por-tdarr" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        S2: Rescate de Archivos Fallidos por Tdarr
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="S2: Rescate de Archivos Fallidos por Tdarr">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#por-que-el-god-mode-y-no-la-opcion-de-rescate-simple" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Por qué el God Mode y no la opción de rescate simple
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#como-proceder" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Cómo proceder
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#s3-triaje-de-codec-separar-lo-terminado-de-lo-pendiente" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        S3: Triaje de Codec — Separar lo Terminado de lo Pendiente
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="S3: Triaje de Codec — Separar lo Terminado de lo Pendiente">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#como-lanzarlo-de-forma-independiente" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Cómo lanzarlo de forma independiente
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#que-genera" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Qué genera
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#el-pipeline-singularidad-de-s1-a-s5-de-un-tiron" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        El Pipeline SINGULARIDAD: De S1 a S5 de un Tirón
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#s4-sincronizacion-de-datos-locales-rawloadrr" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        S4: Sincronización de Datos Locales — RawLoadrr
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="S4: Sincronización de Datos Locales — RawLoadrr">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#como-lanzarlo-de-forma-independiente_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Cómo lanzarlo de forma independiente
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#flujo-de-subida-y-composicion-de-la-descripcion" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Flujo de subida y composición de la descripción
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#s5-actualizador-de-paginas-del-tracker-orquestador-unit3d" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        S5: Actualizador de Páginas del Tracker — Orquestador UNIT3D
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="S5: Actualizador de Páginas del Tracker — Orquestador UNIT3D">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#como-lanzarlo-de-forma-independiente_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Cómo lanzarlo de forma independiente
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#los-cuatro-scripts-que-se-ejecutan-en-secuencia" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Los cuatro scripts que se ejecutan en secuencia
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#s6-scraper-de-contenido-faltante-rawloadrr-con-tor" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        S6: Scraper de Contenido Faltante — RawLoadrr con Tor
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#el-radar-de-operaciones-dashboard" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        El Radar de Operaciones — Dashboard
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#puedo-confiar-esta-herramienta-con-mi-biblioteca" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ¿Puedo confiar esta herramienta con mi biblioteca?
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#instalacion-y-despliegue" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Instalación y Despliegue
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Instalación y Despliegue">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#requisitos-previos" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Requisitos Previos
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#para-frikis-drivers-vaapi-altamente-recomendado-en-linux" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Para Frikis: Drivers VAAPI (Altamente Recomendado en Linux)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#despliegue-en-linux" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Despliegue en Linux
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#despliegue-en-windows" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Despliegue en Windows
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#referencia-completa-del-makefile" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Referencia Completa del Makefile
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#nota-sobre-privileged-true-en-docker" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Nota sobre privileged: true en Docker
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#uso-cotidiano" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Uso Cotidiano
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#una-nota-final-sobre-el-tamano-de-la-imagen" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Una Nota Final sobre el Tamaño de la Imagen
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="integracion-de-singularity-con-el-ecosistema-arr">Integración de Singularity con el Ecosistema Arr</h1>
+<p>Bienvenido a la sección más práctica de esta wiki. Aquí vamos a ver cómo encaja <strong>Singularity</strong> en un flujo de trabajo real junto a Radarr, Sonarr y qBittorrent. El objetivo es sencillo: que tu biblioteca esté limpia, verificada, en el codec correcto y compartida en el tracker de forma consistente y sin intervención manual constante.</p>
+<p>Esta guía está pensada para usuarios que ya tienen su stack Arr funcionando y quieren darle un salto de calidad a su gestión de medios.</p>
+<hr />
+<h2 id="el-flujo-maestro">El Flujo Maestro</h2>
+<p>El siguiente diagrama muestra cómo fluye el contenido desde una petición de descarga hasta que acaba publicado y catalogado en el tracker. Singularity actúa en las etapas intermedias y finales, haciendo el trabajo pesado que los Arrs no pueden ni deben hacer.</p>
+<p><img alt="Flujo de Integración ARR / Singularity" src="../FLujo-aRR-Singularity-v2.png" /></p>
+<p>El flujo se divide en seis etapas clave, numeradas de <strong>S1 a S5</strong> más una etapa auxiliar S6. Ninguna de ellas es automática en el sentido de que se dispare sola sin tu intervención: Singularity es una herramienta de invocación manual. Escribes <code>singularity</code> en la terminal, eliges qué quieres hacer, y el programa se encarga del resto hasta el final, generando informes si algo falla.</p>
+<hr />
+<h2 id="dos-pipelines-una-suite">Dos pipelines, una suite</h2>
+<p>Antes de entrar en detalle con cada etapa, conviene entender la arquitectura del programa para no perderse.</p>
+<p><strong>MKVerything tiene dos modos de operación</strong>:</p>
+<ul>
+<li><strong>God Mode</strong> (<code>[5]</code> en el launcher de MKVerything): pipeline completo con análisis frame a frame, decodificación real del contenido, limpieza profunda de metadatos, subtítulos y adjuntos. Es lento, es exhaustivo, y es el que debe pasar al menos una vez por cada archivo de tu biblioteca.</li>
+<li><strong>Goddess Mode</strong> (<code>[6]</code> en el launcher de MKVerything): chequeo estructural rápido sin decodificación. Detecta problemas de contenedor, cabeceras rotas y formatos incorrectos, pero no analiza el interior del stream. Es el modo del día a día en bibliotecas ya saneadas.</li>
+</ul>
+<p>Estos dos modos son la base de los <strong>dos pipelines SINGULARIDAD</strong> del menú principal:</p>
+<ul>
+<li><strong><code>[5] SINGULARIDAD (God Mode)</code></strong>: ejecuta el flujo completo de S1 a S5 utilizando el God Mode de MKVerything en la Fase 1. Tarda más, pero es el más seguro.</li>
+<li><strong><code>[6] SINGULARIDAD (Goddess Mode)</code></strong>: ejecuta el mismo flujo pero con el Goddess Mode en la Fase 1. Para bibliotecas ya trabajadas donde confías en el estado del contenido.</li>
+</ul>
+<p>La clave está en <strong>cuándo usar cada pipeline</strong>:</p>
+<ul>
+<li><strong>S1 y S2</strong> (sanear archivos antes de compartir) → se usa directamente <strong>MKVerything</strong> desde el menú <code>[1]</code>. No se toca nada del tracker, no se sube nada. Solo quirófano local.</li>
+<li><strong>S3 a S5</strong> (triaje, subida y mantenimiento del tracker) → se usa el <strong>pipeline SINGULARIDAD</strong> completo desde <code>[5]</code> o <code>[6]</code>, que además engloba internamente las fases de MKVerything.</li>
+</ul>
+<hr />
+<h2 id="s1-pre-ingesta-con-mkverything">S1: Pre-Ingesta con MKVerything</h2>
+<p>Esta etapa ocurre <strong>después de que qBittorrent termina de descargar</strong> y <strong>antes de que Radarr o Sonarr importen el archivo</strong> a tu biblioteca definitiva.</p>
+<p>El problema que resuelve es simple: los Arrs confían ciegamente en que el archivo que reciben es correcto. Si ese archivo está corrupto, tiene metadatos basura, subtítulos incrustados de forma incorrecta, adjuntos innecesarios, o era en realidad un MPEG4 disfrazado de MKV, lo van a importar tal cual y el problema quedará enterrado en tu biblioteca.</p>
+<p>MKVerything intercepta ese archivo antes de que eso ocurra.</p>
+<p><img align="right" alt="S1 - El Escudo de Pre-Ingesta (Sanitización)" src="../S1.png" width="330" /></p>
+<h3 id="como-lanzarlo">Cómo lanzarlo</h3>
+<ol>
+<li>Escribe <code>singularity</code> en cualquier terminal.</li>
+<li>En el menú principal, elige <strong><code>[1] MKVerything (Auditoría y Spam)</code></strong>.</li>
+<li>Dentro del submenú, selecciona <strong><code>[1.1] Lanzador (todos los modos)</code></strong>.</li>
+</ol>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>  [1.1]  Lanzador (todos los modos)
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>  [1.2]  Ajustes / Dependencias
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>  [1.3]  Testeo rápido de herramientas
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>  [b]    Atrás
+</code></pre></div>
+<ol>
+<li>El launcher de MKVerything se abrirá con su propio menú:</li>
+</ol>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>   [1] ⚖️  AUDITORÍA DE CAMPO (Recursivo + Informe de Bajas)
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>   [2] 🚑 Rescatar MKVs Rotos (Lista/Ruta)
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>   [3] 🎞️  Convertir Legacy (AVI/MP4 -&gt; MKV)
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>   [4] 📦 Extraer ISOs (MakeMKV)
+<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>
+<a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>   [5] ⚡ GOD MODE (Extracción + Conversión + Rescate Desatendido)
+<a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a>   [6] 🌸 GODDESS MODE (Fast Scan: Check Estructural sin Decodificación)
+</code></pre></div>
+<ol>
+<li>Elige <strong><code>[5] GOD MODE</code></strong> e introduce la ruta de tu carpeta de descargas.</li>
+</ol>
+<h3 id="que-hace-el-god-mode-de-mkverything">Qué hace el God Mode de MKVerything</h3>
+<ul>
+<li><strong>Fase 1</strong>: Extrae ISOs con MakeMKV.</li>
+<li><strong>Fase 2</strong>: Pasa todos los archivos de vídeo por el rescatador universal en modo estricto: análisis frame a frame con VapourSynth + L-SMASH (incluyendo contenedores rotos que FFmpeg solo no puede abrir), limpieza de subtítulos problemáticos, eliminación de metadatos basura y adjuntos innecesarios, recodificación de formatos heredados (AVI, MP4, DIVX) a MKV verificado. Al finalizar genera un informe con lo que procesó, lo que se saltó, y lo que falló.</li>
+</ul>
+<p>Una vez terminado, tus Arrs recibirán archivos limpios, consistentes y listos para ser indexados.</p>
+<blockquote>
+<p><strong>¿Cuándo usar Goddess Mode?</strong>: En bibliotecas ya saneadas donde solo quieres hacer una revisión rápida antes de importar. En una biblioteca de 8 TB en buen estado, el God Mode puede tardar una semana; el Goddess Mode lo resuelve en horas. En la vida útil de un archivo, el God Mode debería pasar al menos una vez. Después, el Goddess Mode es suficiente para el día a día.</p>
+</blockquote>
+<hr />
+<h2 id="s2-rescate-de-archivos-fallidos-por-tdarr">S2: Rescate de Archivos Fallidos por Tdarr</h2>
+<p><strong>Tdarr</strong> es un transcodificador automático muy popular. El problema es que cuando falla en un archivo, ese archivo puede quedar en un estado intermedio: parcialmente procesado, con cabeceras inconsistentes, con streams de audio o subtítulos en formato legacy, o directamente como un contenedor MKV que en realidad guarda un stream MPEG4 o DIVX por dentro. Los Arrs y el propio RawLoadrr no van a tocarlo.</p>
+<p>Esta etapa es <strong>opcional y personal</strong>: puedes decidir buscar otra fuente para ese contenido o, si el archivo tiene valor y vale la pena rescatarlo, pasarlo por el quirófano de MKVerything.</p>
+<p><img align="right" alt="S2 - El Loop de Rescate (Tdarr Fix)" src="../S2.png" width="330" /></p>
+<h3 id="por-que-el-god-mode-y-no-la-opcion-de-rescate-simple">Por qué el God Mode y no la opción de rescate simple</h3>
+<p>La opción <code>[2] Rescatar MKVs Rotos</code> del launcher de MKVerything verifica e intenta reparar el archivo. Pero los archivos que Tdarr escupe como error suelen necesitar el pipeline completo: limpieza de metadatos, reempaquetado, recodificación de streams heredados, y validación posterior. Por eso, la recomendación es usar el <strong>God Mode</strong>.</p>
+<h3 id="como-proceder">Cómo proceder</h3>
+<p><strong>Paso 1</strong>: En la interfaz de Tdarr, ve a la sección de errores y usa la opción de exportar como CSV.</p>
+<p><strong>Paso 2</strong>: Abre el CSV y copia la columna de rutas absolutas a un archivo de texto plano (<code>.txt</code>), una ruta por línea. Guárdalo donde quieras.</p>
+<p><strong>Paso 3</strong>: En Singularity, ve a <strong><code>[1] MKVerything → [1.1] Lanzador</code></strong>.</p>
+<p><strong>Paso 4</strong>: En el launcher de MKVerything, elige la opción <strong><code>[5] GOD MODE</code></strong> e introduce la ruta de la carpeta donde están los archivos fallados.</p>
+<blockquote>
+<p>Si los archivos están dispersos en distintas ubicaciones (no comparten carpeta raíz), usa la opción <code>[2] Rescatar MKVs Rotos</code> en su lugar: acepta directamente la ruta al <code>.txt</code> con las rutas absolutas. Para casos ordinarios de rescate puntual esta opción es perfectamente válida. Para los archivos que Tdarr devuelve como error, el God Mode completo es lo recomendable.</p>
+</blockquote>
+<p><strong>Paso 5</strong>: El programa procesa los archivos de forma desatendida y genera un informe al finalizar. A partir de ahí, esos archivos están listos para pasar a S3.</p>
+<hr />
+<h2 id="s3-triaje-de-codec-separar-lo-terminado-de-lo-pendiente">S3: Triaje de Codec — Separar lo Terminado de lo Pendiente</h2>
+<p>Esta etapa responde a una necesidad real cuando usas Tdarr de forma activa: <strong>no querrás subir al tracker archivos que Tdarr va a recodificar próximamente</strong>, porque cuando lo haga tendrás que rehacer el torrent.</p>
+<p>El triaje <strong>no es de calidad de imagen</strong>: es de <strong>codec</strong>. Separa lo que ya es HEVC (H.265, terminado) de lo que sigue siendo H264 o cualquier formato legacy. La lógica es: si ya está en HEVC, Tdarr no le va a tocar más. Si aún está en H264, espera a que Tdarr termine con él antes de compartirlo.</p>
+<p><img align="right" alt="S3 - Triaje Lógico (HEVC vs H264)" src="../S3.png" width="330" /></p>
+<h3 id="como-lanzarlo-de-forma-independiente">Cómo lanzarlo de forma independiente</h3>
+<p>En el menú principal, ve a <strong><code>[4] Extras → [4.3] Triaje MKV (HEVC vs H264)</code></strong>.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>  [4.1]  Ingestor de Tags
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>  [4.2]  Comparador de Torrents
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>  [4.3]  Triaje MKV (HEVC vs H264)
+<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>  [4.4]  Chaos Maker  (⚠ JODE MKVs — solo para pruebas)
+<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>  [4.5]  CSI: Check, Search, Identify
+</code></pre></div>
+<p>Cuando selecciones <code>[4.3]</code>, el programa te pedirá el directorio a analizar. Escribe la ruta completa y pulsa Enter.</p>
+<h3 id="que-genera">Qué genera</h3>
+<p>El script recorre el directorio recursivamente. Por cada carpeta con archivos MKV, consulta el codec con <code>mediainfo</code> y clasifica:</p>
+<ul>
+<li><strong><code>todo-hevc-DD-MM-YY.txt</code></strong>: Lista de carpetas donde <strong>todos</strong> los MKVs son HEVC. Listos para subir.</li>
+<li><strong><code>sigue-h264-DD-MM-YY.txt</code></strong>: Lista de carpetas que contienen H264 u otros formatos legacy. Aún en proceso.</li>
+</ul>
+<p>Estas listas son las que el pipeline SINGULARIDAD (fases 3 y siguientes) usa para alimentar RawLoadrr. También puedes usarlas directamente en RawLoadrr si prefieres lanzar la subida de forma independiente.</p>
+<blockquote>
+<p>Si tu biblioteca ya está completamente en HEVC (Tdarr ha terminado y MKVerything ha limpiado los formatos heredados), esta etapa es casi un trámite. Pero es un paso necesario en cualquier flujo automatizado: no ahorramos en seguridad.</p>
+</blockquote>
+<hr />
+<h2 id="el-pipeline-singularidad-de-s1-a-s5-de-un-tiron">El Pipeline SINGULARIDAD: De S1 a S5 de un Tirón</h2>
+<p>Una vez que tu contenido está saneado (S1/S2 completados), puedes lanzar el pipeline completo SINGULARIDAD desde el menú principal. Este pipeline abarca desde la verificación del archivo hasta la subida y el mantenimiento del tracker.</p>
+<p>En el menú principal, elige:
+- <strong><code>[5] SINGULARIDAD (God Mode - Full Check)</code></strong> para análisis exhaustivo.
+- <strong><code>[6] SINGULARIDAD (Goddess Mode - Fast Check)</code></strong> para análisis rápido en bibliotecas ya trabajadas.</p>
+<p>El programa te pedirá:</p>
+<ol>
+<li><strong>Ruta raíz de tu biblioteca</strong> de medios.</li>
+<li><strong>Carpeta de salida para ISOs</strong> extraídas (por defecto, la misma).</li>
+<li><strong>Identificador del tracker</strong> (ej: <code>MILNU</code>).</li>
+<li><strong>Qué lista usar para la subida</strong>: solo HEVC (<code>todo-hevc-*.txt</code>), solo H264/Legacy (<code>sigue-h264-*.txt</code>), una lista personalizada tuya, o todo lo que encuentre.</li>
+<li><strong>Si quieres activar el Orquestador UNIT3D</strong> al final (y en ese caso, el rango de IDs a procesar).</li>
+</ol>
+<p>Una vez confirmada la configuración, el pipeline corre solo hasta el final y muestra un <strong>Reporte de Daños</strong> con el estado de cada fase.</p>
+<hr />
+<h2 id="s4-sincronizacion-de-datos-locales-rawloadrr">S4: Sincronización de Datos Locales — RawLoadrr</h2>
+<p>RawLoadrr es el módulo que se ocupa de <strong>crear los archivos <code>.torrent</code> y registrarlos</strong> tanto en qBittorrent como en el tracker. Es el puente entre tu biblioteca local y el mundo exterior.</p>
+<p><img align="right" alt="S4 - El Arquitecto de Torrents (RawLoadrr)" src="../S4.png" width="330" /></p>
+<h3 id="como-lanzarlo-de-forma-independiente_1">Cómo lanzarlo de forma independiente</h3>
+<p>En el menú principal, selecciona <strong><code>[2] RawLoadrr (Subidas automáticas)</code></strong>. Esto lanza el <strong>Rawncher</strong>, el gestor interactivo de RawLoadrr.</p>
+<p>Lo primero que hace al arrancar es una <strong>Aduana de verificación</strong>: comprueba que tienes configuradas las APIs globales (TMDB, IMGBB, etc.) y que puede conectar con qBittorrent. Si algo falta, te lo pide en ese momento y lo guarda en la configuración para la próxima vez.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>  [1]  Usar tracker existente
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>  [2]  Configurar tracker existente
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>  [3]  Crear nuevo tracker
+<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>  [4]  Modo debug (sin subida real)
+<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>  [5]  Listar sesiones guardadas
+<a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a>  [6]  Cargar sesión guardada
+<a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a>  [0]  Salir
+</code></pre></div>
+<h3 id="flujo-de-subida-y-composicion-de-la-descripcion">Flujo de subida y composición de la descripción</h3>
+<p><strong><code>[1] Usar tracker existente</code></strong> es la opción principal. El Rawncher te mostrará la lista de trackers configurados (con indicación visual de cuáles tienen API key y cuáles no). Seleccionas el tracker destino y el programa:</p>
+<ol>
+<li>Analiza el directorio o lista de carpetas que le indiques.</li>
+<li>Extrae metadatos del contenido (resolución, codec, audio, subs) mediante <code>mediainfo</code>.</li>
+<li>Consulta TMDB/TVDB para obtener título normalizado, año, géneros y sinopsis.</li>
+<li><strong>Genera capturas de pantalla</strong> con VapourSynth + L-SMASH (para abrir correctamente incluso contenedores con índices problemáticos) y zimg para la decodificación matemática de calidad, incluyendo HDR. No uses capturas del VLC: las capturas de pantalla hechas así son fieles al contenido real del stream y se ven correctamente en cualquier display. El número de capturas, su tamaño y el tipo de muestreo de frames son configurables en <code>config.py</code>.</li>
+<li>Sube las capturas al host de imágenes configurado (ImgBB, PTScreens, Imgbox, etc.) con fallback automático si uno falla.</li>
+<li><strong>Compone la descripción</strong> en BBCode: inserta las imágenes con el tamaño configurado, añade la firma y el banner que hayas definido para ese tracker (o el global si no hay uno específico). Tú no escribes la descripción: la suite la genera automáticamente según tu configuración.</li>
+<li>Crea el archivo <code>.torrent</code> y lo envía a qBittorrent vía API (o lo guarda en la carpeta de watch si qBit no está disponible).</li>
+<li>Publica el torrent en el tracker con la descripción completa.</li>
+</ol>
+<p>Si la conexión con qBittorrent falla, RawLoadrr entra automáticamente en <strong>modo solo local</strong>: guarda los <code>.torrent</code> en una carpeta <code>qbit_backup</code> para que los añadas manualmente después. La subida al tracker se hace igualmente.</p>
+<blockquote>
+<p><strong><code>[4] Modo debug</code></strong>: Ejecuta todo el proceso excepto la subida real. Ideal para verificar que la configuración es correcta antes de lanzar una sesión masiva.</p>
+</blockquote>
+<hr />
+<h2 id="s5-actualizador-de-paginas-del-tracker-orquestador-unit3d">S5: Actualizador de Páginas del Tracker — Orquestador UNIT3D</h2>
+<p>Esta etapa se ocupa del <strong>mantenimiento y enriquecimiento de las páginas de torrents ya publicados</strong> en el tracker. Si tienes decenas o cientos de subidas con descripciones desactualizadas, imágenes rotas o metadatos incorrectos, el Orquestador las actualiza en masa de forma desatendida.</p>
+<p><img align="right" alt="S5 - El Orquestador de Masas (UNIT3D Edit)" src="../S5.png" width="165" /></p>
+<h3 id="como-lanzarlo-de-forma-independiente_2">Cómo lanzarlo de forma independiente</h3>
+<p>En el menú principal, selecciona <strong><code>[3] UNIT3D Ed. (Edita en el Tracker)</code></strong>.</p>
+<p>El programa te pedirá:</p>
+<ol>
+<li><strong>El banner BBCode</strong> que quieres añadir a las descripciones (o pulsar Enter para usar el configurado por defecto en <code>.env</code>).</li>
+<li><strong>El ID del primer torrent</strong> a editar (el número que aparece en la URL del tracker: <code>tracker.com/torrents/</code><strong><code>14</code></strong>).</li>
+<li><strong>El ID del último torrent</strong> a editar (se procesarán todos los IDs intermedios).</li>
+<li>Confirmar si quieres lanzar la secuencia completa.</li>
+</ol>
+<h3 id="los-cuatro-scripts-que-se-ejecutan-en-secuencia">Los cuatro scripts que se ejecutan en secuencia</h3>
+<p><strong><code>01_scraper.py</code></strong> — Cosecha de IDs<br />
+Recorre las páginas de tus subidas en el tracker y extrae todos los IDs de tus torrents. Los guarda en <code>ids.txt</code>. Esto es la base de datos de trabajo para los pasos siguientes.</p>
+<p><strong><code>02_indexer.py</code></strong> — Construcción del Índice<br />
+Lee los IDs recopilados y, para cada torrent, consulta la API del tracker para obtener los datos actuales (nombre, descripción, imágenes). Construye el archivo <code>mapeo_maestro.json</code>, que es el mapa maestro de tu catálogo publicado.</p>
+<p><strong><code>03_mass_updater.py</code></strong> — Actualización Masiva<br />
+Lee el <code>mapeo_maestro.json</code> y actualiza cada página del tracker: sustituye banners antiguos por el nuevo, limpia firmas obsoletas, añade el nuevo BBCode de descripción. Incluye manejo de rate limiting (respeta los 429 del servidor), pausas adaptativas ante errores de Cloudflare, y logging completo de cada acción.</p>
+<p><strong><code>04_image_resurrector.py</code></strong> — Resurrección de Imágenes<br />
+Detecta imágenes rotas en las descripciones (URLs que ya no responden) y las resube automáticamente a los hosts de imágenes configurados, con fallback entre ImgBB y PTScreens. Actualiza las URLs en la página del tracker.</p>
+<blockquote>
+<p>Estos cuatro scripts también se pueden lanzar como la <strong>Fase 4</strong> del pipeline SINGULARIDAD si activas la opción durante la configuración. La diferencia es que en ese caso, los IDs se toman del rango configurado en <code>.env</code> (<code>ID_START</code> / <code>ID_END</code>).</p>
+</blockquote>
+<hr />
+<h2 id="s6-scraper-de-contenido-faltante-rawloadrr-con-tor">S6: Scraper de Contenido Faltante — RawLoadrr con Tor</h2>
+<p>Esta es la etapa más especializada. Cuando tienes contenido en tu biblioteca que no has podido publicar porque no encuentras la fuente original para crear el torrent verificado, o cuando quieres nutrir tu tracker con contenido que no está disponible en las fuentes habituales, entra en juego la integración de <strong>Tor y el feed de RawLoadrr</strong>.</p>
+<p>RawLoadrr puede enrutar sus peticiones de API externas a través del proxy SOCKS5 de Tor (<code>127.0.0.1:9050</code>) cuando detecta que Tor está activo en el sistema. Esto permite:</p>
+<ul>
+<li>Acceder a fuentes de metadatos con restricciones geográficas.</li>
+<li>Realizar scraping de contenido sin exponer la IP del servidor.</li>
+<li>Mantener el anonimato en operaciones de indexación masiva.</li>
+</ul>
+<p>Tor está incluido en el contenedor Docker. Si necesitas activarlo, entra al shell del contenedor con <code>make shell</code> y arráncalo. RawLoadrr lo detectará automáticamente en la siguiente operación.</p>
+<blockquote>
+<p>Esta funcionalidad es avanzada y no es necesaria para la mayoría de los usuarios. Está ahí para casos específicos donde el anonimato o el acceso alternativo son necesarios.</p>
+</blockquote>
+<hr />
+<h2 id="el-radar-de-operaciones-dashboard">El Radar de Operaciones — Dashboard</h2>
+<p>Mientras cualquier proceso de Singularity está en marcha, hay un dashboard web accesible en <strong><code>http://localhost:8002</code></strong> (o la IP de tu servidor si accedes en remoto).</p>
+<p>Se lanza automáticamente en segundo plano cada vez que abres el menú principal de Singularity. Si ya está corriendo de una sesión anterior, lo detecta y no abre un proceso duplicado.</p>
+<p>El dashboard muestra en tiempo real:</p>
+<ul>
+<li><strong>Estado de cada módulo</strong>: CORE, MKVerything, RawLoadrr, UNIT3D, Pipeline.</li>
+<li><strong>Tarea actual</strong> en cada módulo.</li>
+<li><strong>Barra de progreso</strong> cuando el proceso reporta avance porcentual.</li>
+<li><strong>Detalles ampliados</strong> (acordeón) con el log de consola del proceso, métricas y timestamps.</li>
+<li><strong>Tiempo transcurrido</strong> desde el inicio de cada operación.</li>
+</ul>
+<p>El dashboard se actualiza automáticamente cada 5 segundos y es especialmente útil en procesos largos para saber qué está pasando sin necesidad de tener la terminal abierta.</p>
+<blockquote>
+<p><strong>Sobre el botón de reset</strong>: No encontrarás un botón de "resetear estado" en el dashboard. Por seguridad, el reset del dashboard se hace desde el TUI: <strong><code>[7] Mantenimiento &amp; Limpieza → [4] Resetear Dashboard (Estado Neutro)</code></strong>. Esto limpia todos los estados del Radar y lo deja en tabula rasa.</p>
+</blockquote>
+<hr />
+<h2 id="puedo-confiar-esta-herramienta-con-mi-biblioteca">¿Puedo confiar esta herramienta con mi biblioteca?</h2>
+<p>Es una pregunta legítima. Estás hablando de darle acceso a un programa a potencialmente terabytes de contenido que has acumulado durante años. Esto es lo que vi en el código y en la arquitectura:</p>
+<p><strong>MKVerything tiene una escalera de resiliencia</strong>: antes de tocar un archivo, lo analiza. Antes de recodificar, verifica. Antes de eliminar el original, confirma que el resultado es válido. Los fallbacks son múltiples y progresivos: si un método falla, intenta el siguiente antes de declarar el archivo como error. Nada se borra sin verificación previa. VapourSynth + L-SMASH-Works se incluye precisamente para poder abrir y analizar correctamente los contenedores más dañados que FFmpeg solo rechazaría.</p>
+<p><strong>RawLoadrr valida antes de subir</strong>: la Aduana de verificación al arrancar no es cosmética. Comprueba credenciales, conexión con qBittorrent, integridad de la configuración. Si algo no está bien, te lo dice antes de hacer nada. El modo debug existe precisamente para que puedas ver exactamente qué haría el programa sin que haga nada real. Las capturas se generan con VapourSynth para garantizar fidelidad, y la descripción BBCode se compone de forma determinista según tu configuración.</p>
+<p><strong>El Orquestador UNIT3D respeta al tracker</strong>: incluye manejo de rate limiting, pausas adaptativas con jitter configurable (<code>DELAY_MIN</code> / <code>DELAY_MAX</code>), y logging exhaustivo. No bombardea el servidor. Si recibe un error 429, para y espera. Si recibe un error de Cloudflare, lo registra y sigue con el siguiente.</p>
+<p><strong>Los logs son tus aliados</strong>: cada módulo escribe su propio log con timestamp, nivel de severidad y detalle de lo que hizo. El directorio <code>work_data/logs/</code> acumula todo el historial de operaciones. Los reportes de MKVerything van a <code>work_data/reports/</code>.</p>
+<p><strong>El dashboard te da visibilidad</strong>: en ningún momento el programa trabaja en la oscuridad. Siempre puedes ver qué está haciendo, en qué archivo está, y qué porcentaje lleva.</p>
+<p>La herramienta es potente y accede a tu hardware y tus archivos. Pero está diseñada con la misma filosofía que un buen administrador de sistemas: <strong>audita primero, actúa después, registra todo</strong>.</p>
+<hr />
+<h2 id="instalacion-y-despliegue">Instalación y Despliegue</h2>
+<h3 id="requisitos-previos">Requisitos Previos</h3>
+<p><strong>Linux</strong>:
+- <strong>Docker</strong> (Engine + Compose plugin)
+- <strong>Make</strong> (<code>sudo dnf install make</code> / <code>sudo apt install make</code>)</p>
+<p><strong>Windows</strong>:
+- <strong>Docker Desktop</strong> instalado y corriendo</p>
+<p>No necesitas Python, FFmpeg, MKVToolNix ni ninguna otra dependencia en el sistema anfitrión. Todo está encapsulado en la imagen Docker.</p>
+<h3 id="para-frikis-drivers-vaapi-altamente-recomendado-en-linux">Para Frikis: Drivers VAAPI (Altamente Recomendado en Linux)</h3>
+<p>Si tienes una GPU AMD o Intel, instalar los drivers VAAPI en el sistema anfitrión mejora dramáticamente el rendimiento de las operaciones de transcodificación. La imagen Docker ya incluye los drivers y el mapeo del dispositivo <code>/dev/dri</code>, pero el sistema anfitrión también debe tenerlos:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="c1"># AMD (Mesa)</span>
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>sudo<span class="w"> </span>apt<span class="w"> </span>install<span class="w"> </span>mesa-va-drivers<span class="w"> </span>libva-drm2<span class="w"> </span>vainfo
+<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>
+<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="c1"># Intel (Non-Free, necesita repositorios non-free en Debian/Ubuntu)</span>
+<a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a>sudo<span class="w"> </span>apt<span class="w"> </span>install<span class="w"> </span>intel-media-va-driver-non-free<span class="w"> </span>libva-drm2<span class="w"> </span>vainfo
+<a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a>
+<a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a><span class="c1"># RHEL/Fedora/Rocky</span>
+<a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a>sudo<span class="w"> </span>dnf<span class="w"> </span>install<span class="w"> </span>mesa-va-drivers<span class="w"> </span>libva<span class="w"> </span>vainfo
+</code></pre></div>
+<p>Verifica que funciona:
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>vainfo
+</code></pre></div></p>
+<p>La diferencia entre CPU pura y VAAPI en procesos de recodificación masiva puede ser de varios órdenes de magnitud. El autor ha ejecutado pipelines de <strong>una semana de duración</strong> con esta herramienta en CPU. Con VAAPI eso se reduce considerablemente.</p>
+<p><strong>¿Y en Windows?</strong> En Windows 11 con Docker Desktop sobre WSL2, el acceso a GPU a través de <code>/dev/dri</code> puede funcionar si tienes instalados los drivers GPU con soporte WSL2 (la mayoría de drivers modernos de AMD/Intel/NVIDIA los incluyen). El <code>docker-compose.yml</code> ya tiene el mapeo de dispositivo necesario (<code>/dev/dri:/dev/dri</code>). Si ajustas el <code>LIBVA_DRIVER_NAME</code> al driver correcto para tu GPU en el compose, hay posibilidades reales de que funcione. No está completamente verificado en todos los setups Windows, pero la arquitectura lo contempla.</p>
+<hr />
+<h3 id="despliegue-en-linux">Despliegue en Linux</h3>
+<p><strong>Opción A: Solo 3 archivos</strong> (instalación ligera, sin clonar el repositorio completo)</p>
+<p>Descarga <code>docker-compose.yml</code>, <code>makefile</code> y <code>final-user-install.sh</code> y colócalos en la misma carpeta. Luego:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="c1"># 1. Crea la estructura de carpetas, genera plantillas de configuración</span>
+<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="c1">#    y registra el comando &#39;singularity&#39; en el sistema</span>
+<a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>make<span class="w"> </span>install
+<a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a>
+<a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a><span class="c1"># 2. Descarga la imagen desde Docker Hub (~3GB)</span>
+<a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a>make<span class="w"> </span>pull
+<a id="__codelineno-6-7" name="__codelineno-6-7" href="#__codelineno-6-7"></a>
+<a id="__codelineno-6-8" name="__codelineno-6-8" href="#__codelineno-6-8"></a><span class="c1"># 3. Levanta el contenedor</span>
+<a id="__codelineno-6-9" name="__codelineno-6-9" href="#__codelineno-6-9"></a>make<span class="w"> </span>up
+</code></pre></div>
+<p><strong>Opción B: Repositorio completo</strong></p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>git<span class="w"> </span>clone<span class="w"> </span>&lt;url-del-repositorio&gt;
+<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="nb">cd</span><span class="w"> </span>RaW_Suite
+<a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a>
+<a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a><span class="c1"># Construye la imagen localmente (tarda bastante la primera vez)</span>
+<a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a>make<span class="w"> </span>build
+<a id="__codelineno-7-6" name="__codelineno-7-6" href="#__codelineno-7-6"></a>
+<a id="__codelineno-7-7" name="__codelineno-7-7" href="#__codelineno-7-7"></a><span class="c1"># O descarga la imagen precompilada</span>
+<a id="__codelineno-7-8" name="__codelineno-7-8" href="#__codelineno-7-8"></a>make<span class="w"> </span>pull
+<a id="__codelineno-7-9" name="__codelineno-7-9" href="#__codelineno-7-9"></a>
+<a id="__codelineno-7-10" name="__codelineno-7-10" href="#__codelineno-7-10"></a><span class="c1"># Levanta el contenedor</span>
+<a id="__codelineno-7-11" name="__codelineno-7-11" href="#__codelineno-7-11"></a>make<span class="w"> </span>up
+</code></pre></div>
+<p>A partir de aquí, escribe <code>singularity</code> desde cualquier terminal para entrar al programa:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>singularity
+</code></pre></div>
+<blockquote>
+<p><strong>Nota</strong>: <code>make install</code> registra el comando <code>singularity</code> en <code>/usr/local/bin/</code> apuntando al contenedor. Solo hace falta ejecutarlo una vez. Después, mientras el contenedor esté levantado (<code>make up</code>), puedes llamar al programa desde cualquier directorio sin parámetros adicionales.</p>
+</blockquote>
+<hr />
+<h3 id="despliegue-en-windows">Despliegue en Windows</h3>
+<ol>
+<li>Asegúrate de que <strong>Docker Desktop</strong> está iniciado.</li>
+<li>Abre una ventana de <strong>PowerShell como Administrador</strong> en la carpeta del repositorio.</li>
+<li>Ejecuta el instalador:</li>
+</ol>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="p">.\</span><span class="nb">install-windows</span><span class="p">.</span><span class="n">bat</span>
+</code></pre></div>
+<p>Este archivo <code>.bat</code> llama automáticamente a <code>setup-windows.ps1</code>, que se encarga de:
+- Crear la estructura de directorios de trabajo (<code>work_data/</code>, <code>config/</code>, logs, reports, etc.)
+- Generar los archivos de configuración de ejemplo (<code>.env</code>, <code>singularity_config.py</code>, <code>config.py</code>) con plantillas listas para rellenar.
+- Crear tres accesos directos <code>.bat</code> para uso cotidiano:
+  - <strong><code>singularity.bat</code></strong>: Lanza el menú principal de Singularity.
+  - <strong><code>singularity-shell.bat</code></strong>: Abre una terminal bash dentro del contenedor.
+  - <strong><code>up.bat</code></strong>: Levanta el contenedor Docker.</p>
+<p>Después del setup:
+<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="c"># Levanta el contenedor</span>
+<a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a><span class="p">.\</span><span class="n">up</span><span class="p">.</span><span class="n">bat</span>
+<a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a>
+<a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a><span class="c"># Lanza Singularity</span>
+<a id="__codelineno-10-5" name="__codelineno-10-5" href="#__codelineno-10-5"></a><span class="p">.\</span><span class="n">singularity</span><span class="p">.</span><span class="n">bat</span>
+</code></pre></div></p>
+<hr />
+<h3 id="referencia-completa-del-makefile">Referencia Completa del Makefile</h3>
+<p>El Makefile es la forma recomendada de gestionar el ciclo de vida del contenedor en Linux. Estos son todos los comandos disponibles:</p>
+<table>
+<thead>
+<tr>
+<th>Comando</th>
+<th>Descripción</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>make install</code></td>
+<td>Ejecuta <code>final-user-install.sh</code>. Crea la estructura de carpetas, genera plantillas de configuración y registra el comando <code>singularity</code> en <code>/usr/local/bin/</code> para poder invocarlo desde cualquier directorio. Solo hay que ejecutarlo una vez.</td>
+</tr>
+<tr>
+<td><code>make pull</code></td>
+<td>Descarga la imagen <code>rawsmoke/singularity-suite:latest</code> desde Docker Hub. Usar esto en lugar de <code>make build</code> si no quieres compilar la imagen localmente.</td>
+</tr>
+<tr>
+<td><code>make build</code></td>
+<td>Construye la imagen Docker localmente desde el <code>Dockerfile</code>. Incluye la compilación de VapourSynth, L-SMASH, zimg y MakeMKV. Puede tardar 20-40 minutos la primera vez.</td>
+</tr>
+<tr>
+<td><code>make up</code></td>
+<td>Lanza <code>prep</code> (verifica estructura de carpetas y permisos) y después levanta el contenedor en segundo plano.</td>
+</tr>
+<tr>
+<td><code>make prep</code></td>
+<td>Solo ejecuta las verificaciones de integridad: crea carpetas que falten, copia los archivos de tracker desde el source, ajusta permisos. Se ejecuta automáticamente antes de <code>up</code>.</td>
+</tr>
+<tr>
+<td><code>make down</code></td>
+<td>Para y elimina el contenedor. Los datos persisten en <code>work_data/</code>.</td>
+</tr>
+<tr>
+<td><code>make restart</code></td>
+<td>Reinicia el contenedor sin bajarlo y volverlo a subir.</td>
+</tr>
+<tr>
+<td><code>make logs</code></td>
+<td>Muestra los logs del contenedor en tiempo real (<code>-f</code>). Útil para debug cuando algo falla al arrancar.</td>
+</tr>
+<tr>
+<td><code>make attach</code></td>
+<td>Ejecuta <code>python3 singularity.py</code> dentro del contenedor ya levantado. Equivalente a escribir <code>singularity</code> si ya hiciste <code>make install</code>.</td>
+</tr>
+<tr>
+<td><code>make shell</code></td>
+<td>Abre una terminal bash dentro del contenedor. Para inspección manual, ejecutar comandos directamente o arrancar servicios como Tor.</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p><strong>Nota</strong>: <code>make up</code> siempre ejecuta <code>make prep</code> antes. No hace falta llamar a <code>prep</code> manualmente salvo que quieras verificar la estructura sin levantar el contenedor.</p>
+</blockquote>
+<hr />
+<h3 id="nota-sobre-privileged-true-en-docker">Nota sobre <code>privileged: true</code> en Docker</h3>
+<p>En el archivo <code>docker-compose.yml</code> encontrarás:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a><span class="nt">privileged</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+</code></pre></div>
+<p><strong>Por qué está ahí</strong>: Originalmente se incluyó durante el desarrollo para simplificar el acceso al hardware. En la versión actual, la configuración ya expone explícitamente los dispositivos necesarios (<code>/dev/dri</code> para GPU AMD/Intel) y añade los grupos correctos (<code>render</code>, <code>video</code>) para el acceso a hardware sin privilegios elevados:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a><span class="nt">group_add</span><span class="p">:</span>
+<a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="s">&quot;997&quot;</span><span class="w">  </span><span class="c1"># grupo &#39;render&#39; (AMD/Intel)</span>
+<a id="__codelineno-12-3" name="__codelineno-12-3" href="#__codelineno-12-3"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="s">&quot;107&quot;</span><span class="w">  </span><span class="c1"># grupo &#39;video&#39;</span>
+<a id="__codelineno-12-4" name="__codelineno-12-4" href="#__codelineno-12-4"></a><span class="nt">devices</span><span class="p">:</span>
+<a id="__codelineno-12-5" name="__codelineno-12-5" href="#__codelineno-12-5"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/dev/dri:/dev/dri</span>
+<a id="__codelineno-12-6" name="__codelineno-12-6" href="#__codelineno-12-6"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/dev/fb0:/dev/fb0</span>
+</code></pre></div>
+<p><strong>¿Puedes comentarlo?</strong>: En Linux, si tu usuario pertenece a los grupos <code>render</code> y <code>video</code>, probablemente puedas comentar la línea <code>privileged: true</code> sin que nada falle. La aceleración por hardware seguirá funcionando a través del mapeo explícito de <code>/dev/dri</code>.</p>
+<p>Sin embargo, hay dos casos donde puede ser necesario mantenerlo:
+- <strong>Windows</strong>: El soporte de Docker en Windows con acceso directo a hardware a través de WSL2 no está completamente probado con esta configuración.
+- <strong>Montajes de <code>/run/media/</code></strong>: Si expones rutas de discos externos montados dinámicamente (como hace la configuración por defecto con <code>/run/media/${USER}</code>), algunos sistemas necesitan el modo privilegiado para que los permisos de acceso funcionen correctamente.</p>
+<p>La recomendación es: si estás en Linux y tu setup es estándar, prueba a comentarlo. Si algo falla (errores de permisos en VAAPI o en el acceso a tus discos), vuelve a activarlo.</p>
+<hr />
+<h2 id="uso-cotidiano">Uso Cotidiano</h2>
+<p>Una vez hecho <code>make install</code> (solo la primera vez) y levantado el contenedor (<code>make up</code>), el flujo diario es tan simple como:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a>singularity
+</code></pre></div>
+<p>Desde cualquier directorio, en cualquier terminal. Singularity arranca, carga el dashboard en segundo plano, y muestra el menú principal. A partir de ahí, todo es interactivo.</p>
+<p>Para uso regular en un flujo con Arrs activos:</p>
+<ol>
+<li><strong>Cuando qBit termina una descarga</strong>: <code>singularity</code> → <code>[1] MKVerything → [1.1] Lanzador → [5] GOD MODE</code> → ruta de descargas.</li>
+<li><strong>Cuando Tdarr genera errores</strong>: mismo flujo apuntando a la carpeta con los archivos fallados.</li>
+<li><strong>Cuando quieres publicar en el tracker</strong>: <code>singularity</code> → <code>[5] SINGULARIDAD (God Mode)</code> o <code>[6] (Goddess Mode)</code> → configurar y confirmar.</li>
+<li><strong>Para mantenimiento del tracker</strong>: <code>[3] UNIT3D Orchestrator</code> con el rango de IDs que quieras actualizar.</li>
+<li><strong>Para limpiar temporales, logs y resetear el dashboard</strong>: <code>[7] Mantenimiento &amp; Limpieza</code>.</li>
+</ol>
+<hr />
+<h2 id="una-nota-final-sobre-el-tamano-de-la-imagen">Una Nota Final sobre el Tamaño de la Imagen</h2>
+<p>La imagen Docker pesa aproximadamente 3 GB. Para los que vengan del mundo de los contenedores y esperaban algo basado en Alpine, la explicación es sencilla: se intentó, y fue un infierno.</p>
+<p>La suite depende de <strong>VapourSynth R73</strong>, <strong>L-SMASH-Works</strong>, <strong>zimg</strong> y <strong>MakeMKV</strong>, todos compilados desde código fuente. Estas dependencias tienen cadenas de compilación complejas, con parches específicos para compatibilidad con FFmpeg 5/6, flags de linkado no estándar, y requisitos de librerías de sistema que Alpine o no incluye, o incluye en versiones incompatibles con las que necesita esta pila en particular.</p>
+<p>Después de varios intentos fallidos con imágenes más ligeras y distintas combinaciones de arquitectura, la única solución que funcionó de forma fiable y reproducible fue <strong>Debian Bookworm</strong> (<code>python:3.11-bookworm</code>). No es la opción más elegante, pero es la que permite que todo esto compile, linkeje y funcione correctamente en producción, hecho con todo el cariño y por pura necesidad.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.tabs", "navigation.sections", "search.highlight", "content.code.copy"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copiado al portapapeles", "clipboard.copy": "Copiar al portapapeles", "search.result.more.one": "1 m\u00e1s en esta p\u00e1gina", "search.result.more.other": "# m\u00e1s en esta p\u00e1gina", "search.result.none": "No se encontraron documentos", "search.result.one": "1 documento encontrado", "search.result.other": "# documentos encontrados", "search.result.placeholder": "Teclee para comenzar b\u00fasqueda", "search.result.term.missing": "Falta", "select.version": "Seleccionar versi\u00f3n"}, "version": null}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>
