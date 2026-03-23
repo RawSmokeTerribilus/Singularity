@@ -2618,7 +2618,7 @@ Detecta imágenes rotas en las descripciones (URLs que ya no responden) y las re
 <h2 id="una-nota-final-sobre-el-tamano-de-la-imagen">Una Nota Final sobre el Tamaño de la Imagen</h2>
 <p>La imagen Docker pesa aproximadamente 3 GB. Para los que vengan del mundo de los contenedores y esperaban algo basado en Alpine, la explicación es sencilla: se intentó, y fue un infierno.</p>
 <p>La suite depende de <strong>VapourSynth R73</strong>, <strong>L-SMASH-Works</strong>, <strong>zimg</strong> y <strong>MakeMKV</strong>, todos compilados desde código fuente. Estas dependencias tienen cadenas de compilación complejas, con parches específicos para compatibilidad con FFmpeg 5/6, flags de linkado no estándar, y requisitos de librerías de sistema que Alpine o no incluye, o incluye en versiones incompatibles con las que necesita esta pila en particular.</p>
-<p>Después de varios intentos fallidos con imágenes más ligeras y distintas combinaciones de arquitectura, la única solución que funcionó de forma fiable y reproducible fue <strong>Debian Bookworm</strong> (<code>python:3.11-bookworm</code>). No es la opción más elegante, pero es la que permite que todo esto compile, linkeje y funcione correctamente en producción, hecho con todo el cariño y por pura necesidad.</p>
+<p>Después de varios intentos fallidos con imágenes más ligeras y distintas combinaciones de arquitectura, la única solución que funcionó de forma fiable y reproducible fue <strong>Debian Bookworm</strong> (<code>python:3.11-bookworm</code>). No es la opción más elegante, pero es la que permite que todo esto compile, linkee y funcione correctamente en producción, hecho con todo el cariño y por pura necesidad.</p>
 
 
 
