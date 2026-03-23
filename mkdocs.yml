@@ -20,6 +20,7 @@ theme:
 
 nav:
   - Inicio: index.md
+  - Manual de Usuario: wiki_integracion_singularity_arr.md
   - Instalación: setup.md
   - Singularity: singularity_mode.md
   - Módulos:
