@@ -22,11 +22,11 @@ Este proyecto no sería nada sin el trabajo de aquellos que mantienen viva la ll
 
 ## 📖 Documentación Oficial (Wiki)
 
-[![Documentation](https://img.shields.io/badge/Wiki-Documentation-blueviolet?style=for-the-badge&logo=github)](https://rawsmoketerribilus.github.io/Singularity/)
+[![Documentation](https://img.shields.io/badge/Wiki-Documentation-blueviolet?style=for-the-badge&logo=github)](https://rawsmoke.codeberg.page/Singularity/)
 
 Para guías detalladas sobre la configuración del entorno, el funcionamiento de los módulos internos y técnicas avanzadas de inyección de metadatos, visita nuestra Wiki oficial:
 
-### 👉 [**Acceder a la Wiki de Singularity**](https://RawSmokeTerribilus.github.io/Singularity/)
+### 👉 [**Acceder a la Wiki de Singularity**](https://rawsmoke.codeberg.page/Singularity/)
 
 Dentro encontrarás todo el conocimiento técnico del Tanque:
 * **Setup Guide:** Instalación de dependencias y despliegue del contenedor.
