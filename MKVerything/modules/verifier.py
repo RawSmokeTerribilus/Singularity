@@ -11,6 +11,7 @@ from datetime import datetime
 
 LEGACY_CODECS      = frozenset({"mpeg4", "xvid", "divx", "msmpeg4", "wmv1", "wmv2", "mpeg2video"})
 GOOD_CODECS        = frozenset({"h264", "hevc"})   # únicos codecs que no necesitan transcode
+BAD_SUB_CODECS     = frozenset({"webvtt"})          # subs que rompen tdarr → convertir a SRT o fusillar
 SUSPICIOUS_SIZE_MB = 1
 
 class Verifier:
@@ -150,10 +151,12 @@ class Verifier:
 
         t_orig = self._count_tracks_ffprobe(meta_orig)
         t_new = self._count_tracks_ffprobe(meta_new)
-        
+        # Subs: excluimos WebVTT del conteo original — se convierten a SRT o se fusillan
+        orig_valid_subs = self._count_valid_subtitle_tracks(meta_orig)
+
         if t_new['video'] < t_orig['video']: report["errors"].append("VIDEO_TRACK_LOST")
         if t_new['audio'] < t_orig['audio']: report["errors"].append("AUDIO_TRACK_LOST")
-        if t_new['subtitle'] < t_orig['subtitle']: report["errors"].append("SUBTITLE_TRACK_LOST")
+        if t_new['subtitle'] < orig_valid_subs: report["errors"].append("SUBTITLE_TRACK_LOST")
 
         dur_orig = float(meta_orig['format'].get('duration', 0)) if meta_orig else 0
         dur_new = float(meta_new['format'].get('duration', 0)) if meta_new else 0
@@ -198,6 +201,26 @@ class Verifier:
                 ctype = s.get('codec_type')
                 if ctype in tracks: tracks[ctype] += 1
         return tracks
+
+    def _count_valid_subtitle_tracks(self, meta):
+        """Cuenta subtítulos excluyendo codecs que se convierten/fusillan intencionalmente (WebVTT)."""
+        count = 0
+        if meta:
+            for s in meta.get('streams', []):
+                if (s.get('codec_type') == 'subtitle' and
+                        s.get('codec_name', '').lower() not in BAD_SUB_CODECS):
+                    count += 1
+        return count
+
+    def _has_bad_sub_codecs(self, meta):
+        """True si hay algún subtítulo con codec problemático para tdarr (e.g. WebVTT)."""
+        if not meta:
+            return False
+        for s in meta.get('streams', []):
+            if (s.get('codec_type') == 'subtitle' and
+                    s.get('codec_name', '').lower() in BAD_SUB_CODECS):
+                return True
+        return False
 
     def _get_width(self, meta):
         if not meta: return 0
@@ -293,10 +316,17 @@ class Verifier:
         #    Goddess Mode (fast_mode=True): structural + ffprobe, sin decode
         health = self.check_health(filepath, fast_mode=fast_mode)
         result["health_ok"] = health
-        if health:
-            result["action"] = "SKIP"
-        else:
+        if not health:
             result["action"] = "RESCUE"
             self._log(f"Roto (codec={codec}): {os.path.basename(filepath)}", "FAIL")
+            return result
+
+        # Sano, pero puede tener subs problemáticos (WebVTT) que rompen tdarr
+        meta = self._run_ffprobe(filepath)
+        if self._has_bad_sub_codecs(meta):
+            result["action"] = "RESCUE"
+            self._log(f"WebVTT detectado — forzando remux a SRT: {os.path.basename(filepath)}", "INFO")
+        else:
+            result["action"] = "SKIP"
 
         return result

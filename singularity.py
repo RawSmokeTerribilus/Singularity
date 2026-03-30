@@ -639,7 +639,7 @@ def singularity_mode(fast_scan=False):
     
     # --- Lógica de Identidad Visual ---
     if fast_scan:
-        mode_label = "GODDESS MODE — PIPELINE LUDICROUS"
+        mode_label = "GODDESS MODE — LUDICROUS PIPELINE"
         mode_style = "magenta"
     else:
         mode_label = "MODO SINGULARIDAD — PIPELINE AUTOMÁTICO"
@@ -757,7 +757,9 @@ def singularity_mode(fast_scan=False):
     # FASE 1 — MKVerything God Mode                                       #
     # ------------------------------------------------------------------ #
     console.print()
-    console.print(Rule("[bold red]FASE 1 — MKVerything: MODO DIOS[/bold red]", style="red"))
+    fase1_label = "FASE 1 — MKVerything: MODO DIOSA" if fast_scan else "FASE 1 — MKVerything: MODO DIOS"
+    fase1_style = "magenta" if fast_scan else "red"
+    console.print(Rule(f"[bold {fase1_style}]{fase1_label}[/bold {fase1_style}]", style=fase1_style))
     update_status("PIPELINE", "FASE 1: MKVerything", "CURRANDO", progress=10, details="Empezando extracción y rescate")
     log.info("Singularity Phase 1 start (MKVerything God Mode)")
     t1 = time.time()

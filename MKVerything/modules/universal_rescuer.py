@@ -118,26 +118,30 @@ clip.set_output()
             # Video del pipe VapourSynth, audio/subs del original
             cmd_subs   = (f"{_VSPIPE_BIN} -c y4m \"{vpy_path}\" - | "
                           f"ffmpeg -hide_banner -y -i - -i \"{input_file}\" "
-                          f"-map 0:v:0 -map 1:a? -map 1:s? "
+                          f"-map 0:v:0 -map 1:a? -map 1:s? -map -1:d "
                           f"{hw_args} -c:a aac -c:s srt {CLEAN_FLAGS} \"{output_file}\"")
             cmd_no_subs = (f"{_VSPIPE_BIN} -c y4m \"{vpy_path}\" - | "
                            f"ffmpeg -hide_banner -y -i - -i \"{input_file}\" "
-                           f"-map 0:v:0 -map 1:a? -sn "
+                           f"-map 0:v:0 -map 1:a? -sn -map -1:d "
                            f"{hw_args} -c:a aac {CLEAN_FLAGS} \"{output_file}\"")
             return self._run_with_sub_fallback(cmd_subs, cmd_no_subs, output_file, level_name)
 
         elif level == 2:
             if source_codec in GOOD_CODECS:
-                level_name = "Nivel 2 (Remux Médico)"
-                video_args = "-c:v copy"
+                # Remux puro: solo cambia el contenedor, audio y vídeo intactos
+                level_name  = "Nivel 2 (Remux Médico)"
+                video_args  = "-c:v copy"
+                audio_args  = "-c:a copy"
             else:
-                level_name = "Nivel 2 (Transcode h264)"
-                video_args = "-c:v libx264 -preset fast -crf 18 -pix_fmt yuv420p"
+                # Legacy/desconocido: transcode completo, preservar canal count (sin -b:a fijo)
+                level_name  = "Nivel 2 (Transcode h264)"
+                video_args  = "-c:v libx264 -preset fast -crf 18 -pix_fmt yuv420p"
+                audio_args  = "-c:a aac -af aresample=async=1"
                 self._log(f"   🔄 {level_name}: codec fuente '{source_codec}' → h264 -crf 18")
             base = (f"ffmpeg -hide_banner -y -fflags +genpts -i \"{input_file}\" "
-                    f"-map 0:v:0 -map 0:a? ")
-            cmd_subs    = base + f"-map 0:s? {video_args} -c:a aac -af aresample=async=1 -c:s srt {CLEAN_FLAGS} \"{output_file}\""
-            cmd_no_subs = base + f"-sn {video_args} -c:a aac -af aresample=async=1 {CLEAN_FLAGS} \"{output_file}\""
+                    f"-map 0:v:0 -map 0:a? -map -0:d ")
+            cmd_subs    = base + f"-map 0:s? {video_args} {audio_args} -c:s srt {CLEAN_FLAGS} \"{output_file}\""
+            cmd_no_subs = base + f"-sn {video_args} {audio_args} {CLEAN_FLAGS} \"{output_file}\""
             return self._run_with_sub_fallback(cmd_subs, cmd_no_subs, output_file, level_name)
 
         elif level == 1:
@@ -145,7 +149,7 @@ clip.set_output()
             self._log(f"   🪜 {level_name_hw}: Intentando recodificación acelerada por hardware...")
             hw_args = self.agent.get_transcode_args(target_codec="h264")
             base_hw = (f"ffmpeg -hide_banner -y -i \"{input_file}\" "
-                       f"-map 0:v:0 -map 0:a? ")
+                       f"-map 0:v:0 -map 0:a? -map -0:d ")
             cmd_hw_subs    = base_hw + f"-map 0:s? {hw_args} -c:a aac -c:s srt {CLEAN_FLAGS} \"{output_file}\""
             cmd_hw_no_subs = base_hw + f"-sn {hw_args} -c:a aac {CLEAN_FLAGS} \"{output_file}\""
 
@@ -160,15 +164,15 @@ clip.set_output()
             base_cpu = (f"ffmpeg -hide_banner -y "
                         f"-fflags +genpts+igndts+discardcorrupt "
                         f"-i \"{input_file}\" "
-                        f"-map 0:v:0 -map 0:a? ")
+                        f"-map 0:v:0 -map 0:a? -map -0:d ")
             cmd_cpu_subs    = (base_cpu + f"-map 0:s? "
                                f"-c:v libx264 -preset fast -crf 18 -pix_fmt yuv420p "
-                               f"-c:a aac -b:a 128k -c:s srt "
+                               f"-c:a aac -c:s srt "
                                f"-metadata:s:v:0 sar=1/1 {CLEAN_FLAGS} \"{output_file}\"")
             cmd_cpu_no_subs = (base_cpu +
                                f"-sn "
                                f"-c:v libx264 -preset fast -crf 18 -pix_fmt yuv420p "
-                               f"-c:a aac -b:a 128k "
+                               f"-c:a aac "
                                f"-metadata:s:v:0 sar=1/1 {CLEAN_FLAGS} \"{output_file}\"")
             return self._run_with_sub_fallback(cmd_cpu_subs, cmd_cpu_no_subs, output_file, level_name_cpu)
 
