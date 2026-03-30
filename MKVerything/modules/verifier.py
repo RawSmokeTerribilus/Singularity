@@ -9,6 +9,10 @@ import re
 import difflib
 from datetime import datetime
 
+LEGACY_CODECS      = frozenset({"mpeg4", "xvid", "divx", "msmpeg4", "wmv1", "wmv2", "mpeg2video"})
+GOOD_CODECS        = frozenset({"h264", "hevc"})   # únicos codecs que no necesitan transcode
+SUSPICIOUS_SIZE_MB = 1
+
 class Verifier:
     def __init__(self, log_file="../logs/security_audit.log"):
         # Aseguramos que el log vaya a la carpeta logs/ correcta
@@ -200,3 +204,99 @@ class Verifier:
         for s in meta.get('streams', []):
             if s.get('codec_type') == 'video': return int(s.get('width', 0))
         return 0
+
+    # =========================================================================
+    # TRIAGE UNIFICADO
+    # =========================================================================
+
+    def get_video_codec(self, filepath):
+        """Devuelve el codec de video en lowercase, o None si no se puede leer."""
+        meta = self._run_ffprobe(filepath)
+        if not meta:
+            return None
+        for s in meta.get('streams', []):
+            if s.get('codec_type') == 'video':
+                return s.get('codec_name', '').lower() or None
+        return None
+
+    def check_timestamps(self, filepath):
+        """
+        Verifica que los timestamps del contenedor sean válidos.
+        Absorbe la lógica de scan_corruptos.sh: comprueba que la duración
+        tenga parte decimal (timestamps íntegros). Devuelve True si son válidos.
+        """
+        cmd = ["ffprobe", "-v", "error", "-show_entries", "format=duration",
+               "-of", "default=noprint_wrappers=1:nokey=1", filepath]
+        try:
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=15)
+            raw = result.stdout.strip()
+            if not raw or result.returncode != 0:
+                return False
+            duration = float(raw)
+            # Timestamps rotos suelen producir duraciones enteras exactas (sin decimales)
+            # o valores inválidos. Un decimal real indica índice de contenedor sano.
+            return '.' in raw and duration > 0
+        except Exception:
+            return False
+
+    def triage_file(self, filepath, fast_mode=False):
+        """
+        Punto de entrada unificado para auditoría y recuperación.
+        Devuelve un dict con el diagnóstico completo y la acción recomendada:
+          - SKIP            : h264/h265 en MKV y sano → no tocar
+          - TRANSCODE       : cualquier cosa que no sea h264/h265 en MKV → a h264 -crf 18
+          - RESCUE          : h264/h265 en MKV pero roto → escalera de recuperación
+          - FLAG_SUSPICIOUS : tamaño < 1MB → no tocar, revisar manualmente
+        """
+        result = {
+            "path":          filepath,
+            "codec":         None,
+            "is_suspicious": False,
+            "is_legacy":     False,
+            "timestamps_ok": True,
+            "health_ok":     False,
+            "action":        "SKIP",
+        }
+
+        # 1. Tamaño sospechoso — flagear sin tocar
+        try:
+            size_mb = os.path.getsize(filepath) / (1024 * 1024)
+            if size_mb < SUSPICIOUS_SIZE_MB:
+                result["is_suspicious"] = True
+                result["action"] = "FLAG_SUSPICIOUS"
+                self._log(f"Sospechoso (<1MB): {os.path.basename(filepath)}", "WARN")
+                return result
+        except OSError:
+            result["action"] = "FLAG_SUSPICIOUS"
+            return result
+
+        # 2. Detectar codec y contenedor
+        codec  = self.get_video_codec(filepath)
+        is_mkv = filepath.lower().endswith('.mkv')
+        result["codec"] = codec
+
+        # 3. Regla principal: solo h264/h265 en MKV pasan al diagnóstico.
+        #    Todo lo demás → TRANSCODE a h264 -crf 18, sin perder tiempo en health checks.
+        if codec not in GOOD_CODECS or not is_mkv:
+            result["is_legacy"] = codec in LEGACY_CODECS
+            result["timestamps_ok"] = self.check_timestamps(filepath)
+            result["action"] = "TRANSCODE"
+            self._log(
+                f"Transcode necesario (codec={codec}, mkv={is_mkv}, "
+                f"ts={'OK' if result['timestamps_ok'] else 'ROTO'}): {os.path.basename(filepath)}",
+                "INFO"
+            )
+            return result
+
+        # 4. h264/h265 en MKV → diagnóstico
+        #    God Mode  (fast_mode=False): decode completo frame a frame con -xerror
+        #    Goddess Mode (fast_mode=True): structural + ffprobe, sin decode
+        health = self.check_health(filepath, fast_mode=fast_mode)
+        result["health_ok"] = health
+        if health:
+            result["action"] = "SKIP"
+        else:
+            result["action"] = "RESCUE"
+            self._log(f"Roto (codec={codec}): {os.path.basename(filepath)}", "FAIL")
+
+        return result

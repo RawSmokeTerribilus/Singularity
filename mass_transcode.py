@@ -21,6 +21,16 @@ def run_mass_transcode(list_path):
             print(f"❌ [SKIP] No encontrada: {ruta}")
             continue
 
+        # Guard de idempotencia: saltar si ya es h264
+        probe = subprocess.run(
+            ['ffprobe', '-v', 'error', '-select_streams', 'v:0',
+             '-show_entries', 'stream=codec_name', '-of', 'default=noprint_wrappers=1:nokey=1', ruta],
+            capture_output=True, text=True
+        )
+        if probe.stdout.strip().lower() == 'h264':
+            print(f"   ⏭ [SKIP] Ya es h264: {os.path.basename(ruta)}")
+            continue
+
         print(f"🎬 [{i+1}/{len(rutas)}] Iniciando: {os.path.basename(ruta)}")
         output = ruta.replace('.mkv', '_provisional.mkv')
         
@@ -50,7 +60,7 @@ def run_mass_transcode(list_path):
             cmd_cpu = [
                 'ffmpeg', '-hide_banner', '-loglevel', 'error', '-y',
                 '-i', ruta,
-                '-c:v', 'libx264', '-preset', 'fast', '-crf', '22',
+                '-c:v', 'libx264', '-preset', 'fast', '-crf', '18',
                 '-c:a', 'aac', '-b:a', '128k',
                 '-map', '0:v:0', '-map', '0:a?', '-map_metadata', '-1',
                 '-fflags', '+genpts+igndts+discardcorrupt',

@@ -140,66 +140,76 @@ def main():
             elif opcion == "1":
                 from modules import verifier
                 v = verifier.Verifier()
-                
+
                 path_target = input("\n📂 Carpeta o Punto de Montaje a auditar: ").strip().replace("'","").replace('"','')
                 if not os.path.exists(path_target):
                     print("❌ La ruta no existe.")
                     time.sleep(2)
                     continue
 
-                # Preparar Informe de Bajas
                 fecha_str = datetime.now().strftime("%d-%m-%y")
-                archivo_bajas = os.path.join(BASE_DIR, "logs", f"videos-rotos-{fecha_str}.txt")
-                os.makedirs(os.path.join(BASE_DIR, "logs"), exist_ok=True)
+                logs_dir = os.path.join(BASE_DIR, "logs")
+                os.makedirs(logs_dir, exist_ok=True)
+                archivo_bajas       = os.path.join(logs_dir, f"videos-rotos-{fecha_str}.txt")
+                archivo_sospechosos = os.path.join(logs_dir, f"videos-sospechosos-{fecha_str}.txt")
 
                 print(f"\n🔍 {C_CYAN}Iniciando inventario...{C_RESET}")
                 archivos = scan_files(path_target, ['.mkv', '.avi', '.mp4', '.mov', '.wmv'])
                 total = len(archivos)
-                
+
                 print(f"📊 {total} archivos detectados. Iniciando escaneo de integridad...")
                 print(f"📄 Informe de bajas: {archivo_bajas}\n")
 
                 rotos = 0
                 sanos = 0
-                spam = 0
+                spam  = 0
+                sospechosos = 0
 
                 for i, f in enumerate(archivos):
                     prog = int((i / total) * 100)
                     print(f"[{i+1}/{total}] {os.path.basename(f)[:50]}...", end="\r")
                     update_status("MKVERYTHING", "Auditoría", "PROCESSING", progress=prog, details=f"Escaneando: {os.path.basename(f)}")
-                    
-                    # Chequeo de Salud (El test real de FFmpeg)
-                    es_sano = v.check_health(f)
-                    # Chequeo de Spam
+
+                    # Triage unificado (detecta legacy, corruptos y sospechosos)
+                    triage    = v.triage_file(f, fast_mode=False)
                     spam_info = v.audit_file_metadata(f)
 
-                    if not es_sano:
+                    if triage["action"] == "FLAG_SUSPICIOUS":
+                        sospechosos += 1
+                        with open(archivo_sospechosos, "a", encoding="utf-8") as out:
+                            out.write(f + "\n")
+                    elif triage["action"] in ("TRANSCODE", "RESCUE"):
                         rotos += 1
                         with open(archivo_bajas, "a", encoding="utf-8") as out:
                             out.write(f + "\n")
                     else:
                         sanos += 1
-                    
+
                     if not spam_info['clean']:
                         spam += 1
 
                 print(f"\n\n{C_YELLOW}--- RESUMEN DE AUDITORÍA ---{C_RESET}")
-                print(f"✅ Sanos: {sanos}")
-                print(f"❌ Rotos: {C_RED}{rotos}{C_RESET}")
-                print(f"🏷️  Spam:  {spam}")
+                print(f"✅ Sanos:        {sanos}")
+                print(f"❌ Rotos/Legacy: {C_RED}{rotos}{C_RESET}")
+                print(f"⚠️  Sospechosos:  {C_YELLOW}{sospechosos}{C_RESET}  (<1MB — revisar manualmente)")
+                print(f"🏷️  Spam:         {spam}")
                 print(f"----------------------------")
-                update_status("MKVERYTHING", "Auditoría", "COMPLETED", progress=100, details=f"Sanos: {sanos}, Rotos: {rotos}")
-                
+                update_status("MKVERYTHING", "Auditoría", "COMPLETED", progress=100,
+                              details=f"Sanos: {sanos}, Rotos: {rotos}, Sospechosos: {sospechosos}")
+
+                if sospechosos > 0:
+                    print(f"\n⚠️  Lista de sospechosos: {C_YELLOW}{archivo_sospechosos}{C_RESET}")
+
                 if rotos > 0:
-                    print(f"\n📢 Se ha generado la lista de bajas en: {C_CYAN}{archivo_bajas}{C_RESET}")
-                    lanzar = input(f"\n🚑 ¿Deseas enviar los {rotos} archivos al Rescatador ahora? (s/n): ")
+                    print(f"\n📢 Lista de bajas: {C_CYAN}{archivo_bajas}{C_RESET}")
+                    lanzar = input(f"\n🚑 ¿Enviar los {rotos} archivos al Rescatador ahora? (s/n): ")
                     if lanzar.lower() == 's':
                         from modules import universal_rescuer
                         rescuer = universal_rescuer.UniversalRescuer()
-                        rescuer.procesar_lista(archivo_bajas, modo_estricto=True)
+                        rescuer.procesar_lista(archivo_bajas, modo_estricto=True, fast_scan=False)
                 else:
                     print(f"\n{C_GREEN}💎 Librería impecable. No se han detectado errores.{C_RESET}")
-                
+
                 input("\n✅ Pulsa Enter para volver...")
                 continue
 
