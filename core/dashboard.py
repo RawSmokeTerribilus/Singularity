@@ -186,8 +186,7 @@ app = FastAPI(title="Singularity Core Dashboard", lifespan=lifespan)
 @app.get("/", response_class=HTMLResponse)
 async def read_root(request: Request):
     status_data = get_status()
-    return templates.TemplateResponse("index.html", {
-        "request": request,
+    return templates.TemplateResponse(request, "index.html", {
         "status": status_data,
         "now": time.time()
     })

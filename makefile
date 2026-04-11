@@ -41,6 +41,8 @@ prep:
 	@touch work_data/mass_editor/completados_img.txt
 	@touch work_data/mass_editor/ids.txt
 	@touch work_data/mass_editor/mapeo_maestro.json
+	@touch work_data/mass_editor/titulos_mapa.json
+	@touch work_data/mass_editor/mapeo_por_titulo.json
 	@mkdir -p config && touch config/.env
 	@sudo chown -R $(USER):$(USER) work_data/
 	@chmod -R 755 $(WORK_TRACKERS)

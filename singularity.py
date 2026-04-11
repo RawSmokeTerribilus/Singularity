@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
 import os
+import re
 import sys
 import time
 import random
 import logging
+import importlib.util
 import subprocess
 import threading
 import socket
@@ -31,7 +33,7 @@ from rich.live import Live
 from rich.align import Align
 from rich.rule import Rule
 
-from singularity_config import GOD_PHRASES, MSG_NUEVO, ID_INICIO, ID_FIN, LOGS_DIR, BASE_URL, COOKIE_VALUE, IMGBB_API, PTSCREENS_API
+from singularity_config import GOD_PHRASES, MSG_NUEVO, ID_INICIO, ID_FIN, LOGS_DIR, BASE_URL, COOKIE_VALUE, IMGBB_API, PTSCREENS_API  # noqa: F401 – BASE_URL/COOKIE_VALUE/IMGBB_API/PTSCREENS_API usados en _ensure_credentials (SING_* namespace)
 
 console = Console()
 
@@ -291,50 +293,373 @@ def _submenu_extras():
 #  Opción 3 — UNIT3D Orchestrator                                    #
 # ------------------------------------------------------------------ #
 
-def unit3d_orchestrator():
-    console.print(Panel(
-        "[bold green]ORQUESTADOR UNIT3D EDITION[/bold green]\nConfiguración para esta sesión",
-        border_style="green",
-    ))
+def _write_env_key(key: str, value: str) -> None:
+    """Persists a single key=value to .env and updates os.environ immediately."""
+    env_path = BASE_DIR / ".env"
+    lines = []
+    found = False
+    if env_path.exists():
+        for line in env_path.read_text().splitlines():
+            if line.strip().startswith(f"{key}="):
+                lines.append(f"{key}={value}")
+                found = True
+            else:
+                lines.append(line)
+    if not found:
+        lines.append(f"{key}={value}")
+    with open(env_path, "w") as fh:
+        fh.write("\n".join(lines) + "\n")
+    os.environ[key] = value
 
-    banner = Prompt.ask(
-        "El texto del banner en BBCode para añadir a las descripciones\n"
-        "  [dim](pulsa Enter para usar el que está por defecto)[/dim]",
-        default=MSG_NUEVO,
-    )
-    start = IntPrompt.ask(
-        "ID del primer torrent que quieres editar\n"
-        "  [dim](el número que se ve en la URL: tracker.com/torrents/[bold]14[/bold])[/dim]",
-        default=ID_INICIO,
-    )
-    end = IntPrompt.ask(
-        "ID del último torrent que quieres editar\n"
-        "  [dim](se tocarán todos los IDs entre el primero y este)[/dim]",
-        default=ID_FIN,
-    )
 
-    confirm = Prompt.ask(f"¿Lanzo la secuencia 01-04 para los IDs del {start} al {end}?", choices=["s", "n"], default="s")
+def _me_load_config() -> dict:
+    """Lee la configuración activa de Mass Edition desde las ME_* env vars."""
+    return {
+        "tracker_url":   os.getenv("ME_TRACKER_URL",         ""),
+        "tracker_name":  os.getenv("ME_TRACKER_DEFAULT",     ""),
+        "cookie_name":   os.getenv("ME_TRACKER_COOKIE_NAME", ""),
+        "cookie":        os.getenv("ME_TRACKER_COOKIE",      ""),
+        "username":      os.getenv("ME_TRACKER_USERNAME",    ""),
+        "api_key":       os.getenv("ME_TRACKER_API_KEY",     ""),
+        "imgbb_api":     os.getenv("ME_IMGBB_API",           ""),
+        "ptscreens_api": os.getenv("ME_PTSCREENS_API",       ""),
+        "tmp_root":      os.getenv("ME_TMP_ROOT",            str(BASE_DIR / "RawLoadrr" / "tmp")),
+        "user_agent":    os.getenv("ME_CUSTOM_USER_AGENT",   "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"),
+    }
 
-    if confirm == "s":
-        scripts = [
-            "extras/MASS-EDITION-UNIT3D/01_scraper.py",
-            "extras/MASS-EDITION-UNIT3D/02_indexer.py",
-            "extras/MASS-EDITION-UNIT3D/03_mass_updater.py",
-            "extras/MASS-EDITION-UNIT3D/04_image_resurrector.py"
-        ]
-        os.environ["ID_START"] = str(start)
-        os.environ["ID_END"] = str(end)
-        log.info(f"UNIT3D Orchestrator: IDs {start}-{end}")
-        for script in scripts:
-            script_path = BASE_DIR / script
-            if not script_path.exists():
-                console.print(f"[yellow]⚠ Script no encontrado, se salta: {script}[/yellow]")
-                log.warning(f"UNIT3D script not found: {script}")
+
+def _me_load_rl_trackers() -> dict:
+    """Carga el dict TRACKERS de RawLoadrr/data/config.py (solo lectura). Devuelve {} si falla."""
+    try:
+        rl_config_path = BASE_DIR / "RawLoadrr" / "data" / "config.py"
+        if not rl_config_path.exists():
+            return {}
+        spec = importlib.util.spec_from_file_location("rl_config", rl_config_path)
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        return getattr(mod, "config", {}).get("TRACKERS", {})
+    except Exception:
+        return {}
+
+
+def _me_check_essential_config(me_cfg: dict) -> dict:
+    """Aduana de arranque: valida los campos obligatorios de Mass Edition (al estilo CSI)."""
+    changed = False
+
+    if not me_cfg.get("tracker_url"):
+        console.print("\n[bold red]ME_TRACKER_URL no configurada.[/bold red]")
+        val = Prompt.ask("URL base del tracker  [dim](ej: https://milnueve.cc)[/dim]").strip()
+        if val:
+            _write_env_key("ME_TRACKER_URL", val)
+            me_cfg["tracker_url"] = val
+            changed = True
+
+    if not me_cfg.get("cookie"):
+        console.print("\n[bold red]ME_TRACKER_COOKIE (sesión) no configurada.[/bold red]")
+        val = Prompt.ask("Cookie de sesión", password=True).strip()
+        if val:
+            _write_env_key("ME_TRACKER_COOKIE", val)
+            me_cfg["cookie"] = val
+            changed = True
+
+    tmp = me_cfg.get("tmp_root", "")
+    if not tmp or not os.path.exists(tmp):
+        default_tmp = str(BASE_DIR / "RawLoadrr" / "tmp")
+        console.print(f"\n[bold yellow]ME_TMP_ROOT no existe o no está configurado: {tmp or '(vacío)'}[/bold yellow]")
+        val = Prompt.ask("Ruta TMP", default=default_tmp).strip()
+        _write_env_key("ME_TMP_ROOT", val)
+        me_cfg["tmp_root"] = val
+        changed = True
+
+    if changed:
+        me_cfg = _me_load_config()
+    return me_cfg
+
+
+def _me_configure_tracker(me_cfg: dict) -> dict:
+    """Menú interactivo de configuración de Mass Edition (al estilo CSI's configure_tracker)."""
+    rl_trackers_raw = _me_load_rl_trackers()
+    rl_trackers = [
+        k for k, v in rl_trackers_raw.items()
+        if isinstance(v, dict) and not k.startswith("default") and v.get("announce_url")
+    ]
+
+    while True:
+        cur_url  = me_cfg.get("tracker_url")  or "(no configurada)"
+        cur_name = me_cfg.get("tracker_name") or "?"
+        cur_user = me_cfg.get("username")     or "(no configurado)"
+        cur_ua   = me_cfg.get("user_agent",   "")
+        cur_tmp  = me_cfg.get("tmp_root",     "")
+        cur_imgbb = "[green]✓[/green]" if me_cfg.get("imgbb_api")     else "[red]✗ vacía[/red]"
+        cur_pts   = "[green]✓[/green]" if me_cfg.get("ptscreens_api") else "[red]✗ vacía[/red]"
+        _c = me_cfg.get("cookie", "")
+        cookie_prev = f"…{_c[-8:]}" if len(_c) > 8 else (_c or "[red]✗ vacía[/red]")
+
+        console.print()
+        console.print(Panel(
+            f"  Tracker  : [cyan]{cur_url}[/cyan]  ID:[bold]{cur_name}[/bold]  user:[bold]{cur_user}[/bold]\n"
+            f"  Cookie   : {cookie_prev}\n"
+            f"  TMP Root : [green]{cur_tmp}[/green]\n"
+            f"  UA       : [yellow]{cur_ua[:60]}{'…' if len(cur_ua) > 60 else ''}[/yellow]\n"
+            f"  ImgBB    : {cur_imgbb}    PTScreens: {cur_pts}\n\n"
+            "  [bold cyan][1][/bold cyan]  Editar tracker  (URL, abrev, cookie, usuario, API key)\n"
+            f"  [bold cyan][2][/bold cyan]  Importar desde RawLoadrr  [dim]({len(rl_trackers)} trackers disponibles)[/dim]\n"
+            "  [bold cyan][3][/bold cyan]  APIs de imágenes  (ImgBB, PTScreens)\n"
+            "  [bold cyan][4][/bold cyan]  Ruta TMP\n"
+            "  [bold cyan][5][/bold cyan]  User-Agent\n"
+            "  [bold cyan][0][/bold cyan]  Volver",
+            title="[bold green]MASS EDITION — Configuración del módulo[/bold green]",
+            border_style="green",
+        ))
+
+        c = Prompt.ask("Selección", choices=["1", "2", "3", "4", "5", "0"], default="0")
+
+        if c == "0":
+            return me_cfg
+
+        elif c == "1":
+            name = Prompt.ask("Abreviatura del tracker", default=me_cfg.get("tracker_name") or "").strip().upper()
+            url  = Prompt.ask("URL base", default=me_cfg.get("tracker_url") or "").strip()
+            user = Prompt.ask("Usuario", default=me_cfg.get("username") or "").strip()
+            api_key = Prompt.ask("API Key del tracker", default=me_cfg.get("api_key") or "").strip()
+            _c_old = me_cfg.get("cookie") or ""
+            console.print(f"[dim]Cookie actual: {'…' + _c_old[-8:] if len(_c_old) > 8 else '(vacía)'}[/dim]")
+            cookie = Prompt.ask("Cookie de sesión [Enter para no cambiar]", password=True, default="").strip()
+            cookie_name = Prompt.ask(
+                "Nombre de la cookie  [dim](ej: milnueve_session)[/dim]",
+                default=me_cfg.get("cookie_name") or "",
+            ).strip()
+            if name:        _write_env_key("ME_TRACKER_DEFAULT",      name)
+            if url:         _write_env_key("ME_TRACKER_URL",          url)
+            if user:        _write_env_key("ME_TRACKER_USERNAME",     user)
+            if api_key:     _write_env_key("ME_TRACKER_API_KEY",      api_key)
+            if cookie:      _write_env_key("ME_TRACKER_COOKIE",       cookie)
+            if cookie_name: _write_env_key("ME_TRACKER_COOKIE_NAME",  cookie_name)
+            me_cfg = _me_load_config()
+            console.print("[green]✓ Configuración del tracker actualizada[/green]")
+
+        elif c == "2":
+            if not rl_trackers:
+                console.print("[yellow]No hay trackers con announce_url en RawLoadrr/data/config.py[/yellow]")
                 continue
-            console.print(Panel(f"[bold yellow]DÁNDOLE CAÑA A:[/bold yellow] {script}", style="bold"))
-            _run(["python3", str(script_path)])
-        console.print("[bold green]✓ Secuencia masiva finiquitada.[/bold green]")
-        time.sleep(2)
+            console.print("\n[bold]Trackers disponibles en RawLoadrr:[/bold]")
+            for i, t in enumerate(rl_trackers, 1):
+                t_data = rl_trackers_raw.get(t, {})
+                announce = t_data.get("announce_url", "")
+                m = re.match(r"(https?://[^/]+)", announce)
+                base_url = m.group(1) if m else ""
+                has_api = bool(t_data.get("api_key", "").strip())
+                status = "[green]API ✓[/green]" if has_api else "[red]sin API key[/red]"
+                console.print(f"  {i}. [bold]{t}[/bold]  {status}  [dim]{base_url}[/dim]")
+
+            sel = Prompt.ask(
+                "Selección  [dim](0 para cancelar)[/dim]",
+                choices=["0"] + [str(i) for i in range(1, len(rl_trackers) + 1)],
+                default="0",
+            )
+            if sel != "0":
+                chosen = rl_trackers[int(sel) - 1]
+                t_data = rl_trackers_raw.get(chosen, {})
+                announce = t_data.get("announce_url", "")
+                m = re.match(r"(https?://[^/]+)", announce)
+                base_url = m.group(1) if m else ""
+                api_key  = t_data.get("api_key", "")
+
+                user = Prompt.ask("Usuario en el tracker", default=me_cfg.get("username") or "").strip()
+                cookie_name = Prompt.ask(
+                    "Nombre de la cookie  [dim](ej: milnueve_session, nuclear_order_bit_syndicate_session)[/dim]",
+                    default=me_cfg.get("cookie_name") or "",
+                ).strip()
+
+                _write_env_key("ME_TRACKER_DEFAULT", chosen)
+                if base_url:    _write_env_key("ME_TRACKER_URL",         base_url)
+                if user:        _write_env_key("ME_TRACKER_USERNAME",    user)
+                if api_key:     _write_env_key("ME_TRACKER_API_KEY",     api_key)
+                if cookie_name: _write_env_key("ME_TRACKER_COOKIE_NAME", cookie_name)
+                console.print(f"[green]✓ Tracker cambiado a {chosen} → {base_url or '(URL no extraída — edita manualmente con [1])'}[/green]")
+                me_cfg = _me_load_config()
+
+        elif c == "3":
+            _i = me_cfg.get("imgbb_api") or ""
+            _p = me_cfg.get("ptscreens_api") or ""
+            console.print(f"[dim]ImgBB actual    : {'…' + _i[-8:] if len(_i) > 8 else '(vacía)'}[/dim]")
+            console.print(f"[dim]PTScreens actual: {'…' + _p[-8:] if len(_p) > 8 else '(vacía)'}[/dim]")
+            new_i = Prompt.ask("ImgBB API key     [Enter para no cambiar]", password=True, default="").strip()
+            new_p = Prompt.ask("PTScreens API key [Enter para no cambiar]", password=True, default="").strip()
+            if new_i: _write_env_key("ME_IMGBB_API",     new_i)
+            if new_p: _write_env_key("ME_PTSCREENS_API", new_p)
+            me_cfg = _me_load_config()
+
+        elif c == "4":
+            new_tmp = Prompt.ask(
+                "Ruta TMP",
+                default=me_cfg.get("tmp_root") or str(BASE_DIR / "RawLoadrr" / "tmp"),
+            ).strip()
+            _write_env_key("ME_TMP_ROOT", new_tmp)
+            me_cfg = _me_load_config()
+
+        elif c == "5":
+            new_ua = Prompt.ask("User-Agent", default=me_cfg.get("user_agent") or "").strip()
+            if new_ua:
+                _write_env_key("ME_CUSTOM_USER_AGENT", new_ua)
+                me_cfg = _me_load_config()
+
+
+def unit3d_orchestrator():
+    me_cfg = _me_check_essential_config(_me_load_config())
+
+    while True:
+        cur_url   = me_cfg.get("tracker_url")  or "(no configurada)"
+        cur_name  = me_cfg.get("tracker_name") or "?"
+        cur_mode  = os.getenv("EDIT_MODE", "BANNER_URL")
+        _c = me_cfg.get("cookie", "")
+        cookie_prev = f"…{_c[-8:]}" if len(_c) > 8 else (_c or "[red]✗ vacía[/red]")
+        cur_imgbb = "✓" if me_cfg.get("imgbb_api")     else "✗"
+        cur_pts   = "✓" if me_cfg.get("ptscreens_api") else "✗"
+
+        console.print()
+        console.print(Panel(
+            f"[cyan]Tracker  [/cyan]: [{cur_name}] {cur_url}\n"
+            f"[cyan]Cookie   [/cyan]: {cookie_prev}\n"
+            f"[cyan]ImgBB    [/cyan]: {cur_imgbb}    [cyan]PTScreens[/cyan]: {cur_pts}\n"
+            f"[cyan]Modo edit[/cyan]: {cur_mode}\n\n"
+            "[C] Configuración del módulo  [dim](tracker, APIs, paths)[/dim]\n"
+            "[E] Configurar edición y lanzar\n"
+            "[0] Volver",
+            title="[bold green]ORQUESTADOR UNIT3D[/bold green]",
+            border_style="green",
+        ))
+
+        sel = Prompt.ask("Selección", choices=["c", "e", "0"])
+
+        if sel == "0":
+            break
+
+        elif sel == "c":
+            me_cfg = _me_configure_tracker(me_cfg)
+
+        elif sel == "e":
+            # --- SELECCIÓN DE MODO ---
+            console.print()
+            console.print(Panel(
+                "[1] [bold]BANNER_URL[/bold]   — Cambiar el link del repo en el banner  [dim](el más seguro)[/dim]\n"
+                "[2] [bold]BANNER_IMG[/bold]   — Cambiar la imagen del banner\n"
+                "[3] [bold]FIRMA_TEXT[/bold]   — Cambiar el texto 🌱...🌱 de la firma\n"
+                "[4] [bold]FIRMA_FULL[/bold]   — Reemplazar el bloque firma+banner completo\n"
+                "[5] [bold]URL_REPLACE[/bold]  — Reemplazar cualquier URL arbitraria\n"
+                "[6] [bold]BLOCK_REPLACE[/bold]— Find & Replace libre  [dim](escape hatch)[/dim]\n"
+                "[0] Sin cambios  [dim](lanzar con el modo guardado en .env)[/dim]",
+                title=f"[bold yellow]¿Qué editamos? (modo actual: {cur_mode})[/bold yellow]",
+                border_style="yellow",
+            ))
+
+            edit_sel = Prompt.ask("Selección", choices=["1", "2", "3", "4", "5", "6", "0"])
+
+            if edit_sel == "1":
+                _write_env_key("EDIT_MODE", "BANNER_URL")
+                cur = os.getenv("BANNER_URL_NUEVA", "")
+                console.print(f"[dim]URL actual: {cur or '(vacía)'}[/dim]")
+                val = Prompt.ask("Nueva URL del repo [Enter para no cambiar]", default="").strip()
+                if val:
+                    _write_env_key("BANNER_URL_NUEVA", val)
+                    console.print("[green]✓ BANNER_URL_NUEVA guardado[/green]")
+
+            elif edit_sel == "2":
+                _write_env_key("EDIT_MODE", "BANNER_IMG")
+                cur = os.getenv("BANNER_IMG_NUEVA", "")
+                console.print(f"[dim]URL imagen actual: {cur or '(vacía)'}[/dim]")
+                val = Prompt.ask("Nueva URL de la imagen del banner [Enter para no cambiar]", default="").strip()
+                if val:
+                    _write_env_key("BANNER_IMG_NUEVA", val)
+                    console.print("[green]✓ BANNER_IMG_NUEVA guardado[/green]")
+
+            elif edit_sel == "3":
+                _write_env_key("EDIT_MODE", "FIRMA_TEXT")
+                cur = os.getenv("FIRMA_TEXT_NUEVA", "")
+                console.print(f"[dim]Texto actual: {cur or '(vacío)'}[/dim]")
+                val = Prompt.ask("Nuevo texto de firma [Enter para no cambiar]", default="").strip()
+                if val:
+                    _write_env_key("FIRMA_TEXT_NUEVA", val)
+                    console.print("[green]✓ FIRMA_TEXT_NUEVA guardado[/green]")
+
+            elif edit_sel == "4":
+                _write_env_key("EDIT_MODE", "FIRMA_FULL")
+                cur = os.getenv("FIRMA_FULL_NUEVA", "")
+                console.print(f"[dim]Bloque actual: {cur or '(vacío)'}[/dim]")
+                val = Prompt.ask("Nuevo bloque firma+banner completo [Enter para no cambiar]", default="").strip()
+                if val:
+                    _write_env_key("FIRMA_FULL_NUEVA", val)
+                    console.print("[green]✓ FIRMA_FULL_NUEVA guardado[/green]")
+
+            elif edit_sel == "5":
+                _write_env_key("EDIT_MODE", "URL_REPLACE")
+                cur_find    = os.getenv("FIND_URL", "")
+                cur_replace = os.getenv("REPLACE_URL", "")
+                console.print(f"[dim]Buscar   : {cur_find or '(vacío)'}[/dim]")
+                console.print(f"[dim]Reemplazar: {cur_replace or '(vacío)'}[/dim]")
+                find_val = Prompt.ask("URL a buscar [Enter para no cambiar]", default="").strip()
+                repl_val = Prompt.ask("URL de reemplazo [Enter para no cambiar]", default="").strip()
+                if find_val:
+                    _write_env_key("FIND_URL", find_val)
+                    console.print("[green]✓ FIND_URL guardado[/green]")
+                if repl_val:
+                    _write_env_key("REPLACE_URL", repl_val)
+                    console.print("[green]✓ REPLACE_URL guardado[/green]")
+
+            elif edit_sel == "6":
+                _write_env_key("EDIT_MODE", "BLOCK_REPLACE")
+                cur_viejo = os.getenv("BLOCK_VIEJO", "")
+                cur_nuevo = os.getenv("BLOCK_NUEVO", "")
+                console.print(f"[dim]Buscar   : {cur_viejo or '(vacío)'}[/dim]")
+                console.print(f"[dim]Reemplazar: {cur_nuevo or '(vacío)'}[/dim]")
+                viejo = Prompt.ask("Texto a buscar [Enter para no cambiar]", default="").strip()
+                nuevo = Prompt.ask("Texto de reemplazo [Enter para no cambiar]", default="").strip()
+                if viejo:
+                    _write_env_key("BLOCK_VIEJO", viejo)
+                    console.print("[green]✓ BLOCK_VIEJO guardado[/green]")
+                if nuevo:
+                    _write_env_key("BLOCK_NUEVO", nuevo)
+                    console.print("[green]✓ BLOCK_NUEVO guardado[/green]")
+
+            # --- RANGO DE IDs ---
+            start = IntPrompt.ask(
+                "\nID del primer torrent\n  [dim](tracker.com/torrents/[bold]14[/bold])[/dim]",
+                default=int(os.getenv("ID_START", str(ID_INICIO))),
+            )
+            end = IntPrompt.ask(
+                "ID del último torrent",
+                default=int(os.getenv("ID_END", str(ID_FIN))),
+            )
+            _write_env_key("ID_START", str(start))
+            _write_env_key("ID_END",   str(end))
+
+            modo_final = os.getenv("EDIT_MODE", "BANNER_URL")
+            confirm = Prompt.ask(
+                f"¿Lanzo la secuencia 01-04 para IDs {start}–{end} en modo [bold]{modo_final}[/bold]?",
+                choices=["s", "n"],
+                default="s",
+            )
+
+            if confirm == "s":
+                scripts = [
+                    "extras/MASS-EDITION-UNIT3D/01_scraper.py",
+                    "extras/MASS-EDITION-UNIT3D/02_indexer.py",
+                    "extras/MASS-EDITION-UNIT3D/03_mass_updater.py",
+                    "extras/MASS-EDITION-UNIT3D/04_image_resurrector.py",
+                ]
+                os.environ["ID_START"] = str(start)
+                os.environ["ID_END"]   = str(end)
+                log.info(f"UNIT3D Orchestrator: IDs {start}-{end}, modo {modo_final}")
+                for script in scripts:
+                    script_path = BASE_DIR / script
+                    if not script_path.exists():
+                        console.print(f"[yellow]⚠ Script no encontrado, se salta: {script}[/yellow]")
+                        log.warning(f"UNIT3D script not found: {script}")
+                        continue
+                    console.print(Panel(f"[bold yellow]DÁNDOLE CAÑA A:[/bold yellow] {script}", style="bold"))
+                    _run(["python3", str(script_path)])
+                console.print("[bold green]✓ Secuencia masiva finiquitada.[/bold green]")
+                time.sleep(2)
 
 
 # ------------------------------------------------------------------ #
@@ -531,30 +856,27 @@ def _ensure_credentials(need_unit3d: bool) -> None:
 
     _creds: list[tuple[str, str, str, bool]] = [
         (
-            "TRACKER_BASE_URL",
-            "La URL base de tu tracker (ej: https://mitracker.com)",
+            "SING_TRACKER_URL",
+            "La URL base del tracker para el pipeline de Singularidad (ej: https://mitracker.com)",
             BASE_URL,
             need_unit3d,
         ),
         (
-            "TRACKER_COOKIE_VALUE",
-            "La cookie de sesión del tracker\n"
-            "  → Abre tu tracker en el navegador, F12 → Application → Cookies\n"
-            "  → Copia el valor de la cookie de sesión (normalmente *_session)",
+            "SING_TRACKER_COOKIE",
+            "La cookie de sesión del tracker para el pipeline de Singularidad\n"
+            "  → F12 → Application → Cookies → copia el valor de la sesión",
             COOKIE_VALUE,
             need_unit3d,
         ),
         (
-            "IMGBB_API_KEY",
-            "La API Key de ImgBB (para las capturas de portada)\n"
-            "  → Regístrate en https://imgbb.com y genera tu clave en 'API'",
+            "SING_IMGBB_API",
+            "La API Key de ImgBB para el pipeline de Singularidad",
             IMGBB_API,
             need_unit3d,
         ),
         (
-            "PTSCREENS_API_KEY",
-            "La API Key de PTScreens (otro servicio para imágenes)\n"
-            "  → Obtén tu clave en https://ptscreens.com/api",
+            "SING_PTSCREENS_API",
+            "La API Key de PTScreens para el pipeline de Singularidad",
             PTSCREENS_API,
             need_unit3d,
         ),
@@ -725,7 +1047,8 @@ def singularity_mode(fast_scan=False):
             default=ID_FIN,
         )
 
-    _ensure_credentials(need_unit3d=(run_unit3d == "s"))
+    if run_unit3d == "s":
+        _me_check_essential_config(_me_load_config())
 
     cfg_table = Table(box=None, show_header=False)
     cfg_table.add_column(style="cyan", no_wrap=True)

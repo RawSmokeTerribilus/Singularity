@@ -882,6 +882,10 @@ class TrackerIndex:
         # Impide marcar ítems como ESTADO_NO_SUBIDO cuando no hay certeza
         self._probe_failed: bool = False
 
+        # CSI v3.1: Flag de auth — True si la cookie del scraper está expirada
+        # Impide marcar ítems como ESTADO_NO_SUBIDO con datos de scraper inválidos
+        self._auth_failed: bool = False
+
     def _ingest(self, torrent: dict):
         """
         CSI v2.0: Ingiere un torrent del tracker en el índice en memoria.
@@ -1022,7 +1026,16 @@ class TrackerIndex:
                 soup = BeautifulSoup(r.text, "html.parser")
                 rows = soup.select("tr.torrent-search--list__row")
                 if not rows:
-                    dbg(f"Scraper: No rows found on page {page}")
+                    # CSI v3.1: Detectar si la página es un login (cookie expirada)
+                    if page == 1 and _detect_auth_failure(soup):
+                        self._auth_failed = True
+                        console.print(
+                            "[bold red]⚠ AUTH FAILURE: Cookie expirada — "
+                            "el scraper recibió página de login en vez de lista de torrents.[/bold red]"
+                        )
+                        dbg(f"Scraper: AUTH FAILURE on page 1 — login page detected, setting _auth_failed=True")
+                    else:
+                        dbg(f"Scraper: No rows found on page {page} — end of pagination")
                     break
                 
                 for row in rows:
@@ -1082,7 +1095,15 @@ class TrackerIndex:
                 dbg(f"Scraper error page {page}: {e}")
                 consecutive_errors += 1
                 if consecutive_errors >= MAX_CONSECUTIVE_ERRORS: break
-                
+
+        # v3.1: Log scraper summary with auth status
+        auth_status = "FAILED" if self._auth_failed else "OK"
+        dbg(f"[SCRAPER] Finished: {matches} matches, {page} pages, auth={auth_status}")
+        if matches == 0 and page > 0 and not self._auth_failed:
+            console.print(
+                "[yellow]⚠ El scraper encontró 0 uploads. Verifica que la cookie "
+                "sigue siendo válida si esto parece incorrecto.[/yellow]"
+            )
         return matches
 
     def _source_local_tmp(self, config: dict) -> int:
@@ -1276,7 +1297,11 @@ class TrackerIndex:
         if name and name.lower() in self.seeding_names:
             return ESTADO_OK  # Si está seeding, asumimos subido
 
-        # ── Sin coincidencia → No subido ─────────────────────────────────────
+        # ── Sin coincidencia ──────────────────────────────────────────────────
+        # CSI v3.1: Si la sonda o la auth fallaron, no afirmar NO_SUBIDO
+        if self._probe_failed or self._auth_failed:
+            dbg(f"[STATE] probe_failed={self._probe_failed} auth_failed={self._auth_failed} → INCIDENCIA")
+            return ESTADO_INCIDENCIA
         return ESTADO_NO_SUBIDO
 
     def has_tv_season_state(self, tmdb_id=None, tvdb_id=None, season_num=None,
@@ -1337,21 +1362,35 @@ class TrackerIndex:
         if name and name.lower() in self.seeding_names:
             return ESTADO_OK
 
+        # CSI v3.1: Si la sonda o la auth fallaron, no afirmar NO_SUBIDO
+        if self._probe_failed or self._auth_failed:
+            dbg(f"[STATE] TV probe_failed={self._probe_failed} auth_failed={self._auth_failed} → INCIDENCIA")
+            return ESTADO_INCIDENCIA
         return ESTADO_NO_SUBIDO
 
     def _check_client_path(self, name: str, client_paths: set) -> bool:
         """
-        CSI v2.0: Comprueba si un ítem está presente en qBittorrent
-        verificando si algún path del cliente contiene el nombre del ítem.
-        Comparación case-insensitive.
+        CSI v3.1: Comprueba si un ítem está presente en qBittorrent.
+        Nivel 1: coincidencia directa case-insensitive (substring).
+        Nivel 2: coincidencia normalizada — ambos lados normalizados.
+        Nivel 3: fallback a seeding_names (v1.x compat).
         """
         if not name or not client_paths:
             return False
         name_lower = name.lower()
+        # Nivel 1: Direct substring
         for cp in client_paths:
             if name_lower in cp:
                 return True
-        # También comprobar contra seeding_names (v1.x compat)
+        # Nivel 2: Normalized — normalizar ambos lados
+        name_norm = _normalize_torrent_name(name)
+        if name_norm and len(name_norm) > 5:
+            for cp in client_paths:
+                cp_norm = re.sub(r"[._]", " ", cp)
+                if name_norm in cp_norm:
+                    dbg(f"[CLIENT_MATCH] Normalized match: '{name_norm}' in '...{cp[-60:]}'")
+                    return True
+        # Nivel 3: seeding_names (v1.x compat)
         if name_lower in self.seeding_names:
             return True
         return False
@@ -1477,9 +1516,10 @@ class TrackerIndex:
 # Solo ESTADO_INCIDENCIA cuando no hay certeza de la respuesta del tracker.
 
 def _compare_icu_results(results: list, local_icu: str | None, tmdb_id,
-                         client_paths: set, local_size_bytes: int = 0) -> str:
+                         client_paths: set, local_size_bytes: int = 0,
+                         query: str = "") -> str:
     """
-    CSI v2.0: Analiza la lista de torrents devuelta por el tracker
+    CSI v3.1: Analiza la lista de torrents devuelta por el tracker
     y determina el estado CSI del ítem local comparando ICUs.
 
     Args:
@@ -1488,12 +1528,25 @@ def _compare_icu_results(results: list, local_icu: str | None, tmdb_id,
         tmdb_id:          TMDB ID del ítem (para logging)
         client_paths:     Paths del cliente qBit (para ESTADO_OK vs FALTA_CLIENTE)
         local_size_bytes: Tamaño local para entropía de desempate
+        query:            Nombre de carpeta local (show_folder/movie_folder) — fallback
+                          para verificar presencia en cliente cuando el nombre del
+                          torrent en el tracker difiere del filename real.
 
     Returns:
         str: Estado CSI determinado
     """
     if not results:
         return ESTADO_NO_SUBIDO
+
+    def _in_client(t_name: str) -> bool:
+        """Verifica presencia en cliente: primero por nombre del tracker,
+        luego por query (folder name) como fallback."""
+        if _check_path_in_client(t_name, client_paths):
+            return True
+        if query and _check_path_in_client(query, client_paths):
+            dbg(f"[COMPARE] Client match via query fallback: '{query}'")
+            return True
+        return False
 
     # Si tenemos ICU local, intentar coincidencia exacta primero
     if local_icu:
@@ -1505,8 +1558,7 @@ def _compare_icu_results(results: list, local_icu: str | None, tmdb_id,
 
             if tracker_icu == local_icu:
                 dbg(f"[COMPARE] ICU exact match en tracker: {tracker_icu}")
-                in_client = _check_path_in_client(t_name, client_paths)
-                return ESTADO_OK if in_client else ESTADO_FALTA_CLIENTE
+                return ESTADO_OK if _in_client(t_name) else ESTADO_FALTA_CLIENTE
 
         # ICU no coincide → mismo TMDB pero versión diferente → DUPE POTENCIAL
         # Aplicar entropía de tamaño como posible desempate
@@ -1521,34 +1573,54 @@ def _compare_icu_results(results: list, local_icu: str | None, tmdb_id,
                 if _size_entropy_tiebreak(local_size_bytes, t_size):
                     dbg(f"[COMPARE] Size entropy tiebreak → probablemente misma versión")
                     t_name = attrs.get("name") or t.get("name") or ""
-                    in_client = _check_path_in_client(t_name, client_paths)
-                    return ESTADO_OK if in_client else ESTADO_FALTA_CLIENTE
+                    return ESTADO_OK if _in_client(t_name) else ESTADO_FALTA_CLIENTE
 
         dbg(f"[COMPARE] DUPE POTENCIAL: tmdb={tmdb_id}, local_icu={local_icu}")
         return ESTADO_DUPE_POTENCIAL
 
     # Sin ICU local, solo sabemos que existe en tracker
-    # Verificar si está en el cliente por nombre
+    # Verificar si está en el cliente por nombre o por query (folder name)
     for t in results:
         attrs = t.get("attributes", {})
         t_name = attrs.get("name") or t.get("name") or ""
-        if _check_path_in_client(t_name, client_paths):
+        if _in_client(t_name):
             return ESTADO_OK
     return ESTADO_FALTA_CLIENTE
 
 
+def _normalize_torrent_name(name: str) -> str:
+    """CSI v3.1: Normaliza un nombre de torrent para comparación flexible.
+    Elimina extensión y grupo, luego convierte dots/underscores a espacios."""
+    n = name.lower()
+    n = re.sub(r"\.(mkv|mp4|avi|srt|nfo)$", "", n).strip()
+    n = re.sub(r"-[a-z0-9]{2,}$", "", n).strip()
+    n = re.sub(r"[._]", " ", n)
+    return n
+
+
 def _check_path_in_client(name: str, client_paths: set) -> bool:
     """
-    CSI v2.0: Comprueba si un nombre de torrent está presente en el cliente
-    buscando coincidencia parcial case-insensitive en los paths de qBit.
+    CSI v3.1: Comprueba si un nombre de torrent está presente en el cliente.
+    Nivel 1: coincidencia directa case-insensitive (substring).
+    Nivel 2: coincidencia normalizada — ambos lados normalizados para absorber
+             diferencias dots/spaces/grupo/extensión entre tracker y filesystem.
     Función auxiliar independiente para uso en búsquedas globales.
     """
     if not name or not client_paths:
         return False
     name_lower = name.lower()
+    # Nivel 1: Direct substring (existing behavior)
     for cp in client_paths:
         if name_lower in cp:
             return True
+    # Nivel 2: Normalized — normalizar ambos lados
+    name_norm = _normalize_torrent_name(name)
+    if name_norm and len(name_norm) > 5:
+        for cp in client_paths:
+            cp_norm = re.sub(r"[._]", " ", cp)
+            if name_norm in cp_norm:
+                dbg(f"[CLIENT_MATCH] Normalized match: '{name_norm}' in '...{cp[-60:]}'")
+                return True
     return False
 
 
@@ -1619,7 +1691,10 @@ def _scraper_search_item(config: dict, tmdb_id=None, tvdb_id=None,
                 if isinstance(row_name_tag, bs4_element.Tag) else ""
             )
             if (tmdb_id and str(row_tmdb) == str(tmdb_id)) or (query and query.lower() in row_name.lower()):
+                # v3.1: Verificar cliente con fallback por query (folder name)
                 in_client = _check_path_in_client(row_name, client_paths)
+                if not in_client and query:
+                    in_client = _check_path_in_client(query, client_paths)
                 if local_icu:
                     tracker_icu = parse_icu_from_tracker_name(row_name, tmdb_id)
                     if tracker_icu == local_icu:
@@ -1721,7 +1796,7 @@ def search_global_state(config: dict, tmdb_id=None, imdb_id=None, tvdb_id=None,
         dbg(f"[GLOBAL_STATE] API OK: tmdb={tmdb_id} tvdb={tvdb_id} "
             f"season={season_num} → {len(results)} resultados")
 
-        return _compare_icu_results(results, local_icu, tmdb_id, client_paths, local_size_bytes)
+        return _compare_icu_results(results, local_icu, tmdb_id, client_paths, local_size_bytes, query=query or "")
 
     except Exception as e:
         dbg(f"[GLOBAL_STATE] API Exception: {e} — intentando scraper fallback")
@@ -1877,7 +1952,7 @@ def forensic_scan(config: dict, meta: MetadataManager, tracker_index: TrackerInd
                         local_size_bytes=local_size_bytes,
                     )
 
-                # CSI v3.0: PATH-FIRST override — evita falsos FALTA_CLIENTE
+                # CSI v3.1: PATH-FIRST override — evita falsos FALTA_CLIENTE
                 if item_state == ESTADO_FALTA_CLIENTE and client_path_map:
                     current_abs = os.path.abspath(str(root_path)).lower()
                     if current_abs in client_path_map:
@@ -1888,6 +1963,15 @@ def forensic_scan(config: dict, meta: MetadataManager, tracker_index: TrackerInd
                         if current_basename and current_basename in client_basenames:
                             item_state = ESTADO_OK
                             dbg(f"[PATH-FIRST] TV FALTA_CLIENTE→OK (basename): {current_basename}")
+                        else:
+                            # v3.1: Show folder substring — cubre rutas raíz diferentes
+                            # ej: librería en /HardLinks/NOBS/Show/ pero qBit en /SERIES/Show/
+                            sf_lower = show_folder.lower()
+                            for cp in client_path_map:
+                                if sf_lower in cp:
+                                    item_state = ESTADO_OK
+                                    dbg(f"[PATH-FIRST] TV FALTA_CLIENTE→OK (folder substr): '{sf_lower}' in '{cp[-70:]}'")
+                                    break
 
                 # CSI v3.0: QBIT DOWN — FALTA_CLIENTE → INCIDENCIA si qBit no está disponible
                 if not qbit_available and item_state == ESTADO_FALTA_CLIENTE:
@@ -1970,7 +2054,7 @@ def forensic_scan(config: dict, meta: MetadataManager, tracker_index: TrackerInd
                         local_size_bytes=local_size_bytes,
                     )
 
-                # CSI v3.0: PATH-FIRST override — evita falsos FALTA_CLIENTE
+                # CSI v3.1: PATH-FIRST override — evita falsos FALTA_CLIENTE
                 if item_state == ESTADO_FALTA_CLIENTE and client_path_map:
                     current_abs = os.path.abspath(str(root_path)).lower()
                     if current_abs in client_path_map:
@@ -1981,6 +2065,14 @@ def forensic_scan(config: dict, meta: MetadataManager, tracker_index: TrackerInd
                         if current_basename and current_basename in client_basenames:
                             item_state = ESTADO_OK
                             dbg(f"[PATH-FIRST] Movie FALTA_CLIENTE→OK (basename): {current_basename}")
+                        else:
+                            # v3.1: Movie folder substring — rutas raíz diferentes
+                            mf_lower = movie_folder.lower()
+                            for cp in client_path_map:
+                                if mf_lower in cp:
+                                    item_state = ESTADO_OK
+                                    dbg(f"[PATH-FIRST] Movie FALTA_CLIENTE→OK (folder substr): '{mf_lower}' in '{cp[-70:]}'")
+                                    break
 
                 # CSI v3.0: QBIT DOWN — FALTA_CLIENTE → INCIDENCIA si qBit no está disponible
                 if not qbit_available and item_state == ESTADO_FALTA_CLIENTE:
@@ -2251,10 +2343,16 @@ def get_client_torrents(config: dict):
 
         result: dict = {}
         skipped = 0
+        no_tracker = 0
+        sample_skipped_tracker = ""
         for t in qbt.torrents_info():
             if tracker_domain:
                 t_tracker = str(getattr(t, "tracker", "") or "").lower()
-                if t_tracker and tracker_domain not in t_tracker:
+                if not t_tracker:
+                    no_tracker += 1
+                elif tracker_domain not in t_tracker:
+                    if not sample_skipped_tracker:
+                        sample_skipped_tracker = t_tracker
                     skipped += 1
                     continue
             abs_path = os.path.abspath(str(t.content_path)).lower()
@@ -2263,10 +2361,19 @@ def get_client_torrents(config: dict):
                 "size": int(getattr(t, "size", 0) or 0),
             }
 
+        total = len(result) + skipped
         dbg(
-            f"qBit: {len(result)} torrent paths loaded"
-            + (f" (filtered by '{tracker_domain}', skipped {skipped})" if tracker_domain else "")
+            f"qBit: {len(result)} torrent paths loaded (total={total}, "
+            f"filtered by '{tracker_domain}', skipped={skipped}, no_tracker={no_tracker})"
         )
+        if sample_skipped_tracker:
+            dbg(f"qBit: Sample skipped tracker URL: '{sample_skipped_tracker}'")
+        # v3.1: Warning si el filtro excluye todos los torrents
+        if tracker_domain and len(result) == 0 and skipped > 0:
+            console.print(
+                f"[bold yellow]⚠ El filtro de dominio '{tracker_domain}' excluyó los {skipped} "
+                f"torrents. Posible mismatch de dominio.[/bold yellow]"
+            )
         return result
 
     except Exception as e:
@@ -2436,24 +2543,50 @@ def configure_tracker(config: dict) -> dict:
                     save_config("TRACKER_API_KEY", ak)
                 config = load_config()
 
-def validate_cookie(config: dict) -> bool:
-    """Perform a HEAD request to the tracker to validate the cookie."""
+def _detect_auth_failure(soup: BeautifulSoup) -> bool:
+    """CSI v3.1: Detecta si una página UNIT3D es un login page en vez de contenido.
+    UNIT3D devuelve HTTP 200 con login page para cookies expiradas."""
+    # Indicadores explícitos de login page
+    if soup.select("form[action*=login]") or soup.select("input[name=password]"):
+        return True
+    # Ausencia total del contenedor de lista de torrents
+    if not soup.select(".torrent-search") and not soup.select("table.table") and not soup.select("tr.torrent-search--list__row"):
+        return True
+    return False
+
+
+def validate_cookie(config: dict) -> tuple:
+    """CSI v3.1: Valida la cookie del tracker con inspección de contenido.
+    Retorna (is_valid: bool, reason: str)."""
     if not config.get("TRACKER_URL") or not (config.get("TRACKER_COOKIE") or config.get("TRACKER_COOKIE_VALUE")):
-        return False
-    
+        return False, "No hay cookie configurada"
+
     base = config["TRACKER_URL"].rstrip("/")
+    user = config.get("TRACKER_USERNAME", "")
     sess = _session(config)
     try:
-        # Check uploader's torrents page or home
-        r = sess.head(f"{base}/torrents", timeout=10, allow_redirects=False)
-        # If we get a 200, it's valid. If we get a 302 to /login, it's invalid.
-        if r.status_code == 200:
-            return True
-        dbg(f"Cookie validation failed: HTTP {r.status_code}")
-        return False
+        url = f"{base}/torrents"
+        if user:
+            url = f"{base}/torrents?uploader={user}&page=1"
+        r = sess.get(url, timeout=15, allow_redirects=True)
+
+        if r.status_code != 200:
+            reason = f"HTTP {r.status_code}"
+            dbg(f"Cookie validation failed: {reason}")
+            return False, reason
+
+        # Inspeccionar contenido — UNIT3D devuelve 200 con login page para cookies expiradas
+        soup = BeautifulSoup(r.text, "html.parser")
+        if _detect_auth_failure(soup):
+            reason = "Cookie expirada — el tracker devuelve página de login"
+            dbg(f"Cookie validation failed: {reason}")
+            return False, reason
+
+        return True, "OK"
     except Exception as e:
-        dbg(f"Cookie validation error: {e}")
-        return False
+        reason = f"Error de conexión: {e}"
+        dbg(f"Cookie validation error: {reason}")
+        return False, reason
 
 def validate_qbit(config: dict) -> bool:
     """Test connectivity to qBittorrent."""
@@ -2596,7 +2729,8 @@ def check_essential_config(config: dict) -> dict:
     
     # 1. Tracker Cookie
     cookie = config.get("TRACKER_COOKIE") or config.get("TRACKER_COOKIE_VALUE")
-    if not cookie or not validate_cookie(config):
+    _cookie_valid, _cookie_reason = validate_cookie(config)
+    if not cookie or not _cookie_valid:
         console.print("[bold red]TRACKER_COOKIE missing or expired![/bold red]")
         new_cookie = Prompt.ask("Enter your tracker session cookie", default=cookie or "")
         if new_cookie:
@@ -2666,6 +2800,21 @@ def tracker_investigation(config: dict):
         return
 
     config = _confirm_scan_path(config)
+
+    # CSI v3.1: Pre-flight cookie validation
+    cookie_ok, cookie_reason = validate_cookie(config)
+    if not cookie_ok:
+        console.print(Panel(
+            f"[bold red]Cookie inválida[/bold red]: {cookie_reason}\n\n"
+            "[yellow]Si continúas, el scraper no podrá verificar uploads del usuario.\n"
+            "Los ítems no verificables se marcarán como INCIDENCIA en vez de NO_SUBIDO.\n"
+            "El modo Global (API) puede funcionar si la API key es válida.[/yellow]",
+            border_style="red", title="⚠ Auth Warning",
+        ))
+        if not Confirm.ask("¿Continuar en modo degradado?", default=False):
+            return
+    else:
+        dbg(f"[AUTH] Cookie validation OK")
 
     meta = MetadataManager(config)
     console.print("[cyan]Loading Sonarr / Radarr catalogs...[/cyan]")

@@ -1,7 +1,7 @@
 import sys, os
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
 from core.status_manager import update_status
-from singularity_config import BASE_URL, COOKIE_VALUE, IMGBB_API, PTSCREENS_API, MSG_NUEVO, FIRMAS_VIEJAS, TMP_DIR_PATH, get_target_ids
+from config import BASE_URL, COOKIE_NAME, COOKIE_VALUE, IMGBB_API, PTSCREENS_API, MSG_NUEVO, FIRMAS_VIEJAS, TMP_DIR_PATH, CUSTOM_USER_AGENT, TRACKER_ABBREV, get_target_ids
 
 import requests
 from bs4 import BeautifulSoup
@@ -20,7 +20,7 @@ uploader_actual = 0
 
 def subir_imagen(ruta_imagen, log_buffer):
     global uploader_actual
-    
+
     # Intentamos hasta 2 veces (una por cada host) para esquivar caídas
     for intento in range(2):
         host = uploader_actual % 2
@@ -37,18 +37,18 @@ def subir_imagen(ruta_imagen, log_buffer):
                 with open(ruta_imagen, "rb") as f:
                     res = requests.post("https://ptscreens.com/api/1/upload", data={"key": PTSCREENS_API}, files={"source": f}, timeout=60)
                 url_directa = res.json().get('image', {}).get('url')
-                
-            if url_directa: 
+
+            if url_directa:
                 log_buffer.append(f"      [OK] URL: {url_directa}")
                 return url_directa
-            else: 
+            else:
                 log_buffer.append(f"      [WARN] El host no devolvió URL. Fallback al otro host...")
         except Exception as e:
             log_buffer.append(f"      [WARN] Error de red o timeout ({e}). Fallback al otro host...")
-        
+
         # Pausa táctica de 3 segundos antes de reintentar con el otro servidor
         time.sleep(3)
-        
+
     log_buffer.append("      [ERROR] Ambos hosts fallaron consecutivamente.")
     return None
 
@@ -58,26 +58,24 @@ def subir_imagen(ruta_imagen, log_buffer):
 with open("mapeo_maestro.json", "r", encoding='utf-8') as f: MAPA = json.load(f)
 
 session = requests.Session()
-session.cookies.set("milnueve_session", COOKIE_VALUE, domain="milnueve.neklair.es")
-headers = {"User-Agent": "Mozilla/5.0 (X11; Linux x86_64)", "X-Requested-With": "XMLHttpRequest"}
+session.cookies.set(COOKIE_NAME, COOKIE_VALUE)
+headers = {"User-Agent": CUSTOM_USER_AGENT, "X-Requested-With": "XMLHttpRequest"}
 
 def procesar_total(torrent_id):
     log_buffer = [f"=== INICIO SINCRONIZACIÓN ID {torrent_id} ==="]
-    edit_url = f"{BASE_URL}/torrents/{torrent_id}/edit"
-    
-    try: res = session.get(edit_url, headers=headers, timeout=15)
-    except Exception as e: return False, f"Error red: {e}", log_buffer
 
-    if res.status_code != 200: return False, f"HTTP {res.status_code}", log_buffer
+    # --- Localizar carpeta local directamente por ID ---
+    ruta_carpeta = MAPA.get(torrent_id)
+    if not ruta_carpeta or not os.path.exists(ruta_carpeta):
+        return False, "Mapping fallido", log_buffer
 
-    soup = BeautifulSoup(res.text, 'html.parser')
-    nombre_web = soup.find('input', {'name': 'name'})['value']
-    
-    ruta_carpeta = MAPA.get(nombre_web)
-    if not ruta_carpeta or not os.path.exists(ruta_carpeta): return False, "Mapping fallido", log_buffer
-    
-    ruta_txt_local = os.path.join(ruta_carpeta, "[MILNU]DESCRIPTION.txt")
-    if not os.path.exists(ruta_txt_local): return False, "Falta TXT local", log_buffer
+    ruta_txt_local = os.path.join(ruta_carpeta, f"[{TRACKER_ABBREV}]DESCRIPTION.txt")
+    if not os.path.exists(ruta_txt_local):
+        txt_files = [f for f in os.listdir(ruta_carpeta) if f.endswith("DESCRIPTION.txt")]
+        if txt_files:
+            ruta_txt_local = os.path.join(ruta_carpeta, txt_files[0])
+        else:
+            return False, "Falta TXT local", log_buffer
 
     with open(ruta_txt_local, "r", encoding="utf-8") as f: desc_local = f.read()
 
@@ -86,7 +84,7 @@ def procesar_total(torrent_id):
 
     archivos_locales = os.listdir(ruta_carpeta)
     imagenes_locales = sorted([f for f in archivos_locales if f.lower().endswith(('.png', '.jpg', '.jpeg')) and not f.startswith('.')])[:6]
-    
+
     if not imagenes_locales: return False, "No hay imágenes locales", log_buffer
 
     nuevos_bbcodes = []
@@ -128,7 +126,16 @@ def procesar_total(torrent_id):
         with open(ruta_txt_local, "w", encoding='utf-8') as f: f.write(desc_final)
     except Exception as e: return False, f"Error escribiendo TXT: {e}", log_buffer
 
-    # --- ENVÍO AL TRACKER ---
+    # --- OBTENER FORMULARIO DEL TRACKER ---
+    edit_url = f"{BASE_URL}/torrents/{torrent_id}/edit"
+    try: res = session.get(edit_url, headers=headers, timeout=15)
+    except Exception as e: return False, f"Error red: {e}", log_buffer
+
+    if res.status_code != 200: return False, f"HTTP {res.status_code}", log_buffer
+
+    soup = BeautifulSoup(res.text, 'html.parser')
+    nombre_web = soup.find('input', {'name': 'name'})['value']
+
     form = soup.find('textarea', {'name': 'description'}).find_parent('form')
     try:
         with open(os.path.join(ruta_carpeta, "meta.json"), "r", encoding='utf-8') as f: m = json.load(f)
@@ -162,14 +169,14 @@ def procesar_total(torrent_id):
 
     target_url = form.get('action')
     if target_url.startswith('/'): target_url = BASE_URL + target_url
-    
+
     xsrf = session.cookies.get('XSRF-TOKEN')
     if xsrf: headers["X-XSRF-TOKEN"] = urllib.parse.unquote(xsrf)
     headers["Referer"] = edit_url
     headers["Accept"] = "application/json"
 
     post_res = session.post(target_url, data=payload, headers=headers, timeout=20)
-    
+
     if post_res.status_code in [200, 302]: return True, "Sincronizado en Local y Web ✨", log_buffer
     if post_res.status_code == 422:
         try: return False, f"Error 422: {post_res.json().get('errors', '???')}", log_buffer
@@ -179,9 +186,9 @@ def procesar_total(torrent_id):
 if __name__ == "__main__":
     completados = set(line.strip() for line in open("completados_img.txt", "r")) if os.path.exists("completados_img.txt") else set()
     ids_pendientes = [tid for tid in get_target_ids() if tid not in completados]
-    
+
     print(f"🚀 Iniciando Mass Resurrector | Pendientes: {len(ids_pendientes)}")
-    
+
     for i, tid in enumerate(ids_pendientes, 1):
         prog = int((i / len(ids_pendientes)) * 100)
         update_status("UNIT3D", "Resurrección de Imágenes", "PROCESSING", progress=prog, details=f"Resucitando ID: {tid} ({i}/{len(ids_pendientes)})")
@@ -190,13 +197,9 @@ if __name__ == "__main__":
 
         if "Mapping fallido" not in mensaje:
             try:
-                with open("mapeo_maestro.json", "r", encoding='utf-8') as f: mapa_temp = json.load(f)
-                res_temp = session.get(f"{BASE_URL}/torrents/{tid}/edit", headers=headers)
-                soup_temp = BeautifulSoup(res_temp.text, 'html.parser')
-                nombre_temp = soup_temp.find('input', {'name': 'name'})['value']
-                carpeta_destino = mapa_temp.get(nombre_temp)
-                if carpeta_destino:
-                    with open(os.path.join(carpeta_destino, f"sync_TOTAL_{datetime.now().strftime('%H_%M')}.log"), "w", encoding="utf-8") as f:
+                ruta_carpeta = MAPA.get(tid)
+                if ruta_carpeta and os.path.exists(ruta_carpeta):
+                    with open(os.path.join(ruta_carpeta, f"sync_TOTAL_{datetime.now().strftime('%H_%M')}.log"), "w", encoding="utf-8") as f:
                         f.write("\n".join(log_buffer))
             except: pass
 
@@ -205,7 +208,7 @@ if __name__ == "__main__":
             with open("completados_img.txt", "a") as f: f.write(f"{tid}\n")
         else:
             print(f"❌ {mensaje}")
-            
+
         if len(ids_pendientes) > 1: time.sleep(2)
 
     update_status("UNIT3D", "Resurrección de Imágenes", "COMPLETED", progress=100)
