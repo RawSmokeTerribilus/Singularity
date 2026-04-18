@@ -3,6 +3,7 @@
 **/.env
 **/config.py
 **/singularity_config.py
+**/mass_config.py
 
 # --- PERMITIR TUS "EXAAMPLES" (DOBLE A) ---
 !**/*.exaample
