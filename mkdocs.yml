@@ -1,6 +1,7 @@
 site_name: "RaW Suite: Singularity"
 site_description: "Automatización total para la gestión de medios y trackers UNIT3D"
 site_author: "RaW Team"
+dev_addr: '127.0.0.1:8001'
 
 theme:
   name: material
