@@ -3360,9 +3360,10 @@ class Prep():
                 parsed = anitopy.parse(Path(video).name)
                 anime_title = parsed.get('anime_title', '')
                 import re as _re
-                if not _re.search(r'[a-zA-Z]', anime_title):
-                    anime_title = Path(video).parent.name
-                    anime_title = _re.sub(r'\s*-?\s*[Ss]eason\s*\d+', '', anime_title).strip()
+                parent_name = _re.sub(r'\s*-?\s*[Ss]eason\s*\d+', '', Path(video).parent.name).strip()
+                grandparent_name = _re.sub(r'\s*\(\d{4}\)', '', Path(video).parent.parent.name).strip()
+                if not anime_title or (anime_title.lower() not in parent_name.lower() and anime_title.lower() not in grandparent_name.lower()):
+                    anime_title = parent_name if parent_name else grandparent_name
                 parsed['anime_title'] = anime_title
                 # romaji, mal_id, eng_title, seasonYear, anilist_episodes = self.get_romaji(guessit(parsed['anime_title'], {"excludes" : ["country", "language"]})['title'])
                 romaji, mal_id, eng_title, seasonYear, anilist_episodes = self.get_romaji(parsed['anime_title'], meta.get('mal', None))
