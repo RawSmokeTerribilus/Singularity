@@ -22,11 +22,24 @@ class MILNU():
         self.logger = get_logger(self.tracker)
         pass
     
-    async def get_cat_id(self, category_name):
+    async def get_cat_id(self, category_name, meta=None):
+        if meta and meta.get('anime', False):
+            if category_name == 'MOVIE':
+                return '3'
+            else:
+                return '4'
         category_id = {
-            'MOVIE': '1', 
-            'TV': '2', 
-            }.get(category_name, '0')
+            'MOVIE': '0',
+            'TV': '1',
+            'MUSIC': '5',
+            'VHS': '7',
+            'ANIME_CA': '8',
+            'DOCUMENTARY': '9',
+            'LATINO': '10',
+            'MANGA': '11',
+            'BOOK': '12',
+            'COMIC': '13',
+        }.get(category_name, '0')
         return category_id
 
     async def get_type_id(self, type):
@@ -63,7 +76,7 @@ class MILNU():
     async def upload(self, meta):
         common = COMMON(config=self.config)
         await common.edit_torrent(meta, self.tracker, self.source_flag)
-        cat_id = await self.get_cat_id(meta['category'])
+        cat_id = await self.get_cat_id(meta['category'], meta)
         type_id = await self.get_type_id(meta['type'])
         resolution_id = await self.get_res_id(meta['resolution'])
         await common.unit3d_edit_desc(meta, self.tracker)
@@ -232,7 +245,7 @@ class MILNU():
         params = {
             'api_token' : self.config['TRACKERS'][self.tracker]['api_key'].strip(),
             'tmdbId' : meta['tmdb'],
-            'categories[]' : await self.get_cat_id(meta['category']),
+            'categories[]' : await self.get_cat_id(meta['category'], meta),
             'types[]' : await self.get_type_id(meta['type']),
             'resolutions[]' : await self.get_res_id(meta['resolution']),
             'name' : ""
