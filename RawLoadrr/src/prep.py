@@ -3358,12 +3358,23 @@ class Prep():
             else:
                 #If Anime
                 parsed = anitopy.parse(Path(video).name)
+                anime_title = parsed.get('anime_title', '')
+                import re as _re
+                if not _re.search(r'[a-zA-Z]', anime_title):
+                    anime_title = Path(video).parent.name
+                    anime_title = _re.sub(r'\s*-?\s*[Ss]eason\s*\d+', '', anime_title).strip()
+                parsed['anime_title'] = anime_title
                 # romaji, mal_id, eng_title, seasonYear, anilist_episodes = self.get_romaji(guessit(parsed['anime_title'], {"excludes" : ["country", "language"]})['title'])
                 romaji, mal_id, eng_title, seasonYear, anilist_episodes = self.get_romaji(parsed['anime_title'], meta.get('mal', None))
                 if mal_id:
                     meta['mal_id'] = mal_id
                 if meta.get('tmdb_manual', None) is None:
                     year = parsed.get('anime_year', str(seasonYear))
+                    if not year or year == '0':
+                        grandparent = Path(video).parent.parent.name
+                        year_match = _re.search(r'\((\d{4})\)', grandparent)
+                        if year_match:
+                            year = year_match.group(1)
                     meta = await self.get_tmdb_id(guessit(parsed['anime_title'], {"excludes" : ["country", "language"]})['title'], year, meta, meta['category'])
                 meta = await self.tmdb_other_meta(meta)
                 if meta['category'] != "TV":
