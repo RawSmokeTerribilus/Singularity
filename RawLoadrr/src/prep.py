@@ -256,6 +256,10 @@ class Prep():
                     ).get("title") or guess_name
                 except Exception:
                     filename = guess_name
+                _parent = re.sub(r'\s*-?\s*[Ss]eason\s*\d+', '', ntpath.basename(ntpath.dirname(video))).strip()
+                _grandparent = re.sub(r'\s*\(\d{4}\)', '', ntpath.basename(ntpath.dirname(ntpath.dirname(video)))).strip()
+                if filename and filename.lower() not in _parent.lower() and filename.lower() not in _grandparent.lower():
+                    filename = _parent if _parent else _grandparent
                 untouched_filename = os.path.basename(video)
                 try:
                     meta['search_year'] = guessit(video)['year']
