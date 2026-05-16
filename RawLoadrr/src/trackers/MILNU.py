@@ -134,7 +134,7 @@ class MILNU():
             data['region_id'] = region_id
         if distributor_id != 0:
             data['distributor_id'] = distributor_id
-        if meta.get('category') == "TV" and not meta.get('anime'):
+        if meta.get('category') == "TV":
             data['season_number'] = int(meta.get('season_int', '0'))
             data['episode_number'] = int(meta.get('episode_int', '0'))
         headers = {
