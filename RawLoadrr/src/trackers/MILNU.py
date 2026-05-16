@@ -16,8 +16,8 @@ class MILNU():
         self.config = config
         self.tracker = 'MILNU'
         self.source_flag = 'Milnueve'
-        self.upload_url = 'https://milnueve.neklair.es/api/torrents/upload'
-        self.search_url = 'https://milnueve.neklair.es/api/torrents/filter'
+        self.upload_url = 'https://tracker.milnueve.cc/api/torrents/upload'
+        self.search_url = 'https://tracker.milnueve.cc/api/torrents/filter'
         self.banned_groups = [""]
         self.logger = get_logger(self.tracker)
         pass
@@ -29,16 +29,16 @@ class MILNU():
             else:
                 return '4'
         category_id = {
-            'MOVIE': '0',
-            'TV': '1',
+            'MOVIE': '1',
+            'TV': '2',
             'MUSIC': '5',
             'VHS': '7',
             'ANIME_CA': '8',
             'DOCUMENTARY': '9',
             'LATINO': '10',
-            'MANGA': '11',
-            'BOOK': '12',
-            'COMIC': '13',
+            'MANGA': '6',
+            'BOOK': '11',
+            'COMIC': '12',
         }.get(category_name, '0')
         return category_id
 
