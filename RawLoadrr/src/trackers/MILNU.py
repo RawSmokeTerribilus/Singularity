@@ -111,7 +111,7 @@ class MILNU():
             'resolution_id' : resolution_id,
             'tmdb' : meta['tmdb'],
             'imdb' : meta['imdb_id'].replace('tt', ''),
-            'tvdb' : meta['tvdb_id'],
+            'tvdb' : None if meta.get('anime') else meta['tvdb_id'],
             'mal' : meta['mal_id'],
             'igdb' : 0,
             'anonymous' : anon,
@@ -134,7 +134,7 @@ class MILNU():
             data['region_id'] = region_id
         if distributor_id != 0:
             data['distributor_id'] = distributor_id
-        if meta.get('category') == "TV":
+        if meta.get('category') == "TV" and not meta.get('anime'):
             data['season_number'] = int(meta.get('season_int', '0'))
             data['episode_number'] = int(meta.get('episode_int', '0'))
         headers = {
