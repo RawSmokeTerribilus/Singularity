@@ -90,7 +90,7 @@ class NOBS():
             files['nfo'] = open_nfo
         manual_name = meta.get('manual_name')
         data = {
-            'name' : manual_name or self.nabs_name(meta),
+            'name' : manual_name or self.nobs_name(meta),
             'description' : desc,
             'mediainfo' : mi_dump,
             'bdinfo' : bd_dump, 
@@ -282,38 +282,38 @@ class NOBS():
         return dupes
 
 
-    def nabs_name(self, meta):
+    def nobs_name(self, meta):
         built_name = meta['name']
         title = meta.get('title', '')
         aka = meta.get('aka', "")
         og_title = meta.get('original_title', "")
         
         if meta.get('original_language', '') in ('es', 'spa') and og_title:
-            nabs_name = built_name.replace(title, og_title).strip()
+            nobs_name = built_name.replace(title, og_title).strip()
         else: 
-            nabs_name = built_name
+            nobs_name = built_name
             
         # Validate length
-        while len(nabs_name) > 255:
-            original_len = len(nabs_name)
+        while len(nobs_name) > 255:
+            original_len = len(nobs_name)
             if aka:
-                nabs_name = nabs_name.replace(aka, '')
-            if len(nabs_name) <= 255:
+                nobs_name = nobs_name.replace(aka, '')
+            if len(nobs_name) <= 255:
                 break
             
             resolution = meta.get('resolution', '')
             if resolution:
-                nabs_name = nabs_name.replace(resolution, '')
+                nobs_name = nobs_name.replace(resolution, '')
             
-            if len(nabs_name) <= 255:
+            if len(nobs_name) <= 255:
                 break
             type = meta.get('type', '')
             if type:
-                nabs_name = nabs_name.replace(type, '')
-            if len(nabs_name) <= 255:
+                nobs_name = nobs_name.replace(type, '')
+            if len(nobs_name) <= 255:
                 break
             
-            if len(nabs_name) == original_len:
+            if len(nobs_name) == original_len:
                 # Break if no change in length to prevent infinite loop
                 break
-        return nabs_name[:255]
+        return nobs_name[:255]
