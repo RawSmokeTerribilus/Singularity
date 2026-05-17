@@ -143,7 +143,7 @@ class COMMON():
                 pr_signature = self.config["TRACKERS"][tracker].get("pr_signature")
                 anon_pr_sig = self.config["TRACKERS"][tracker].get("anon_pr_signature")
                 if signature is None or anon_signature is None or pr_signature is None or anon_pr_sig is None:
-                    print("[bold][red]WARN[/red]: Global Signatures are turned off, but no signature is provided for selected tracker.[/bold]")
+                    pass  # signatures handled by launcher interactive flow
 
         async with aiofiles.open(f"{meta['base_dir']}/tmp/{meta['uuid']}/[{tracker}]DESCRIPTION.txt", 'a', encoding='utf-8') as descfile:
             if meta["personalrelease"]:

@@ -158,8 +158,26 @@ class Rawncher:
             console.print(Panel(f"[yellow]No se pudo conectar a qBittorrent. El script funcionará en [bold]modo solo local[/bold], guardando los torrents en una carpeta 'watch'.\nCausa: [dim]{e}[/dim]", 
                                 title="[bold yellow]⚠️ Conexión qBit fallida[/]"))
 
+        # ── ADUANA: BT_backup / torrent_storage_dir ───────────────────────── #
+        stored_path = self.config.get('qbit', {}).get('torrent_storage_dir', '')
+        if not stored_path or not Path(stored_path).exists():
+            console.print(Rule("[bold yellow]⚙  ADUANA — Ruta de sesión qBittorrent[/bold yellow]", style="yellow"))
+            if stored_path and not Path(stored_path).exists():
+                console.print(f"[bold red]✖ Ruta configurada no existe:[/bold red] [dim]{stored_path}[/dim]")
+            else:
+                console.print("[bold yellow]⚠️  torrent_storage_dir no configurado.[/bold yellow]")
+            console.print("[dim]Ruta a la carpeta BT_backup de qBittorrent (permite reutilizar hashes ya descargados).[/dim]")
+            new_path = Prompt.ask("Ruta BT_backup", default=str(self.base_dir / 'qbit_backup'))
+            if "qbit" not in self.config:
+                self.config["qbit"] = {}
+            self.config["qbit"]["torrent_storage_dir"] = new_path.strip()
+            self._guardar_config()
+            console.print("[bold green]✅ Ruta de sesión persistida.[/]")
+            self._reload_config()
+            stored_path = new_path.strip()
+
         # Definimos ruta de salvaguarda
-        self.watch_folder = Path(self.config.get('qbit', {}).get('torrent_storage_dir', self.base_dir / 'qbit_backup'))
+        self.watch_folder = Path(stored_path)
         self.watch_folder.mkdir(parents=True, exist_ok=True)
 
     # <--- AQUÍ TERMINA EL __INIT__ (Alineado con el def de arriba)

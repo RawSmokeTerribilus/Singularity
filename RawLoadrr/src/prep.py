@@ -247,7 +247,19 @@ class Prep():
                 videopath, meta['filelist'] = self.get_video(videoloc, meta.get('mode', 'discord')) 
                 video, meta['scene'], meta['imdb'] = self.is_scene(videopath, meta.get('imdb', None))
                 guess_name = ntpath.basename(video).replace('-',' ')
-                filename = guessit(re.sub(r"[^0-9a-zA-Z\[\]]+", " ", guess_name), {"excludes" : ["country", "language"]}).get("title", guessit(re.sub("[^0-9a-zA-Z]+", " ", guess_name), {"excludes" : ["country", "language"]})["title"])
+                try:
+                    cleaned = re.sub(r"[^0-9a-zA-Z\[\]]+", " ", guess_name)
+                    parsed = guessit(cleaned, {"excludes": ["country", "language"]})
+                    filename = parsed.get("title") or guessit(
+                        re.sub("[^0-9a-zA-Z]+", " ", guess_name),
+                        {"excludes": ["country", "language"]}
+                    ).get("title") or guess_name
+                except Exception:
+                    filename = guess_name
+                _parent = re.sub(r'\s*-?\s*[Ss]eason\s*\d+', '', ntpath.basename(ntpath.dirname(video))).strip()
+                _grandparent = re.sub(r'\s*\(\d{4}\)', '', ntpath.basename(ntpath.dirname(ntpath.dirname(video)))).strip()
+                if filename and filename.lower() not in _parent.lower() and filename.lower() not in _grandparent.lower():
+                    filename = _parent if _parent else _grandparent
                 untouched_filename = os.path.basename(video)
                 try:
                     meta['search_year'] = guessit(video)['year']
@@ -3350,12 +3362,24 @@ class Prep():
             else:
                 #If Anime
                 parsed = anitopy.parse(Path(video).name)
+                anime_title = parsed.get('anime_title', '')
+                import re as _re
+                parent_name = _re.sub(r'\s*-?\s*[Ss]eason\s*\d+', '', Path(video).parent.name).strip()
+                grandparent_name = _re.sub(r'\s*\(\d{4}\)', '', Path(video).parent.parent.name).strip()
+                if not anime_title or (anime_title.lower() not in parent_name.lower() and anime_title.lower() not in grandparent_name.lower()):
+                    anime_title = parent_name if parent_name else grandparent_name
+                parsed['anime_title'] = anime_title
                 # romaji, mal_id, eng_title, seasonYear, anilist_episodes = self.get_romaji(guessit(parsed['anime_title'], {"excludes" : ["country", "language"]})['title'])
                 romaji, mal_id, eng_title, seasonYear, anilist_episodes = self.get_romaji(parsed['anime_title'], meta.get('mal', None))
                 if mal_id:
                     meta['mal_id'] = mal_id
                 if meta.get('tmdb_manual', None) is None:
                     year = parsed.get('anime_year', str(seasonYear))
+                    if not year or year == '0':
+                        grandparent = Path(video).parent.parent.name
+                        year_match = _re.search(r'\((\d{4})\)', grandparent)
+                        if year_match:
+                            year = year_match.group(1)
                     meta = await self.get_tmdb_id(guessit(parsed['anime_title'], {"excludes" : ["country", "language"]})['title'], year, meta, meta['category'])
                 meta = await self.tmdb_other_meta(meta)
                 if meta['category'] != "TV":

@@ -1,4 +1,5 @@
 # --- EXCLUSIONES CORE (DATOS REALES - ¡PROHIBIDO SUBIR!) ---
+.claude/
 .env
 **/.env
 **/config.py
