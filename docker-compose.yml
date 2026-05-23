@@ -49,12 +49,20 @@ services:
       - ./work_data/trackers:/app/RawLoadrr/src/trackers:z
       - ./work_data/reports:/app/work_data/reports:z
       
-      # --- 3. CSI LOGS (Exponemos la carpeta del CSI para debug real) ---
+      # --- 3. PERSISTENCIA DE MÓDULOS ---
       - ./work_data/logs/csi_log:/app/extras/CSI/csi_log:z
+      - ./work_data/cookies:/app/RawLoadrr/data/cookies:z
+      - ./work_data/logs/rawloadrr:/app/RawLoadrr/logs:z
+      - ./work_data/logs/mkverything:/app/MKVerything/logs:z
+      - ./work_data/qbit_backup:/app/RawLoadrr/qbit_backup:z
 
       # --- 4. EL ARSENAL (30TB) ---
       - /run/media/${USER}:/run/media/${USER}:z
-      - ${HOME}:${HOME}:z
+      # v3.0.0 hardening: dropped blanket ${HOME}:${HOME}. Targeted mounts only.
+      - ${HOME}/Descargas:${HOME}/Descargas:z
+      - ${HOME}/Vídeos:${HOME}/Vídeos:z
+      - ${HOME}/Qbit_Docker:${HOME}/Qbit_Docker:z
+      - ./work_data:${HOME}/RaW_Suite_Docker/work_data:z
 
     network_mode: host
     stdin_open: true
