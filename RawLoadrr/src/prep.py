@@ -2,6 +2,9 @@
 import sys
 from src.args import Args
 from src.console import console, log
+from src.id_resolver import (resolve as _resolve_ids,
+                             save_override as _save_override,
+                             report_pending as _report_pending)
 from src.discparse import DiscParse
 from src.exceptions import ManualDateException, WeirdSystem, XEMNotFound
 from src.trackers.PTP import PTP
@@ -256,7 +259,7 @@ class Prep():
                     ).get("title") or guess_name
                 except Exception:
                     filename = guess_name
-                _parent = re.sub(r'\s*-?\s*[Ss]eason\s*\d+', '', ntpath.basename(ntpath.dirname(video))).strip()
+                _parent = re.sub(r'\s*[-_]?\s*(?<![a-zA-Z])(?:s|season|temporada|saison|staffel|stagione|seizoen|sezon|сезон|시즌|シーズン|季)\s*\d+\s*$', '', ntpath.basename(ntpath.dirname(video)), flags=re.IGNORECASE).strip()
                 _grandparent = re.sub(r'\s*\(\d{4}\)', '', ntpath.basename(ntpath.dirname(ntpath.dirname(video)))).strip()
                 if filename and filename.lower() not in _parent.lower() and filename.lower() not in _grandparent.lower():
                     filename = _parent if _parent else _grandparent
@@ -399,7 +402,7 @@ class Prep():
             if meta.get('tmdb', None) is None and meta.get('imdb', None) is None:
                 meta['category'], meta['tmdb'], meta['imdb'] = self.get_tmdb_imdb_from_mediainfo(mi, meta['category'], meta['is_disc'], meta['tmdb'], meta['imdb'])      
             if meta.get('tmdb', None) is None and meta.get('imdb', None) is None:
-                meta = await self.get_tmdb_id(filename, meta['search_year'], meta, meta['category'], untouched_filename)
+                meta = await self.resolve_ids(meta, filename, aliases=[_parent, _grandparent])
             elif meta.get('imdb', None) is not None and meta.get('tmdb_manual', None) is None:
                 meta['imdb_id'] = str(meta['imdb']).replace('tt', '')
                 meta = await self.get_tmdb_from_imdb(meta, filename)
@@ -1334,32 +1337,40 @@ class Prep():
                         if not os.path.exists(image_path) or retake:                       
                             try:
                                 ss_times = self.valid_ss_time(ss_times, num_screens, length)
-                                (
+                                proc = (
                                     ffmpeg
                                     .input(file, ss=ss_times[-1], skip_frame=keyframe)
                                     .output(image_path, vframes=1, pix_fmt="rgb24")
                                     .overwrite_output()
                                     .global_args('-loglevel', loglevel)
-                                    .run(quiet=debug)
+                                    .run_async(quiet=debug)
                                 )
+                                deadline = time.time() + 60
+                                while proc.poll() is None:
+                                    if time.time() > deadline:
+                                        proc.kill()
+                                        try:
+                                            proc.wait(timeout=5)
+                                        except subprocess.TimeoutExpired:
+                                            pass
+                                        raise Exception(f"ffmpeg timed out after 60s on screenshot {i}")
+                                    time.sleep(0.5)
                             except Exception:
                                 console.print(traceback.format_exc())
-                            
-                            self.optimize_images(image_path)
-                            if os.path.getsize(Path(image_path)) <= 75000:
-                                console.print("[bold yellow]Image is incredibly small, retaking")
-                                time.sleep(1)                            
-                            elif os.path.getsize(Path(image_path)) <= 31000000 and self.img_host == "imgbb":
-                                i += 1
-                            elif os.path.getsize(Path(image_path)) <= 10000000 and self.img_host in ["imgbox", "pixhost", "ptscreens", "oeimg" ]:
-                                i += 1
-                            elif self.img_host in ["ptpimg", "lensdump", "ptscreens", "oeimg"] and not retake:
-                                i += 1
-                            elif retake:
-                                pass                               
-                            else:
-                                console.print("[red]Image too large for your image host, retaking")
-                                time.sleep(1)
+
+                            if os.path.exists(image_path):
+                                self.optimize_images(image_path)
+                                if os.path.getsize(Path(image_path)) <= 75000:
+                                    console.print("[bold yellow]Image is incredibly small, retaking")
+                                    time.sleep(1)
+                                elif os.path.getsize(Path(image_path)) <= 31000000 and self.img_host == "imgbb":
+                                    i += 1
+                                elif os.path.getsize(Path(image_path)) <= 10000000 and self.img_host in ["imgbox", "pixhost", "ptscreens", "oeimg"]:
+                                    i += 1
+                                elif self.img_host in ["ptpimg", "lensdump", "ptscreens", "oeimg"] and not retake:
+                                    i += 1
+                                elif retake:
+                                    pass
                         else:
                             screenshot_size = os.path.getsize(image_path)
                             if screenshot_size < smallest_image_size:
@@ -1477,13 +1488,23 @@ class Prep():
                                 ff = ffmpeg.input(f"{meta['discs'][disc_num]['path']}/VTS_{main_set[n]}", ss=img_time)
                                 if w_sar != 1 or h_sar != 1:
                                     ff = ff.filter('scale', int(round(width * w_sar)), int(round(height * h_sar))) 
-                                (
+                                proc = (
                                     ff
                                     .output(image, vframes=1, pix_fmt="rgb24")
                                     .overwrite_output()
                                     .global_args('-loglevel', loglevel)
-                                    .run(quiet=debug)
-                                )                           
+                                    .run_async(quiet=debug)
+                                )
+                                deadline = time.time() + 60
+                                while proc.poll() is None:
+                                    if time.time() > deadline:
+                                        proc.kill()
+                                        try:
+                                            proc.wait(timeout=5)
+                                        except subprocess.TimeoutExpired:
+                                            pass
+                                        raise Exception(f"ffmpeg timed out after 60s on screenshot {i}")
+                                    time.sleep(0.5)
                             except Exception:
                                 console.print(traceback.format_exc())
 
@@ -1508,9 +1529,7 @@ class Prep():
                                 elif self.img_host == "oeimg":
                                     i += 1
                                 else:
-                                    console.print("[red]Image too large for your image host, retaking")
-                                    retake = True
-                                    time.sleep(1)
+                                    i += 1
                                 looped = 0
                             except Exception:
                                 if looped >= 25:
@@ -1596,13 +1615,23 @@ class Prep():
                                     ff = ffmpeg.input(path, ss=ss_times[-1])
                                     if w_sar != 1 or h_sar != 1:
                                         ff = ff.filter('scale', int(round(width * w_sar)), int(round(height * h_sar)))
-                                    (
+                                    proc = (
                                         ff
                                         .output(image_path, vframes=1, pix_fmt="rgb24")
                                         .overwrite_output()
                                         .global_args('-loglevel', loglevel)
-                                        .run(quiet=debug)
+                                        .run_async(quiet=debug)
                                     )
+                                    deadline = time.time() + 60
+                                    while proc.poll() is None:
+                                        if time.time() > deadline:
+                                            proc.kill()
+                                            try:
+                                                proc.wait(timeout=5)
+                                            except subprocess.TimeoutExpired:
+                                                pass
+                                            raise Exception(f"ffmpeg timed out after 60s on screenshot {i}")
+                                        time.sleep(0.5)
                                 except Exception:
                                     console.print(Traceback.extract())
                                     self.optimize_images(image_path)
@@ -1624,10 +1653,7 @@ class Prep():
                                         elif retake:
                                             pass
                                         else:
-                                            console.print("[red]Image too large for your image host, retaking")
-                                            retake = True
-                                            os.remove(image_path)
-                                            time.sleep(1)
+                                            i += 1
                             else:
                                 screenshot_size = os.path.getsize(image_path)
                                 if screenshot_size < smallest_image_size:
@@ -1748,6 +1774,133 @@ class Prep():
                     parser = Args(config=self.config)
                     meta['category'], meta['tmdb'] = parser.parse_tmdb_id(id=tmdb_id, category=meta.get('category'))
         await asyncio.sleep(2)
+        return meta
+
+    def _looks_anime(self, meta, filename):
+        """Cheap heuristic so the anime providers are only queried for anime."""
+        blob = f"{meta.get('path', '')} {filename}".lower()
+        if re.search(r'[぀-ヿ一-鿿]', blob):
+            return True                          # hiragana / katakana / kanji
+        if 'anime' in blob:
+            return True
+        base = os.path.basename(meta.get('path', '') or '')
+        return base.startswith('[')              # fansub [Group] convention
+
+    def _override_key(self, meta):
+        """Stable key for the saved-decision store: the fed release folder."""
+        return os.path.basename(str(meta.get('path', '')).rstrip('/\\'))
+
+    def _apply_resolved(self, meta, res):
+        """Copy a resolved id-set onto meta."""
+        meta['category'] = res['category']
+        meta['tmdb'] = res['tmdb'] or 0
+        if res['imdb']:
+            meta['imdb'] = res['imdb']
+            meta['imdb_id'] = res['imdb'].replace('tt', '')
+        if res['tvdb']:
+            meta['tvdb_id'] = res['tvdb']
+        if res['mal']:
+            meta['mal'] = res['mal']
+        if meta['tmdb']:
+            meta['tmdb_manual'] = meta['tmdb']
+        return meta
+
+    async def resolve_ids(self, meta, filename, aliases=None):
+        """
+        Identify the release by cross-referencing several metadata providers
+        and only trust an id-set that >=2 of them agree on. Replaces the old
+        'blindly take TMDB search.results[0]' logic, which mis-identified
+        releases whose real entry was missing or out-ranked on TMDB.
+
+        High consensus -> used directly. No consensus -> the release is never
+        guessed silently: unattended runs log it to the pending-IDs report and
+        skip; interactive runs prompt, and the answer is saved so the same
+        conflictive release is never asked about again.
+        """
+        year = meta.get('search_year') or None
+        category = (meta.get('category') or 'TV').upper()
+        aliases = [a for a in (aliases or []) if a and str(a).strip()]
+        mal_hint = self._looks_anime(meta, filename)
+        okey = self._override_key(meta)
+        try:
+            res = _resolve_ids(filename, year, category, self.config,
+                               aliases=aliases, mal_hint=mal_hint,
+                               override_key=okey,
+                               log=lambda m: log.info(f"[id_resolver] {m}"))
+        except Exception as e:
+            console.print(f"[yellow]ID resolver error: {e} — "
+                          f"falling back to TMDB search.")
+            return await self.get_tmdb_id(filename, year, meta, category)
+
+        if res['confidence'] == 'high' and (res['tmdb'] or res['imdb']):
+            self._apply_resolved(meta, res)
+            if res.get('source') == 'override':
+                src = "saved override"
+            else:
+                src = f"{res['votes'] or res['mal_votes']} providers agree"
+            console.print(
+                f"[bold green]✓ ID confirmed[/bold green] ([cyan]{src}[/cyan]): "
+                f"{res['title']} ({res['year']}) — tmdb={meta['tmdb']} "
+                f"imdb={meta.get('imdb', '0')} tvdb={meta.get('tvdb_id', 0)} "
+                f"mal={meta.get('mal', 0)}")
+            return meta
+
+        # no >=2 provider agreement -> never guess silently
+        console.print(f"[bold yellow]⚠ ID not confirmed[/bold yellow] for "
+                      f"[white]{filename}[/white] — providers disagree.")
+        if res['confidence'] == 'low':
+            console.print(f"[yellow]  Best guess "
+                          f"({res['votes'] or res['mal_votes']} source): "
+                          f"{res['title']} tmdb={res['tmdb']} "
+                          f"imdb={res['imdb']}[/yellow]")
+        for c in res['detail'][:5]:
+            console.print(f"[dim]   {c['provider']:8} {c['title']} "
+                          f"({c['year']}) imdb={c['imdb']} tmdb={c['tmdb']} "
+                          f"mal={c['mal']}[/dim]")
+
+        # unattended (list/auto-upload): log to the pending report, skip item,
+        # let the queue keep moving -- triage happens in one batched pass later
+        if meta.get('unattended'):
+            console.print("[red]  Logged to pending-IDs report — skipped; "
+                          "the queue continues.[/red]")
+            _report_pending({
+                "path": meta.get('path', ''),
+                "override_key": okey,
+                "filename": filename, "title": filename,
+                "year": year, "category": res['category'],
+                "confidence": res['confidence'],
+                "best_guess": {"tmdb": res['tmdb'], "imdb": res['imdb'],
+                               "title": res['title']},
+                "candidates": [
+                    {"provider": c['provider'], "title": c['title'],
+                     "year": c['year'], "imdb": c['imdb'],
+                     "tmdb": c['tmdb'], "mal": c['mal'],
+                     "score": round(c['score'], 2)}
+                    for c in res['detail'][:8]],
+            })
+            meta['tmdb_not_found'] = True
+            meta['tmdb'] = meta.get('tmdb') or 0
+            return meta
+
+        # interactive: ask once, then remember the decision forever
+        default = f"{(res['category'] or 'tv').lower()}/{res['tmdb']}" \
+            if res['tmdb'] else ""
+        tmdb_id = Prompt.ask(
+            "Please enter tmdb id in this format: tv/12345 or movie/12345",
+            default=default)
+        parser = Args(config=self.config)
+        meta['category'], meta['tmdb'] = parser.parse_tmdb_id(
+            id=tmdb_id, category=meta.get('category'))
+        meta['tmdb_manual'] = meta['tmdb']
+        if okey and meta.get('tmdb'):
+            _save_override(okey, {"tmdb": meta['tmdb'],
+                                  "imdb": meta.get('imdb', ''),
+                                  "tvdb": meta.get('tvdb_id', 0),
+                                  "mal": meta.get('mal', 0),
+                                  "category": meta['category'],
+                                  "title": filename, "year": year})
+            console.print("[dim]  Saved — this release won't be asked "
+                          "about again.[/dim]")
         return meta
 
     async def get_tmdb_id(self, filename, search_year, meta, category, untouched_filename="", attempted=0):

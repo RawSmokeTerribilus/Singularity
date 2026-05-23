@@ -32,7 +32,10 @@ def main():
         comando = [
             "python3", SCRIPT_UPLOAD,
             "--tracker", TRACKER_NAME,
-            "--input", ruta
+            "--input", ruta,
+            "--unattended",   # bulk list run: never stop for a prompt -- a
+                              # release whose ID can't be confirmed is logged
+                              # to the pending-IDs report and skipped instead
         ] + unknown_args # Añadimos los argumentos extra
         
         # 'palante como los de alicante': si falla, sigue con el siguiente

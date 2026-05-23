@@ -159,22 +159,65 @@ class Rawncher:
                                 title="[bold yellow]⚠️ Conexión qBit fallida[/]"))
 
         # ── ADUANA: BT_backup / torrent_storage_dir ───────────────────────── #
-        stored_path = self.config.get('qbit', {}).get('torrent_storage_dir', '')
-        if not stored_path or not Path(stored_path).exists():
+        # CSI v3.4 (cosmetic fix 2026-05-23): the upload-side `clients.py`
+        # reads from `config['TORRENT_CLIENTS'][default_torrent_client]
+        # ['torrent_storage_dir']`, not the top-level `config['qbit']` key
+        # that this aduana used to write to. Result: user typed the path in
+        # the aduana prompt, it landed only in `config['qbit']`, and the
+        # upload pipeline kept warning about a stale snap path from the
+        # `TORRENT_CLIENTS.qbit` slot. We now write to BOTH keys so the
+        # warning never returns regardless of which side is reading.
+        default_client = (self.config.get('DEFAULT', {}) or {}).get(
+            'default_torrent_client', 'qbit')
+        clients_cell = (
+            self.config.get('TORRENT_CLIENTS', {}) or {}
+        ).get(default_client, {}) or {}
+
+        legacy_path  = (self.config.get('qbit', {}) or {}).get('torrent_storage_dir', '')
+        upload_path  = clients_cell.get('torrent_storage_dir', '')
+        # Treat the configured path as "stored" when either key has it AND it
+        # actually exists on disk. Mismatch between the two also forces the
+        # prompt so we resync them.
+        candidate = upload_path or legacy_path
+        needs_prompt = (
+            not candidate
+            or not Path(candidate).exists()
+            or (legacy_path and upload_path and legacy_path != upload_path)
+        )
+        if needs_prompt:
             console.print(Rule("[bold yellow]⚙  ADUANA — Ruta de sesión qBittorrent[/bold yellow]", style="yellow"))
-            if stored_path and not Path(stored_path).exists():
-                console.print(f"[bold red]✖ Ruta configurada no existe:[/bold red] [dim]{stored_path}[/dim]")
+            if candidate and not Path(candidate).exists():
+                console.print(f"[bold red]✖ Ruta configurada no existe:[/bold red] [dim]{candidate}[/dim]")
+            elif legacy_path and upload_path and legacy_path != upload_path:
+                console.print(
+                    f"[bold yellow]⚠ Rutas desincronizadas:[/bold yellow]\n"
+                    f"  legacy (qbit):           [dim]{legacy_path}[/dim]\n"
+                    f"  upload (TORRENT_CLIENTS): [dim]{upload_path}[/dim]"
+                )
             else:
                 console.print("[bold yellow]⚠️  torrent_storage_dir no configurado.[/bold yellow]")
             console.print("[dim]Ruta a la carpeta BT_backup de qBittorrent (permite reutilizar hashes ya descargados).[/dim]")
             new_path = Prompt.ask("Ruta BT_backup", default=str(self.base_dir / 'qbit_backup'))
+            new_path = new_path.strip()
+
+            # Write to BOTH keys to keep CSI (aduana legacy) and clients.py
+            # (upload pipeline) in lockstep. Future readers see the same path
+            # no matter which slot they consult.
             if "qbit" not in self.config:
                 self.config["qbit"] = {}
-            self.config["qbit"]["torrent_storage_dir"] = new_path.strip()
+            self.config["qbit"]["torrent_storage_dir"] = new_path
+            if "TORRENT_CLIENTS" not in self.config:
+                self.config["TORRENT_CLIENTS"] = {}
+            if default_client not in self.config["TORRENT_CLIENTS"]:
+                self.config["TORRENT_CLIENTS"][default_client] = {}
+            self.config["TORRENT_CLIENTS"][default_client]["torrent_storage_dir"] = new_path
+
             self._guardar_config()
-            console.print("[bold green]✅ Ruta de sesión persistida.[/]")
+            console.print("[bold green]✅ Ruta de sesión persistida en ambas claves.[/]")
             self._reload_config()
-            stored_path = new_path.strip()
+            stored_path = new_path
+        else:
+            stored_path = candidate
 
         # Definimos ruta de salvaguarda
         self.watch_folder = Path(stored_path)
@@ -624,7 +667,7 @@ class Rawncher:
 
         console.print(f"[bold green]✅ Lista con {len(lines)} entrada(s).[/bold green]")
 
-        cmd = ["python3", "auto-upload.py", "--list", str(ruta), "--tracker", tracker]
+        cmd = ["python3", "auto-upload.py", "--list", str(ruta.resolve()), "--tracker", tracker]
 
         # LÓGICA DE CONTINGENCIA
         if self.client is None and '--no-seed' not in cmd:
@@ -646,12 +689,107 @@ class Rawncher:
         )
 
         if Confirm.ask("[bold]¿Ejecutar?[/bold]", default=True):
+            self._pending_mod().clear_pending()   # fresh pending report
             update_status("RAWLOADRR", "Subida", "PROCESSING", details=f"Subiendo: {os.path.basename(ruta)}")
             self._ejecutar_comando(cmd)
             update_status("RAWLOADRR", "Subida", "COMPLETED")
             console.print()
             console.print(Rule(style="dim"))
             console.print(Panel("[bold green]🚀 Payload lanzado. Proceso completado.[/bold green]", border_style="green"))
+            self._triage_pending(tracker)
+
+    def _pending_mod(self):
+        """Lazy import of id_resolver (the pending-IDs store lives in src/)."""
+        import sys
+        if str(self.base_dir) not in sys.path:
+            sys.path.insert(0, str(self.base_dir))
+        from src import id_resolver
+        return id_resolver
+
+    def _triage_pending(self, tracker: str) -> None:
+        """
+        End-of-list-run triage. The bulk run logs every release whose ID it
+        could not confirm to the pending-IDs report; here the user resolves
+        them in one batched pass. Each answer is saved to the override store
+        (so the same release is never asked about again) and the resolved
+        releases are re-fed for upload.
+        """
+        try:
+            idr = self._pending_mod()
+            pend = idr.load_pending()
+        except Exception as e:
+            console.print(f"[yellow]Triaje no disponible: {e}[/yellow]")
+            return
+        if not pend:
+            return
+        console.print()
+        console.print(Rule(f"[bold yellow]▸  TRIAJE — {len(pend)} ID(s) sin "
+                            f"confirmar[/bold yellow]", style="yellow"))
+        if not Confirm.ask(f"[bold]¿Resolver {len(pend)} ID(s) "
+                           f"conflictivo(s) ahora?[/bold]", default=True):
+            console.print(f"[dim]Pendientes en: {idr.pending_path()}[/dim]")
+            return
+
+        resolved = []
+        for i, item in enumerate(pend, 1):
+            console.print()
+            console.print(f"[bold cyan][{i}/{len(pend)}][/bold cyan] "
+                          f"{item.get('title', '?')} ({item.get('year', '?')})")
+            console.print(f"[dim]   {item.get('path', '')}[/dim]")
+            bg = item.get('best_guess', {}) or {}
+            if bg.get('tmdb') or bg.get('imdb'):
+                console.print(f"   [yellow]mejor estimación:[/yellow] "
+                              f"{bg.get('title', '')} tmdb={bg.get('tmdb')} "
+                              f"imdb={bg.get('imdb')}")
+            for c in (item.get('candidates') or [])[:8]:
+                console.print(f"   [dim][{c.get('score')}] "
+                              f"{str(c.get('provider', '')):8} {c.get('title')} "
+                              f"({c.get('year')}) imdb={c.get('imdb')} "
+                              f"tmdb={c.get('tmdb')} mal={c.get('mal')}[/dim]")
+            default = ""
+            if bg.get('tmdb'):
+                default = (f"{(item.get('category', 'tv') or 'tv').lower()}"
+                           f"/{bg['tmdb']}")
+            ans = Prompt.ask("   [bold]tmdb id[/bold] (tv/123, movie/123, "
+                             "vacío para saltar)", default=default).strip()
+            if not ans:
+                console.print("   [dim]saltado[/dim]")
+                continue
+            low = ans.lower()
+            if low.startswith('tv/'):
+                cat, tmdb_id = 'TV', ans.split('/', 1)[1].strip()
+            elif low.startswith('movie/'):
+                cat, tmdb_id = 'MOVIE', ans.split('/', 1)[1].strip()
+            else:
+                cat, tmdb_id = (item.get('category') or 'TV'), ans
+            idr.save_override(item.get('override_key', ''), {
+                "tmdb": tmdb_id, "imdb": bg.get('imdb', ''),
+                "category": cat, "title": item.get('title', ''),
+                "year": item.get('year')})
+            if item.get('path'):
+                resolved.append(item['path'])
+            console.print("   [green]✓ guardado[/green]")
+
+        idr.clear_pending()
+        if not resolved:
+            return
+        tmp_list = self.base_dir / "tmp" / "triage_resolved.txt"
+        tmp_list.parent.mkdir(parents=True, exist_ok=True)
+        tmp_list.write_text("\n".join(resolved) + "\n", encoding="utf-8")
+        console.print()
+        console.print(Rule(f"[bold yellow]▸  Re-subiendo {len(resolved)} "
+                            f"release(s) resuelto(s)[/bold yellow]",
+                            style="yellow"))
+        cmd = ["python3", "auto-upload.py", "--list", str(tmp_list),
+               "--tracker", tracker]
+        if self.client is None:
+            cmd.append('--no-seed')
+        if Confirm.ask("[bold]¿Subir los releases resueltos ahora?[/bold]",
+                       default=True):
+            self._ejecutar_comando(cmd)
+            console.print(Panel("[bold green]🚀 Releases resueltos "
+                                "procesados.[/bold green]",
+                                border_style="green"))
 
     def _flujo_triage(self, tracker: str) -> None:
         """Sub-flujo: ejecutar triage_mkv.py y luego subir las listas generadas"""

@@ -8,8 +8,8 @@ pull:
 	docker compose pull
 
 build:
-	docker build -t rawsmoke/singularity-suite:v2.1.0 .
-	docker tag rawsmoke/singularity-suite:v2.1.0 rawsmoke/singularity-suite:latest
+	docker build -t rawsmoke/singularity-suite:v3.0.0 .
+	docker tag rawsmoke/singularity-suite:v3.0.0 rawsmoke/singularity-suite:latest
 
 up: prep
 	docker compose up -d

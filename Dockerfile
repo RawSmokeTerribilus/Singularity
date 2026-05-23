@@ -147,4 +147,45 @@ RUN chown -R 1000:1000 /app
 COPY --chown=1000:1000 . .
 RUN mkdir -p logs tmp core/templates && chown -R 1000:1000 /app
 
+# --- 11. AESTHETICS + HARDENING (v3.0.0) ---
+# tini = proper PID-1, reaps zombies and forwards signals cleanly.
+# useradd = makes the runtime UID 1000 a real account so tools like git,
+# less, and the shell prompt stop emitting `cannot find name for user ID
+# 1000`. The compose still pins `user: "1000:1000"`; this is belt-and-
+# suspenders for anyone running the image outside compose.
+RUN apt-get update && apt-get install -y --no-install-recommends tini \
+    && rm -rf /var/lib/apt/lists/* \
+    && groupadd -g 1000 singularity \
+    && useradd -u 1000 -g 1000 -m -s /bin/bash -d /home/singularity \
+       -c "Singularity Suite runtime" singularity \
+    && chown -R 1000:1000 /home/singularity
+
+# OCI image metadata — kills the "noname image" critique.
+LABEL org.opencontainers.image.title="Singularity Suite" \
+      org.opencontainers.image.description="ARR-stack media management toolkit — CSI, RawLoadrr, MKVerything, Mass Editor" \
+      org.opencontainers.image.source="https://codeberg.org/RawSmoke/Singularity" \
+      org.opencontainers.image.url="https://codeberg.org/RawSmoke/Singularity" \
+      org.opencontainers.image.documentation="https://codeberg.org/RawSmoke/Singularity" \
+      org.opencontainers.image.licenses="AGPL-3.0-or-later" \
+      org.opencontainers.image.authors="RawSmoke" \
+      org.opencontainers.image.vendor="RawSmoke" \
+      org.opencontainers.image.base.name="python:3.11-bookworm" \
+      org.opencontainers.image.version="3.0.0"
+
+# Dashboard port. EXPOSE doesn't publish on host-net mode, but it
+# self-documents the listening service for `docker inspect`/`docker ps`.
+EXPOSE 8002
+
+# Explicit > implicit. SIGTERM lets python3 / tini close gracefully.
+STOPSIGNAL SIGTERM
+
+# Liveness probe — accepts 2xx/3xx (dashboard redirects "/" → /login).
+HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
+  CMD curl -fsSL http://127.0.0.1:8002/ -o /dev/null || exit 1
+
+# Drop privileges as the final image layer. Standalone `docker run` of
+# this image now lands in a UID-1000 shell, not root.
+USER 1000:1000
+
+ENTRYPOINT ["/usr/bin/tini", "--"]
 CMD ["python3", "singularity.py"]

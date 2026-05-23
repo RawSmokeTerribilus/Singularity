@@ -9,6 +9,7 @@ import subprocess
 import logging
 import importlib.util
 import json
+import difflib                                # CSI v3.2: fuzzy folder match
 from pathlib import Path
 from datetime import datetime, timezone
 from dotenv import load_dotenv, set_key
@@ -110,6 +111,10 @@ TMP_ROOT = get_tmp_path()
 # CSI v2.0: Ruta de persistencia del TrackerIndex entre sesiones
 # Almacenado en REPORTS_DIR (ya mapeado a volumen en Docker, accesible desde host)
 TRACKER_INDEX_PATH = REPORTS_DIR / "tracker_index.json"
+# CSI v3.2: sidecar cache for folder→ids resolutions (Plex/Jellyfin embedded
+# ids, fuzzy/external lookups). Same volume as tracker_index.json so the
+# Docker bind-mount in the Makefile prep step covers it automatically.
+ID_RESOLVER_CACHE_PATH = REPORTS_DIR / "id_resolver_cache.json"
 
 # ─── LOGGING & INIT ──────────────────────────────────────────────────────────
 console = Console()
@@ -593,17 +598,47 @@ _RES_PATTERNS = [
     (re.compile(r"\b576p?\b",  re.I), "576P"),
 ]
 
-# Patrones de fuente/codec reconocidos
-_CODEC_PATTERNS = [
+# CSI v3.3 (W8): SOURCE and CODEC are now separate dimensions.
+# The old single _CODEC_PATTERNS list mixed both with source-first ordering,
+# so `normalize_folder_name("Show S01 1080p WEB-DL x265-GRP")` returned
+# codec="WEB-DL" — pushing a source token into the ICU's codec slot.
+# Local mediainfo only knows the *codec* (HEVC/AVC), never the *source*, so
+# tracker ICU `{id}|1080P|WEB-DL|GRP` could never line up with local ICU
+# `{id}|1080P|X265|UNKNOWN` — L1 exact match misfired on every torrent that
+# carried a source token (≈ every tracker upload).
+#
+# Now we extract them independently. ICU's codec slot only holds CODEC
+# (X265/X264/XVID). The source travels alongside in icu_index entries for
+# diagnostics but does NOT participate in the equality check.
+_SOURCE_PATTERNS = [
     (re.compile(r"\bREMUX\b",             re.I), "REMUX"),
     (re.compile(r"\bBluRay\b|\bBDRip\b",  re.I), "BLURAY"),
     (re.compile(r"\bWEB[-.]?DL\b",        re.I), "WEB-DL"),
     (re.compile(r"\bWEBRip\b|\bWEB\b",    re.I), "WEBRIP"),
     (re.compile(r"\bHDTV\b",              re.I), "HDTV"),
-    (re.compile(r"\bx265\b|\bHEVC\b|\bH\.265\b", re.I), "x265"),
-    (re.compile(r"\bx264\b|\bAVC\b|\bH\.264\b",  re.I), "x264"),
-    (re.compile(r"\bXviD\b|\bDivX\b",    re.I), "XVID"),
+    (re.compile(r"\bDVDRip\b|\bDVD\b",    re.I), "DVD"),
+    (re.compile(r"\bSDTV\b",              re.I), "SDTV"),
 ]
+
+_CODEC_PATTERNS = [
+    (re.compile(r"\bx265\b|\bHEVC\b|\bH\.265\b|\bh265\b", re.I), "x265"),
+    (re.compile(r"\bx264\b|\bAVC\b|\bH\.264\b|\bh264\b",  re.I), "x264"),
+    (re.compile(r"\bXviD\b|\bDivX\b",                     re.I), "XVID"),
+]
+
+
+# CSI v3.2: shared normalized-key builder used by both MetadataManager (Arr
+# lookup tiers) AND TrackerIndex (`tracker_names` fallback in has_*_state).
+# Keeping it module-level avoids a circular dep between the two classes and
+# guarantees both sides hash a string the same way.
+def _norm_folder_key(name: str) -> str:
+    if not name:
+        return ""
+    comps = normalize_folder_name(name)
+    base = comps.get("base_name", "") or name
+    base = re.sub(r"\[[^\]]+\]", " ", base)
+    base = re.sub(r"[^a-z0-9]+", " ", base.lower())
+    return re.sub(r"\s+", " ", base).strip()
 
 
 def normalize_folder_name(name: str) -> dict:
@@ -648,11 +683,17 @@ def normalize_folder_name(name: str) -> dict:
             resolution = value
             break
 
-    # Extraer codec/fuente
+    # CSI v3.3 (W8): codec y source se extraen independientemente.
+    # ICU codec slot recibe SOLO codec (X265/X264/XVID), nunca el source.
     codec = ""
     for pattern, value in _CODEC_PATTERNS:
         if pattern.search(working):
             codec = value
+            break
+    source = ""
+    for pattern, value in _SOURCE_PATTERNS:
+        if pattern.search(working):
+            source = value
             break
 
     # Extraer año: "(YYYY)" o "YYYY" como token solitario (1900-2099)
@@ -685,13 +726,14 @@ def normalize_folder_name(name: str) -> dict:
     base = re.sub(r"\s+", " ", base).strip(" -.,")
 
     dbg(f"[ICU] normalize_folder_name('{name}') → base='{base}' year='{year}' "
-        f"res='{resolution}' codec='{codec}' group='{group}'")
+        f"res='{resolution}' codec='{codec}' source='{source}' group='{group}'")
 
     return {
         "base_name":  base,
         "year":       year,
         "resolution": resolution,
         "codec":      codec,
+        "source":     source,    # CSI v3.3 (W8): separate dimension, ICU-agnostic
         "group":      group,
     }
 
@@ -742,6 +784,93 @@ def _size_entropy_tiebreak(local_size_bytes: int, tracker_size_bytes: int,
         f"ratio={ratio:.3f} tolerance={tolerance:.2f} → {'MATCH' if within else 'DIFF'}")
     return within
 
+# ─── ID RESOLVER CACHE ────────────────────────────────────────────────────────
+# CSI v3.2: persistent cache for folder→ids resolutions.
+#
+# Lives at REPORTS_DIR / "id_resolver_cache.json". Keyed by the folder basename
+# (lowercased). Values include both positive resolutions (ids found) and
+# negative ones (no match anywhere) with a TTL so we retry a misfire later
+# rather than re-querying TMDB on every single scan.
+#
+# Negative entries are *much* more numerous than positives for a healthy
+# library (every legit-untracked or junk folder), so storing them is what
+# makes the second scan fast. 30-day TTL means a folder that gained an entry
+# upstream gets picked up eventually without manual intervention.
+class IdResolverCache:
+    NEG_TTL_SECONDS = 30 * 24 * 3600   # retry "not found" entries after 30 days
+    SCHEMA_VERSION  = "1.0"
+
+    def __init__(self, path: Path):
+        self.path = path
+        self._entries: dict = {}
+        self._dirty = False
+
+    def load(self):
+        if not self.path.exists():
+            dbg(f"[RESOLVER] No cache at {self.path} — starting empty")
+            return
+        try:
+            with open(self.path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            if data.get("version") != self.SCHEMA_VERSION:
+                dbg(f"[RESOLVER] Schema mismatch — discarding cache")
+                return
+            self._entries = data.get("entries", {}) or {}
+            dbg(f"[RESOLVER] Loaded {len(self._entries)} entries from {self.path}")
+        except Exception as e:
+            dbg(f"[RESOLVER] Load error ({e}) — starting empty")
+
+    def save(self):
+        if not self._dirty:
+            return
+        try:
+            self.path.parent.mkdir(parents=True, exist_ok=True)
+            payload = {
+                "version":      self.SCHEMA_VERSION,
+                "last_updated": datetime.now(timezone.utc).isoformat(),
+                "entries":      self._entries,
+            }
+            tmp = self.path.with_suffix(".json.tmp")
+            with open(tmp, "w", encoding="utf-8") as f:
+                json.dump(payload, f, ensure_ascii=False, indent=2)
+            tmp.replace(self.path)
+            self._dirty = False
+            dbg(f"[RESOLVER] Saved {len(self._entries)} entries to {self.path}")
+        except Exception as e:
+            dbg(f"[RESOLVER] Save error: {e}")
+
+    def get(self, folder_name: str) -> Optional[dict]:
+        """Return cached entry or None. Negative entries expire after NEG_TTL."""
+        key = (folder_name or "").lower()
+        entry = self._entries.get(key)
+        if not entry:
+            return None
+        # Negative-entry TTL — let the resolver retry stale "not found"s.
+        if not (entry.get("tmdb_id") or entry.get("imdb_id") or entry.get("tvdb_id")):
+            try:
+                ts = datetime.fromisoformat(entry.get("resolved_at", "").replace("Z", "+00:00"))
+                age = (datetime.now(timezone.utc) - ts).total_seconds()
+                if age > self.NEG_TTL_SECONDS:
+                    dbg(f"[RESOLVER] Negative entry expired for '{key}' — re-resolve")
+                    return None
+            except Exception:
+                return None
+        return entry
+
+    def set(self, folder_name: str, ids: dict, source: str):
+        key = (folder_name or "").lower()
+        self._entries[key] = {
+            "tmdb_id":      str(ids.get("tmdb_id") or ""),
+            "imdb_id":      str(ids.get("imdb_id") or "").replace("tt", ""),
+            "tvdb_id":      str(ids.get("tvdb_id") or ""),
+            "mal_id":       str(ids.get("mal_id")  or ""),
+            "media_type":   ids.get("media_type") or "",       # "movie"|"tv"
+            "resolved_via": source,
+            "resolved_at":  datetime.now(timezone.utc).isoformat(),
+        }
+        self._dirty = True
+
+
 # ─── METADATA MANAGER ─────────────────────────────────────────────────────────
 class MetadataManager:
     """
@@ -753,9 +882,81 @@ class MetadataManager:
 
     def __init__(self, config: dict):
         self.cfg = config
-        self._sonarr_by_path  = {}  # lower folder name → series dict
-        self._sonarr_by_tvdb  = {}  # tvdb id str → series dict
-        self._radarr_by_path  = {}  # lower folder name → movie dict
+
+        # ── Primary lookup: folder basename (the "saved us" trick) ────────────
+        # Keys are lower-cased basenames of the Arr's reported `path`. The full
+        # mount prefix is stripped on purpose so we can match across very
+        # different filesystem layouts (Arr at /Downloads/X, CSI walking
+        # /hardlinks/NOBS/X, etc).
+        self._sonarr_by_path  = {}   # basename(path).lower() → series
+        self._radarr_by_path  = {}   # basename(path).lower() → movie
+
+        # ── Normalized basename map ───────────────────────────────────────────
+        # Same key, but run through normalize_folder_name() so we can match
+        # when the library kept a different extra suffix than Arr (e.g. Arr
+        # renamed to "Movie (2024)" but hardlink is "Movie 2024 [1080p]").
+        self._sonarr_by_norm  = {}
+        self._radarr_by_norm  = {}
+
+        # ── Reverse id indexes ────────────────────────────────────────────────
+        # Built so [tmdb-N]/[imdb-tt…]/[tvdb-N] suffixes in a folder name (the
+        # Plex/Jellyfin convention) can jump straight to the Arr entry.
+        self._sonarr_by_tvdb  = {}
+        self._sonarr_by_tmdb  = {}   # NEW
+        self._sonarr_by_imdb  = {}   # NEW (numeric form, no 'tt')
+        self._radarr_by_tmdb  = {}   # NEW
+        self._radarr_by_imdb  = {}   # NEW
+
+        # Resolver cache — folder_name → resolved ids. Lazy-loaded.
+        self._resolver_cache: Optional[IdResolverCache] = None
+
+    # ──────────────────────────────────────────────────────────────────────────
+    # Internal helpers — normalize key, embedded id extraction, fuzzy ratio.
+    # Kept on the class so the same routines are used at load time and lookup.
+    # ──────────────────────────────────────────────────────────────────────────
+
+    @staticmethod
+    def _norm_key(name: str) -> str:
+        """Delegate to module-level `_norm_folder_key` so MetadataManager and
+        TrackerIndex hash strings identically (W5 name-fallback rely on it)."""
+        return _norm_folder_key(name)
+
+    @staticmethod
+    def _embedded_ids(name: str) -> dict:
+        """
+        Extract Plex/Jellyfin-style id suffixes from a folder name:
+          [tmdb-12345]   [tmdbid-12345]   {tmdb-12345}
+          [imdb-tt1234567]
+          [tvdb-67890]
+        Also catches the legacy CSI pattern "TVdbID-N" and "YYYY-NNNNNN".
+        """
+        out = {"tmdb": "", "imdb": "", "tvdb": ""}
+        if not name:
+            return out
+        # tmdb
+        m = re.search(r"[\[\{](?:tmdb(?:id)?)[- _:]+(\d+)[\]\}]", name, re.I)
+        if m: out["tmdb"] = m.group(1)
+        # imdb (with or without 'tt' prefix)
+        m = re.search(r"[\[\{](?:imdb(?:id)?)[- _:]+(?:tt)?(\d{6,10})[\]\}]", name, re.I)
+        if m: out["imdb"] = m.group(1)
+        # tvdb
+        m = re.search(r"[\[\{](?:tvdb(?:id)?)[- _:]+(\d+)[\]\}]", name, re.I)
+        if m: out["tvdb"] = m.group(1)
+        # Legacy CSI pattern
+        if not out["tvdb"]:
+            m = re.search(r"TVdbID[- _](\d+)", name, re.I)
+            if m: out["tvdb"] = m.group(1)
+        if not out["tvdb"]:
+            m = re.search(r"\d{4}-(\d{5,7})(?:\b|$|-)", name)
+            if m: out["tvdb"] = m.group(1)
+        return out
+
+    @staticmethod
+    def _fuzzy_ratio(a: str, b: str) -> float:
+        """Cheap zero-dep string similarity (0..1). Used as last-resort match."""
+        if not a or not b:
+            return 0.0
+        return difflib.SequenceMatcher(None, a, b).ratio()
 
     def load_sonarr(self):
         if not (self.cfg["SONARR_URL"] and self.cfg["SONARR_API_KEY"]):
@@ -770,11 +971,23 @@ class MetadataManager:
             )
             for s in r.json():
                 if s.get("path"):
-                    self._sonarr_by_path[Path(s["path"]).name.lower()] = s
+                    base = Path(s["path"]).name
+                    self._sonarr_by_path[base.lower()] = s
+                    nk = self._norm_key(base)
+                    if nk:
+                        self._sonarr_by_norm[nk] = s
                 tvdb = str(s.get("tvdbId") or "")
                 if tvdb:
                     self._sonarr_by_tvdb[tvdb] = s
-            dbg(f"Sonarr: {len(self._sonarr_by_path)} series loaded")
+                tmdb = str(s.get("tmdbId") or "")        # Sonarr v3 exposes tmdbId
+                if tmdb and tmdb != "0":
+                    self._sonarr_by_tmdb[tmdb] = s
+                imdb = str(s.get("imdbId") or "").replace("tt", "")
+                if imdb:
+                    self._sonarr_by_imdb[imdb] = s
+            dbg(f"Sonarr: {len(self._sonarr_by_path)} series loaded "
+                f"(tmdb={len(self._sonarr_by_tmdb)}, imdb={len(self._sonarr_by_imdb)}, "
+                f"tvdb={len(self._sonarr_by_tvdb)}, norm={len(self._sonarr_by_norm)})")
         except Exception as e:
             dbg(f"Sonarr load error: {e}")
 
@@ -791,34 +1004,445 @@ class MetadataManager:
             )
             for m in r.json():
                 if m.get("path"):
-                    self._radarr_by_path[Path(m["path"]).name.lower()] = m
-            dbg(f"Radarr: {len(self._radarr_by_path)} movies loaded")
+                    base = Path(m["path"]).name
+                    self._radarr_by_path[base.lower()] = m
+                    nk = self._norm_key(base)
+                    if nk:
+                        self._radarr_by_norm[nk] = m
+                tmdb = str(m.get("tmdbId") or "")
+                if tmdb and tmdb != "0":
+                    self._radarr_by_tmdb[tmdb] = m
+                imdb = str(m.get("imdbId") or "").replace("tt", "")
+                if imdb:
+                    self._radarr_by_imdb[imdb] = m
+            dbg(f"Radarr: {len(self._radarr_by_path)} movies loaded "
+                f"(tmdb={len(self._radarr_by_tmdb)}, imdb={len(self._radarr_by_imdb)}, "
+                f"norm={len(self._radarr_by_norm)})")
         except Exception as e:
             dbg(f"Radarr load error: {e}")
 
+    # ──────────────────────────────────────────────────────────────────────────
+    # CSI v3.2: Layered lookup chain. Each tier is cheaper than the next; we
+    # short-circuit on the first hit. The same chain shape is used for Sonarr
+    # (series) and Radarr (movies):
+    #   1. exact basename
+    #   2. normalized basename (strip year/tech/tags, lowercase, collapse ws)
+    #   3. embedded ids [tmdb-N]/[imdb-tt…]/[tvdb-N]/TVdbID-N → reverse index
+    #   4. fuzzy normalized match (≥0.88 ratio, single best winner)
+    #   5. external resolver (TMDB /search/multi) — cached
+    # Returns the matching Arr entry dict, or None when even the resolver
+    # comes up empty.
+    # ──────────────────────────────────────────────────────────────────────────
+
+    FUZZY_THRESHOLD = 0.88   # SequenceMatcher.ratio() floor for tier 4
+
     def get_series(self, folder_name: str) -> Optional[dict]:
-        """
-        Locate Sonarr series for a show folder.
-        Priority: exact path match → TVdbID extracted from folder name.
-        """
+        # Tier 1 — exact basename
         s = self._sonarr_by_path.get(folder_name.lower())
         if s:
             return s
-        # Pattern: "Show Name YEAR-TVdbID-NNNNNN-..." (explicit)
-        m = re.search(r"TVdbID[- _](\d+)", folder_name, re.I)
-        if not m:
-            # Pattern: "Show Name YEAR-NNNNNN" (implicit 5-7 digit ID after year)
-            m = re.search(r"\d{4}-(\d{5,7})(?:\b|$|-)", folder_name)
-        if m:
-            s = self._sonarr_by_tvdb.get(m.group(1))
+
+        # Tier 2 — normalized
+        nk = self._norm_key(folder_name)
+        if nk:
+            s = self._sonarr_by_norm.get(nk)
             if s:
-                dbg(f"Sonarr match via TVdbID {m.group(1)} for '{folder_name}'")
+                dbg(f"Sonarr match via normalized key '{nk}' for '{folder_name}'")
                 return s
-        dbg(f"Sonarr: no match for folder '{folder_name}'")
+
+        # Tier 3 — embedded ids
+        ids = self._embedded_ids(folder_name)
+        if ids["tvdb"]:
+            s = self._sonarr_by_tvdb.get(ids["tvdb"])
+            if s:
+                dbg(f"Sonarr match via tvdb={ids['tvdb']} for '{folder_name}'")
+                return s
+        if ids["tmdb"]:
+            s = self._sonarr_by_tmdb.get(ids["tmdb"])
+            if s:
+                dbg(f"Sonarr match via tmdb={ids['tmdb']} for '{folder_name}'")
+                return s
+        if ids["imdb"]:
+            s = self._sonarr_by_imdb.get(ids["imdb"])
+            if s:
+                dbg(f"Sonarr match via imdb={ids['imdb']} for '{folder_name}'")
+                return s
+
+        # Tier 4 — fuzzy on normalized keys
+        if nk and self._sonarr_by_norm:
+            best_key, best_ratio = "", 0.0
+            for k in self._sonarr_by_norm:
+                r = self._fuzzy_ratio(nk, k)
+                if r > best_ratio:
+                    best_ratio, best_key = r, k
+            if best_ratio >= self.FUZZY_THRESHOLD:
+                dbg(f"Sonarr fuzzy match '{best_key}' (ratio={best_ratio:.2f}) for '{folder_name}'")
+                return self._sonarr_by_norm[best_key]
+
+        # Tier 5 — external resolver (TMDB → reverse map). Only when allowed.
+        ext = self._external_resolve(folder_name, hint_type="tv")
+        if ext and ext.get("media_type") == "tv":
+            tmdb_id = ext.get("tmdb_id") or ""
+            tvdb_id = ext.get("tvdb_id") or ""
+            if tmdb_id and tmdb_id in self._sonarr_by_tmdb:
+                dbg(f"Sonarr match via external→tmdb={tmdb_id} for '{folder_name}'")
+                return self._sonarr_by_tmdb[tmdb_id]
+            if tvdb_id and tvdb_id in self._sonarr_by_tvdb:
+                dbg(f"Sonarr match via external→tvdb={tvdb_id} for '{folder_name}'")
+                return self._sonarr_by_tvdb[tvdb_id]
+            # External says "this exists on TMDB" but not in Sonarr — return a
+            # synthetic entry so callers still have ids to feed the tracker.
+            dbg(f"Sonarr no entry but external resolved → synthetic for '{folder_name}'")
+            return {
+                "title":       ext.get("title") or folder_name,
+                "tmdbId":      int(tmdb_id) if tmdb_id.isdigit() else 0,
+                "tvdbId":      int(tvdb_id) if tvdb_id.isdigit() else 0,
+                "imdbId":      ("tt" + ext["imdb_id"]) if ext.get("imdb_id") else "",
+                "_synthetic":  True,
+                "_source":     "external",
+            }
+
+        dbg(f"Sonarr: no match for folder '{folder_name}' across all tiers")
         return None
 
     def get_movie(self, folder_name: str) -> Optional[dict]:
-        return self._radarr_by_path.get(folder_name.lower())
+        # Tier 1 — exact basename
+        m = self._radarr_by_path.get(folder_name.lower())
+        if m:
+            return m
+
+        # Tier 2 — normalized
+        nk = self._norm_key(folder_name)
+        if nk:
+            m = self._radarr_by_norm.get(nk)
+            if m:
+                dbg(f"Radarr match via normalized key '{nk}' for '{folder_name}'")
+                return m
+
+        # Tier 3 — embedded ids
+        ids = self._embedded_ids(folder_name)
+        if ids["tmdb"]:
+            m = self._radarr_by_tmdb.get(ids["tmdb"])
+            if m:
+                dbg(f"Radarr match via tmdb={ids['tmdb']} for '{folder_name}'")
+                return m
+        if ids["imdb"]:
+            m = self._radarr_by_imdb.get(ids["imdb"])
+            if m:
+                dbg(f"Radarr match via imdb={ids['imdb']} for '{folder_name}'")
+                return m
+
+        # Tier 4 — fuzzy
+        if nk and self._radarr_by_norm:
+            best_key, best_ratio = "", 0.0
+            for k in self._radarr_by_norm:
+                r = self._fuzzy_ratio(nk, k)
+                if r > best_ratio:
+                    best_ratio, best_key = r, k
+            if best_ratio >= self.FUZZY_THRESHOLD:
+                dbg(f"Radarr fuzzy match '{best_key}' (ratio={best_ratio:.2f}) for '{folder_name}'")
+                return self._radarr_by_norm[best_key]
+
+        # Tier 5 — external resolver
+        ext = self._external_resolve(folder_name, hint_type="movie")
+        if ext and ext.get("media_type") == "movie":
+            tmdb_id = ext.get("tmdb_id") or ""
+            imdb_id = ext.get("imdb_id") or ""
+            if tmdb_id and tmdb_id in self._radarr_by_tmdb:
+                dbg(f"Radarr match via external→tmdb={tmdb_id} for '{folder_name}'")
+                return self._radarr_by_tmdb[tmdb_id]
+            if imdb_id and imdb_id in self._radarr_by_imdb:
+                dbg(f"Radarr match via external→imdb={imdb_id} for '{folder_name}'")
+                return self._radarr_by_imdb[imdb_id]
+            dbg(f"Radarr no entry but external resolved → synthetic for '{folder_name}'")
+            return {
+                "title":      ext.get("title") or folder_name,
+                "tmdbId":     int(tmdb_id) if tmdb_id.isdigit() else 0,
+                "imdbId":     ("tt" + imdb_id) if imdb_id else "",
+                "_synthetic": True,
+                "_source":    "external",
+            }
+
+        dbg(f"Radarr: no match for folder '{folder_name}' across all tiers")
+        return None
+
+    # ──────────────────────────────────────────────────────────────────────────
+    # Tier 5 implementation — external resolver. Backed by IdResolverCache so
+    # repeated CSI runs don't pound TMDB. Picks the best candidate by name
+    # similarity AND year; falls back to first result for short queries.
+    # ──────────────────────────────────────────────────────────────────────────
+
+    def _resolver(self) -> IdResolverCache:
+        if self._resolver_cache is None:
+            self._resolver_cache = IdResolverCache(ID_RESOLVER_CACHE_PATH)
+            self._resolver_cache.load()
+        return self._resolver_cache
+
+    def _external_resolve(self, folder_name: str,
+                          hint_type: Optional[str] = None) -> Optional[dict]:
+        """
+        Resolve ids for a folder by name via TMDB /search/multi.
+        hint_type: "tv" / "movie" — biases tie-breaks but doesn't filter out
+        the other type (TMDB sometimes mis-types anime as movie or vice-versa).
+        Cached. Returns the entry dict or None on hard miss.
+        """
+        cache = self._resolver()
+        hit = cache.get(folder_name)
+        if hit is not None:
+            # Treat negative cache as None to caller
+            if not (hit.get("tmdb_id") or hit.get("imdb_id") or hit.get("tvdb_id")):
+                return None
+            return hit
+
+        tmdb_key = self.cfg.get("TMDB_API_KEY") or ""
+        if not tmdb_key:
+            dbg(f"[RESOLVER] No TMDB key — cannot externally resolve '{folder_name}'")
+            return None
+
+        comps = normalize_folder_name(folder_name)
+        query = (comps.get("base_name") or folder_name).strip()
+        year  = (comps.get("year") or "").strip()
+        if not query:
+            return None
+
+        try:
+            api_limiter.wait()
+            params = {"api_key": tmdb_key, "query": query, "include_adult": "false"}
+            if year:
+                # TMDB /search/multi doesn't accept year; we use it for tie-break
+                pass
+            r = requests.get(
+                "https://api.themoviedb.org/3/search/multi",
+                params=params,
+                headers={"Accept": "application/json", "User-Agent": "csi-resolver"},
+                timeout=15,
+            )
+            if r.status_code != 200:
+                dbg(f"[RESOLVER] TMDB HTTP {r.status_code} for '{query}'")
+                cache.set(folder_name, {}, source="tmdb_error")
+                return None
+            results = (r.json() or {}).get("results", []) or []
+        except Exception as e:
+            dbg(f"[RESOLVER] TMDB exception '{query}': {e}")
+            return None
+
+        # Keep only movie + tv (drop person)
+        results = [x for x in results if x.get("media_type") in ("movie", "tv")]
+        if not results:
+            cache.set(folder_name, {}, source="tmdb_empty")
+            cache.save()
+            dbg(f"[RESOLVER] TMDB returned 0 for '{query}' (cached negative)")
+            return None
+
+        # Pick the best — combined title similarity + year match + hint bias
+        nk = self._norm_key(query)
+        def score(item):
+            title = item.get("title") or item.get("name") or ""
+            it_year = ""
+            for f in ("release_date", "first_air_date"):
+                if item.get(f):
+                    it_year = item[f][:4]; break
+            ratio = self._fuzzy_ratio(nk, self._norm_key(title))
+            year_bonus = 0.15 if (year and it_year and year == it_year) else 0.0
+            hint_bonus = 0.05 if (hint_type and item.get("media_type") == hint_type) else 0.0
+            popularity = float(item.get("popularity") or 0) / 1000.0  # mild
+            return ratio + year_bonus + hint_bonus + popularity
+
+        best = max(results, key=score)
+        media_type = best.get("media_type")
+        tmdb_id = str(best.get("id") or "")
+        title   = best.get("title") or best.get("name") or ""
+
+        # Optionally fetch external_ids to populate imdb_id (and tvdb for tv).
+        # One extra call per resolution — paced by api_limiter.
+        imdb_id, tvdb_id = "", ""
+        if media_type and tmdb_id:
+            try:
+                api_limiter.wait()
+                ext_url = f"https://api.themoviedb.org/3/{media_type}/{tmdb_id}/external_ids"
+                r2 = requests.get(ext_url,
+                                  params={"api_key": tmdb_key},
+                                  headers={"Accept": "application/json"},
+                                  timeout=15)
+                if r2.status_code == 200:
+                    ext = r2.json() or {}
+                    imdb_id = str(ext.get("imdb_id") or "").replace("tt", "")
+                    tvdb_id = str(ext.get("tvdb_id") or "")
+            except Exception as e:
+                dbg(f"[RESOLVER] external_ids exception for {tmdb_id}: {e}")
+
+        out = {
+            "tmdb_id":    tmdb_id,
+            "imdb_id":    imdb_id,
+            "tvdb_id":    tvdb_id,
+            "media_type": media_type,
+            "title":      title,
+        }
+        cache.set(folder_name, out, source="tmdb_search")
+        cache.save()
+        dbg(f"[RESOLVER] TMDB resolved '{folder_name}' → {media_type} tmdb={tmdb_id} "
+            f"imdb={imdb_id} tvdb={tvdb_id} (\"{title}\")")
+        return out
+
+    # ──────────────────────────────────────────────────────────────────────────
+    # CSI v3.2: Multi-signal TV/Movie classifier.
+    #
+    # Returns dict:
+    #   media_type:  "tv" | "movie" | "unknown"
+    #   season_num:  int | None — best guess of the season being looked at
+    #   confidence:  float (0..1) — for the INCIDENCIA bucket if low
+    #   reason:      str — which signal won (debug)
+    #
+    # Signals, in order of evaluation:
+    #   S6  Sonarr/Radarr knows this folder → trust Arr completely
+    #   S2  Filename(s) contain S\d+E\d+ / S\d+ / Season N
+    #   S3  Filename(s) contain "\d+ - " anime-episode numbering AND ≥3 files
+    #   S1  Parent dir contains "Season N" / "S\d\d" / lang variants
+    #   S4  File count vote: 1-2 → movie-lean, ≥3 → tv-lean (weak)
+    #   S5  Mediainfo runtime: <70 min → tv-lean, ≥80 min → movie-lean (weak)
+    #   S7  External TMDB lookup (only when other signals tie)
+    # ──────────────────────────────────────────────────────────────────────────
+
+    _RX_PARENT_SEASON = re.compile(
+        r"(?:season|temporada|saison|staffel|stagione|seizoen|sezon|сезон)\s*\d+|\bS\d{2}\b",
+        re.I,
+    )
+    _RX_FILE_SE       = re.compile(r"[ ._]S\d{1,2}(?:E\d{1,3})?\b|Season\s*\d+", re.I)
+    _RX_ANIME_EP      = re.compile(r"\b\d{1,3}\s*-\s+", re.I)
+    _RX_SEASON_NUM    = re.compile(
+        r"(?:season|temporada|saison|staffel|stagione|seizoen|sezon|сезон)\s*(\d+)|S(\d{1,2})",
+        re.I,
+    )
+    # CSI v3.4 (W9): mini-series numbering like "1 de 6", "1 of 6", "1of6",
+    # "Part 1", "Capítulo 1", "Episodio 1". Used as a separate signal: when
+    # ≥2 files in the same folder match → strong TV indicator. Avoids the
+    # single-file movie false positive (e.g., "Lord of the Rings Part 1").
+    _RX_MINISERIES    = re.compile(
+        r"\b\d+\s*(?:de|of)\s*\d+\b"        # "1 de 6" / "1 of 6"
+        r"|\b\d+of\d+\b"                    # "1of6"
+        r"|\bPart\s*\d+\b"                  # "Part 1"
+        r"|\bParte\s*\d+\b"                 # "Parte 1"
+        r"|\bCap[íi]tulo\s*\d+\b"           # "Capítulo 1"
+        r"|\bEpisodio\s*\d+\b"              # "Episodio 1"
+        r"|\bEp(?:isode)?\.?\s*\d+\b",      # "Ep 1" / "Episode 1"
+        re.I,
+    )
+    # CSI v3.4 (W10): filename patterns identifying extras / non-content
+    # videos that should NEVER trigger an upload candidate. Drop these from
+    # mkv_files before classification + ICU building.
+    _RX_EXTRAS_FILE = re.compile(
+        r"^(?:opening|ending|op|ed|menu|sample|trailer|teaser|preview|"
+        r"intro|outro|nc[- _]?op|nc[- _]?ed|behind|making[- _]?of|extras?)"
+        r"[\s._-]*\d*\.[a-z0-9]+$",
+        re.I,
+    )
+
+    def classify_folder(self, root_path: Path, lib_path: Path,
+                        mkv_files: list) -> dict:
+        """Multi-signal classification. See block comment above."""
+        out = {"media_type": "unknown", "season_num": None, "confidence": 0.0, "reason": ""}
+        if not mkv_files:
+            return out
+
+        rel_parts = root_path.relative_to(lib_path).parts
+        parent_name  = root_path.name
+        parent_2up   = root_path.parent.name
+        # CSI v3.4 (W11): never use the library root as an Arr-lookup
+        # candidate. lib_path.name could be "NOBS", "Movies", "Library" —
+        # generic strings that the external resolver may have cached as a
+        # bogus movie hit, polluting every top-level folder's classification.
+        lib_root_name = lib_path.name
+        candidates = [c for c in (parent_name, parent_2up)
+                      if c and c != lib_root_name]
+
+        # ── S6 — Arr override (strongest, free) ───────────────────────────────
+        # Check the immediate dir name AND the parent (covers Show/Season N).
+        for candidate in candidates:
+            if self.get_series(candidate):
+                # Found in Sonarr — pull the season number from path.
+                m = self._RX_SEASON_NUM.search(parent_name)
+                season = int(m.group(1) or m.group(2)) if m else None
+                # If the immediate dir IS the show (no season subdir), look
+                # inside the filenames for a season hint.
+                if season is None:
+                    for f in mkv_files:
+                        m2 = self._RX_SEASON_NUM.search(f)
+                        if m2:
+                            season = int(m2.group(1) or m2.group(2))
+                            break
+                if season is None:
+                    season = 1   # default for flat per-episode anime
+                out.update(media_type="tv", season_num=season, confidence=0.95,
+                           reason=f"S6:sonarr({candidate!r})")
+                return out
+        for candidate in candidates:
+            if self.get_movie(candidate):
+                out.update(media_type="movie", confidence=0.95,
+                           reason=f"S6:radarr({candidate!r})")
+                return out
+
+        # ── S2 — filename SxxExx / Season N ──────────────────────────────────
+        se_hits = sum(1 for f in mkv_files if self._RX_FILE_SE.search(f))
+        if se_hits >= 1:
+            # Find season from first matching file
+            season = None
+            for f in mkv_files:
+                m = self._RX_SEASON_NUM.search(f)
+                if m:
+                    season = int(m.group(1) or m.group(2))
+                    break
+            out.update(media_type="tv", season_num=season or 1, confidence=0.85,
+                       reason=f"S2:file_se({se_hits} files)")
+            return out
+
+        # ── S3 — anime-episode pattern, only when there are several files ────
+        anime_hits = sum(1 for f in mkv_files if self._RX_ANIME_EP.search(f))
+        if anime_hits >= 3:
+            out.update(media_type="tv", season_num=1, confidence=0.75,
+                       reason=f"S3:anime_ep({anime_hits} files)")
+            return out
+
+        # ── S3b — mini-series numbering "X de Y" / "X of Y" / "Part N" ──────
+        # Requires ≥2 hits in the same folder to avoid single-file movie false
+        # positives like "Lord of the Rings - Part 1". NATGEO "1 de 6 La
+        # Agresion" / "2 de 6 La Derrota..." catches here.
+        mini_hits = sum(1 for f in mkv_files if self._RX_MINISERIES.search(f))
+        if mini_hits >= 2:
+            out.update(media_type="tv", season_num=1, confidence=0.80,
+                       reason=f"S3b:miniseries({mini_hits} files)")
+            return out
+
+        # ── S1 — parent dir Season/S\d\d (the old logic, kept as a tier) ─────
+        if any(self._RX_PARENT_SEASON.search(p) for p in rel_parts[-2:]):
+            m = self._RX_SEASON_NUM.search(parent_name)
+            season = int(m.group(1) or m.group(2)) if m else None
+            out.update(media_type="tv", season_num=season or 1, confidence=0.80,
+                       reason="S1:parent_season")
+            return out
+
+        # ── S4/S5 weak signals + S7 external — only when nothing fired ───────
+        file_count = len(mkv_files)
+        movie_lean = (file_count <= 2)
+        tv_lean    = (file_count >= 3)
+        weak_reason = f"S4:files={file_count}"
+
+        # S7 — external lookup as tie-breaker.
+        ext = self._external_resolve(parent_name, hint_type=("tv" if tv_lean else "movie"))
+        if ext and ext.get("media_type") in ("tv", "movie"):
+            mt = ext["media_type"]
+            out.update(media_type=mt,
+                       season_num=(1 if mt == "tv" else None),
+                       confidence=0.70,
+                       reason=f"S7:tmdb({mt}) + {weak_reason}")
+            return out
+
+        # Fall back to weak file-count vote with low confidence.
+        if movie_lean:
+            out.update(media_type="movie", confidence=0.40, reason=weak_reason)
+        elif tv_lean:
+            out.update(media_type="tv", season_num=1, confidence=0.40,
+                       reason=weak_reason)
+        return out
 
     def get_aired_episodes(self, sonarr_series_id: int, season_num: int) -> Optional[int]:
         """Count aired episodes (airDateUtc < now UTC) for a Sonarr season."""
@@ -864,8 +1488,10 @@ class TrackerIndex:
     def __init__(self):
         self.movie_tmdb    = set()   # str tmdb IDs de películas en tracker
         self.movie_imdb    = set()   # str imdb IDs (numeric, sin 'tt')
+        self.movie_tvdb    = set()   # CSI v3.0 (A1): str tvdb IDs de películas (raro pero soportado)
         self.tv_seasons    = set()   # (tmdb_str, season_str) — temporadas en tracker
         self.tv_tvdb       = set()   # (tvdb_str, season_str) — TV por TVDB
+        self.tv_imdb       = set()   # CSI v3.0 (A1): (imdb_str_norm, season_str) — TV por IMDB
         self.seeding_names = set()      # paths absolutos (lower) desde qBit — compat v1.x
         self.seeding_paths = set()      # paths absolutos (lower) desde qBit — v2.0
         self.client_path_map: dict = {} # CSI v3.0: abs_path_lower → {hash, size}
@@ -885,6 +1511,140 @@ class TrackerIndex:
         # CSI v3.1: Flag de auth — True si la cookie del scraper está expirada
         # Impide marcar ítems como ESTADO_NO_SUBIDO con datos de scraper inválidos
         self._auth_failed: bool = False
+
+        # CSI v3.2 (W5 — name-fallback): mapa de nombres normalizados de
+        # torrent a metadatos básicos. Lo usamos como red de seguridad en
+        # has_*_state cuando los id-sets fallan (carpeta sin ids tras 5-tier
+        # fallback, o torrent ingestado sin tmdb/imdb/tvdb por bug del
+        # template HTML). Clave: _norm_folder_key(name). Valor: lista de
+        # entradas {torrent_id, name, is_tv, season_number, ids}.
+        # Lista porque dos torrents pueden compartir clave normalizada
+        # (re-encodes, distintas temporadas, etc).
+        self.tracker_names: dict = {}
+
+        # CSI v3.1 (categorías dinámicas): mapa cat_id (str) → {
+        #   "name": str,        # nombre humano tal como llega del tracker
+        #   "is_tv": bool,
+        #   "is_movie": bool,
+        #   "is_anime": bool,
+        # }
+        # Sembrado por bootstrap_categories() al inicio de build_user() con UNA
+        # llamada a /api/torrents/filter?perPage=200, persistido entre sesiones.
+        # Reemplaza el viejo hardcode `cat_id == "1" / "0"` que sólo funcionaba
+        # contra el layout de categorías por defecto de UNIT3D y rompía cuando
+        # el admin reordenaba o añadía categorías (Retro Arcade, Anime, etc).
+        self.categories: dict = {}
+
+    # ──────────────────────────────────────────────────────────────────────────
+    # CSI v3.1: Bootstrap dinámico de categorías
+    # ──────────────────────────────────────────────────────────────────────────
+    #
+    # Cada UNIT3D puede definir sus propias categorías y reordenarlas a gusto.
+    # El layout por defecto pone Movies=1 / TV=2 pero NOBS, por ejemplo, lleva:
+    #   1 Movies | 2 TV | 3 Retro Arcade | 4 Anime Movies | 5 Anime TV Shows
+    # Y se prevé que esa lista siga creciendo. Hardcodear los ids o trustear
+    # "1=TV" rompe cada vez que un admin reorganiza. Solución: pedir una
+    # muestra al endpoint público de filtro (1 llamada) y derivar la tabla
+    # cat_id → tipo por keywords sobre el nombre humano. Multi-idioma OK.
+
+    _CAT_TV_KEYWORDS    = r"\btv\b|series?|shows?|programas?|temporadas?|épisode|episodes?"
+    _CAT_MOVIE_KEYWORDS = r"movies?|films?|pel[ií]culas?|cin[eé]"
+    _CAT_ANIME_KEYWORDS = r"anime|manga|otaku"
+
+    @classmethod
+    def _classify_cat_name(cls, name: str) -> dict:
+        """Return {is_tv, is_movie, is_anime} for a free-form category name."""
+        n = (name or "").lower()
+        is_anime = bool(re.search(cls._CAT_ANIME_KEYWORDS, n, re.I))
+        is_tv    = bool(re.search(cls._CAT_TV_KEYWORDS,    n, re.I))
+        is_movie = bool(re.search(cls._CAT_MOVIE_KEYWORDS, n, re.I)) and not is_tv
+        # Tie-breaker: "Anime Movies" → movie=True, tv=False, anime=True.
+        # "Anime TV Shows" → tv=True, movie=False, anime=True.
+        return {"is_tv": is_tv, "is_movie": is_movie, "is_anime": is_anime}
+
+    def bootstrap_categories(self, config: dict) -> int:
+        """
+        Build self.categories with one API call. Fallbacks:
+          1) /api/torrents/filter?perPage=200 (preferred — gives many cat_ids)
+          2) parse /torrents page (cookie scraper) for the filter dropdown
+          3) leave self.categories empty → _ingest falls back to name regex
+        Returns the number of categories registered.
+        """
+        base = (config.get("TRACKER_URL") or "").rstrip("/")
+        api_key = config.get("TRACKER_API_KEY") or ""
+        if not base:
+            dbg("[CATBOOT] No TRACKER_URL — categories bootstrap skipped")
+            return 0
+
+        # ── Source 1: API filter (sample for variety) ────────────────────────
+        if api_key:
+            try:
+                api_limiter.wait()
+                url = f"{base}/api/torrents/filter"
+                r = requests.get(
+                    url,
+                    params={"api_token": api_key, "perPage": 200},
+                    headers={"Accept": "application/json", "User-Agent": "undici"},
+                    timeout=20,
+                )
+                if r.status_code == 200:
+                    data = r.json().get("data", []) or []
+                    seen: dict = {}
+                    for t in data:
+                        a = t.get("attributes", {}) or {}
+                        cid  = str(a.get("category_id") or "").strip()
+                        cname = (a.get("category") or "").strip()
+                        if not cid or cid in seen:
+                            continue
+                        cls = self._classify_cat_name(cname)
+                        seen[cid] = {"name": cname, **cls}
+                    if seen:
+                        self.categories.update(seen)
+                        dbg(f"[CATBOOT] API: {len(seen)} categorías → {seen}")
+                        return len(seen)
+                    dbg("[CATBOOT] API responded but 0 unique cats in sample")
+                else:
+                    dbg(f"[CATBOOT] API HTTP {r.status_code} — caerá a HTML fallback")
+            except Exception as e:
+                dbg(f"[CATBOOT] API exception: {e} — caerá a HTML fallback")
+
+        # ── Source 2: HTML dropdown (cookie scraper) ─────────────────────────
+        # Inertia/Vue payload sits in <div ... data-page="<urlencoded json>">.
+        # We don't parse the whole payload; we just look for a flat "categories"
+        # array of {id, name, *_meta} via a permissive regex. Cheap and robust.
+        try:
+            sess = _session(config)
+            r = sess.get(f"{base}/torrents", timeout=20)
+            if r.status_code == 200:
+                # Common UNIT3D shapes seen in the wild:
+                #   "categories":[{"id":1,"name":"Movies","movie_meta":1,...}, ...]
+                seen2: dict = {}
+                for m in re.finditer(
+                    r'\{[^{}]*"id"\s*:\s*(\d+)[^{}]*"name"\s*:\s*"([^"]+)"[^{}]*\}',
+                    r.text,
+                ):
+                    cid = m.group(1)
+                    nm  = m.group(2)
+                    # Only keep entries that look category-shaped (have at least
+                    # one *_meta keyword nearby). Heuristic, avoids picking up
+                    # unrelated `{"id":..,"name":...}` objects on the page.
+                    if not re.search(r'(movie|tv|game|music|no|anime)_meta', m.group(0), re.I):
+                        continue
+                    if cid in seen2:
+                        continue
+                    seen2[cid] = {"name": nm, **self._classify_cat_name(nm)}
+                if seen2:
+                    self.categories.update(seen2)
+                    dbg(f"[CATBOOT] HTML: {len(seen2)} categorías → {seen2}")
+                    return len(seen2)
+                dbg("[CATBOOT] HTML: no categorías reconocibles en /torrents")
+            else:
+                dbg(f"[CATBOOT] HTML /torrents HTTP {r.status_code}")
+        except Exception as e:
+            dbg(f"[CATBOOT] HTML exception: {e}")
+
+        dbg("[CATBOOT] Sin categorías — _ingest caerá a regex por nombre")
+        return 0
 
     def _ingest(self, torrent: dict):
         """
@@ -908,18 +1668,34 @@ class TrackerIndex:
         except (ValueError, TypeError):
             size_bytes = 0
 
-        # MASTER RULE: data-category-id="1" for TV, 0 for Movies.
-        # MANDATORY FALLBACK: Pattern matching in name
+        # CSI v3.1: clasificación dinámica por mapa de categorías.
+        # Prioridad:
+        #   1. self.categories[cat_id] sembrado por bootstrap_categories()
+        #   2. Fallback regex sobre el nombre (S01E02 / Season N / E01)
+        # El antiguo hardcode `cat_id == "1"` / `== "0"` ha desaparecido porque
+        # rompía contra trackers que reordenan categorías (NOBS: 1=Movies,
+        # 2=TV, 3=Retro Arcade, 4=Anime Movies, 5=Anime TV Shows). El bug
+        # producía falsos NO_SUBIDO en cualquier torrent con cat_id≠"0"/"1":
+        # caía al else y el regex fallaba en nombres "A Brief History 2024
+        # S01E01E02..." porque `\bE\d{2,}\b` exige límite de palabra antes,
+        # que no existe cuando hay "S01" pegado.
         is_tv = False
-        if cat_id == "1":
-            is_tv = True
-        elif cat_id == "0":
-            is_tv = False
+        cat_info = self.categories.get(cat_id) if cat_id else None
+        if cat_info is not None:
+            is_tv = bool(cat_info.get("is_tv"))
         else:
-            # P1/P3: Only fallback when category is unknown and tighten regex
-            if re.search(r"[ .]S\d{2}\b|Season\s+\d+|\bE\d{2,}\b", name, re.I):
+            # Sin mapa de categorías cargado o cat_id desconocido.
+            # Regex permisivo: cualquier "SxxEyy" o "SxxEyyEzz..." o "Season N".
+            # \bE\d{2,}\b no sirve porque no hay límite de palabra antes de E
+            # cuando el nombre lleva S01E01...  → usamos un patrón sin word-
+            # boundary inicial detrás de la S.
+            if re.search(
+                r"[ .]S\d{2}(E\d{2,})?\b|Season\s+\d+|\bE\d{2,}\b",
+                name, re.I,
+            ):
                 is_tv = True
 
+        season_str: Optional[str] = None
         if is_tv:
             # If it's TV, we need a season number. If missing, try to extract from name.
             if season is None:
@@ -928,35 +1704,67 @@ class TrackerIndex:
                 else: season = 1 # Default to S01 if totally unknown but matched as TV
 
             try:
-                s = str(int(season))
-                if tmdb: self.tv_seasons.add((tmdb, s))
-                if tvdb: self.tv_tvdb.add((tvdb, s))
+                season_str = str(int(season))
+                if tmdb: self.tv_seasons.add((tmdb, season_str))
+                if tvdb: self.tv_tvdb.add((tvdb, season_str))
+                if imdb: self.tv_imdb.add((imdb, season_str))   # CSI v3.0 (A1)
             except (ValueError, TypeError):
                 pass
         else:
             if tmdb: self.movie_tmdb.add(tmdb)
             if imdb: self.movie_imdb.add(imdb)
+            if tvdb: self.movie_tvdb.add(tvdb)                  # CSI v3.0 (A1)
 
         # CSI v2.0: Construir ICU del torrent ingresado y almacenar en icu_index
-        # Esto permite comparación exacta de versión (resolución/codec/grupo)
-        if tmdb or tvdb:
+        # Esto permite comparación exacta de versión (resolución/codec/grupo).
+        # CSI v3.0 (A1+A2): además guardamos imdb_id, season_number y well_configured
+        # para permitir OR-match cross-id y filtrado por configuración fiable.
+        if tmdb or tvdb or imdb:
             components = normalize_folder_name(name)
             icu = build_icu(
-                tmdb or tvdb,
+                tmdb or tvdb or imdb,
                 components.get("resolution", ""),
                 components.get("codec",      ""),
                 components.get("group",      ""),
             )
+            # CSI v3.0 (A2): well-configured (interim) = tmdb AND (tvdb OR imdb)
+            well_configured = bool(tmdb) and (bool(tvdb) or bool(imdb))
+
             if icu not in self.icu_index:
                 self.icu_index[icu] = {
-                    "torrent_id": tid,
-                    "name":       name,
-                    "size_bytes": size_bytes,
-                    "tmdb_id":    tmdb,
-                    "tvdb_id":    tvdb,
-                    "is_tv":      is_tv,
+                    "torrent_id":      tid,
+                    "name":            name,
+                    "size_bytes":      size_bytes,
+                    "tmdb_id":         tmdb,
+                    "tvdb_id":         tvdb,
+                    "imdb_id":         imdb,             # CSI v3.0 (A1)
+                    "is_tv":           is_tv,
+                    "season_number":   season_str,       # CSI v3.0 (A1) — TV only
+                    "well_configured": well_configured,  # CSI v3.0 (A2)
+                    "source":          (components.get("source") or "").upper(),  # v3.3 (W8)
+                    "resolution":      (components.get("resolution") or "").upper(),
+                    "codec":           (components.get("codec") or "").upper(),
+                    "group":           (components.get("group") or "").upper(),
                 }
-                dbg(f"[ICU] Ingested: {icu} ← '{name}'")
+                dbg(f"[ICU] Ingested: {icu} ← '{name}' (well_configured={well_configured})")
+
+        # CSI v3.2 (W5): name-fallback index. Stored even when the torrent had
+        # ids — it's the only way to match an id-less local folder against the
+        # tracker side. Key = normalized form; bucket is a list because
+        # different versions / seasons of the same title collapse to the same
+        # key. Filtering by season/is_tv happens at lookup time.
+        nk = _norm_folder_key(name)
+        if nk:
+            self.tracker_names.setdefault(nk, []).append({
+                "torrent_id":    tid,
+                "name":          name,
+                "size_bytes":    size_bytes,
+                "is_tv":         is_tv,
+                "season_number": season_str,
+                "tmdb_id":       tmdb,
+                "tvdb_id":       tvdb,
+                "imdb_id":       imdb,
+            })
 
     def build_user(self, config: dict) -> bool:
         """
@@ -971,21 +1779,49 @@ class TrackerIndex:
         # CSI v2.0: Registrar el tracker_url para invalidación futura del JSON
         self.tracker_url = config["TRACKER_URL"].rstrip("/")
 
+        # CSI v3.1: Bootstrap del mapa de categorías ANTES de scrappear.
+        # Una sola llamada API (o fallback HTML) → todos los _ingest() siguientes
+        # consultan self.categories y deciden is_tv correctamente.
+        try:
+            self.bootstrap_categories(config)
+        except Exception as e:
+            dbg(f"[CATBOOT] excepción no fatal: {e}")
+
         user = config.get("TRACKER_USERNAME")
         total = 0
 
         with Progress(SpinnerColumn(), TextColumn("[progress.description]{task.description}")) as prog:
             t_id = prog.add_task(f"Triangulating index for {user}...", total=None)
 
-            # ── Source A: Cookie Scraper ──────────────────────────────────────
-            prog.update(t_id, description="[Scraper] Parsing tracker pages...")
-            total += self._source_scraper(config, prog, t_id)
+            # ── Source A: UNIT3D REST API (preferred when api_token set) ──────
+            # The HTML scraper used to be the only path and silently dropped
+            # ~64% of rows when `data-tmdb-id`/`data-imdb-id`/`data-tvdb-id`
+            # were absent on the rendered list page (markup-specific; the DB
+            # still had `tmdb_movie_id`/`tmdb_tv_id` populated). The API is
+            # immune to that — every torrent attribute is serialised regardless
+            # of how the listing template chose to expose it.
+            api_matches = 0
+            if config.get("TRACKER_API_KEY"):
+                prog.update(t_id, description="[API] Fetching torrents via REST...")
+                api_matches = self._source_api(config, prog, t_id)
+                total += api_matches
 
-            # ── Source B: Local Metadata ──────────────────────────────────────
+            # ── Source B: Cookie Scraper ──────────────────────────────────────
+            # Kept as fallback/supplement: closed-API trackers, or to backfill
+            # if the API source returned nothing (auth failure, network, etc.).
+            # When API succeeded we skip scraping by default — the two sources
+            # describe the same upload list and double-scanning costs 4-5 min.
+            if api_matches == 0:
+                prog.update(t_id, description="[Scraper] Parsing tracker pages (API fallback)...")
+                total += self._source_scraper(config, prog, t_id)
+            else:
+                dbg(f"[BUILD_USER] API source returned {api_matches} — skipping scraper")
+
+            # ── Source C: Local Metadata ──────────────────────────────────────
             prog.update(t_id, description="[Tmp] Scanning local metadata...")
             total += self._source_local_tmp(config)
 
-            # ── Source C: qBittorrent ─────────────────────────────────────────
+            # ── Source D: qBittorrent ─────────────────────────────────────────
             prog.update(t_id, description="[qBit] Checking seeding status...")
             total += self._source_qbit(config)
 
@@ -996,8 +1832,118 @@ class TrackerIndex:
         )
         return True
 
+    def _source_api(self, config: dict, progress, task_id) -> int:
+        """
+        Source A (preferred): UNIT3D REST API — paginate
+        `/api/torrents/filter?uploader=USER&perPage=100`.
+
+        Why this beats the HTML scraper:
+          - Returns torrent_id + tmdb_id + tvdb_id + imdb_id + category_id +
+            name + size for EVERY upload, regardless of how the listing
+            template chose to render data-* attributes. The scraper missed
+            ~64% of NOBS's user uploads (1152/3235) because rows whose
+            `data-tmdb-id` was empty got dropped — UNIT3D had the id in
+            `tmdb_movie_id`/`tmdb_tv_id`, just not in that one HTML attr.
+          - Handles HTTP 429 explicitly with a Retry-After-style back-off.
+          - One source of truth (no row-skip fallback regex on hrefs).
+
+        On non-200 or empty data it returns the running count so build_user
+        can fall back to the scraper.
+        """
+        user = config.get("TRACKER_USERNAME")
+        base = config["TRACKER_URL"].rstrip("/")
+        api_key = config.get("TRACKER_API_KEY", "")
+        if not (user and base and api_key):
+            return 0
+
+        sess = _session(config)
+        url  = f"{base}/api/torrents/filter"
+        page = 0
+        matches = 0
+        consecutive_errors = 0
+        MAX_CONSECUTIVE_ERRORS = 3
+        PER_PAGE = 100
+        HARD_PAGE_CAP = 5000   # only a runaway-loop guard, not a torrent limit
+
+        while True:
+            page += 1
+            if page > HARD_PAGE_CAP:
+                dbg(f"[API] Hard page cap {HARD_PAGE_CAP} reached — stopping")
+                break
+
+            params = {
+                "api_token": api_key,
+                "uploader":  user,
+                "perPage":   PER_PAGE,
+                "page":      page,
+            }
+            try:
+                api_limiter.wait()
+                r = sess.get(url, params=params,
+                             headers={"Accept": "application/json", "User-Agent": "undici"},
+                             timeout=25)
+            except Exception as e:
+                dbg(f"[API] page {page} exception: {e}")
+                consecutive_errors += 1
+                if consecutive_errors >= MAX_CONSECUTIVE_ERRORS:
+                    break
+                continue
+
+            # 429 — back off using server's hint if provided
+            if r.status_code == 429:
+                retry_after = 0
+                try:
+                    retry_after = int(r.headers.get("Retry-After", "0") or 0)
+                except ValueError:
+                    retry_after = 0
+                # Bound the sleep so we don't hang forever; min 5s, max 60s
+                wait_s = max(5, min(60, retry_after or 10))
+                dbg(f"[API] page {page} HTTP 429 — sleeping {wait_s}s (Retry-After={retry_after})")
+                time.sleep(wait_s)
+                page -= 1  # retry the same page
+                continue
+
+            if r.status_code != 200:
+                dbg(f"[API] page {page} HTTP {r.status_code}")
+                consecutive_errors += 1
+                if consecutive_errors >= MAX_CONSECUTIVE_ERRORS:
+                    break
+                continue
+
+            consecutive_errors = 0
+            try:
+                payload = r.json()
+            except Exception as e:
+                dbg(f"[API] page {page} JSON parse error: {e}")
+                break
+
+            data = payload.get("data", []) or []
+            if not data:
+                dbg(f"[API] page {page}: empty — end of pagination")
+                break
+
+            for t in data:
+                self._ingest(t)
+                matches += 1
+
+            dbg(f"[API] page {page}: +{len(data)} cum={matches}")
+            if progress is not None and task_id is not None:
+                try:
+                    progress.update(task_id,
+                                    description=f"[API] page {page} (+{matches} torrents)")
+                except Exception:
+                    pass
+
+            if len(data) < PER_PAGE:
+                # Last page — UNIT3D returns < perPage rows when at the tail.
+                dbg(f"[API] page {page}: partial ({len(data)}<{PER_PAGE}) — last page")
+                break
+
+        dbg(f"[API] Finished: {matches} torrents over {page} page(s)")
+        return matches
+
     def _source_scraper(self, config: dict, progress, task_id) -> int:
-        """Source A: Scraping UNIT3D torrent list via cookies."""
+        """Source B (fallback): Scraping UNIT3D torrent list via cookies."""
         user = config.get("TRACKER_USERNAME")
         base = config["TRACKER_URL"].rstrip("/")
         page = 0
@@ -1067,11 +2013,19 @@ class TrackerIndex:
                             m = re.search(r"title/tt(\d+)", str(imdb_link.get("href", "") or ""))
                             if m: imdb = m.group(1)
                     
+                    # CSI v3.1: NO longer drop rows that lack data-*-id attrs.
+                    # UNIT3D's listing template sometimes omits those attrs
+                    # even when the DB has tmdb_movie_id/tmdb_tv_id populated
+                    # (NOBS audit 2026-05-23: 1152/3235 = ~36% — scraper was
+                    # silently losing ~64% of uploads). Ingest with whatever
+                    # ids we managed to extract; _ingest will still register
+                    # the torrent via torrent_id + name + category_id, and
+                    # the has_*_state machine can later match by name when
+                    # ids are absent.
                     if not any([tmdb, imdb, tvdb]):
-                        dbg(f"[DEBUG] Row skipped (No IDs): {name_text}")
-                        continue
+                        dbg(f"[SCRAPER] Row has no extractable ids — ingesting "
+                            f"by name only: tid={tid} '{name_text[:60]}'")
 
-                    # For now, let's use the standard ingest but with a dict
                     fake_torrent = {
                         "attributes": {
                             "tmdb_id": tmdb,
@@ -1082,7 +2036,7 @@ class TrackerIndex:
                             "name": name_text
                         }
                     }
-                    
+
                     self._ingest(fake_torrent)
                     matches += 1
                     dbg(f"[DEBUG] [TRIANGULATION] Matched {name_text} via Scraper")
@@ -1215,6 +2169,128 @@ class TrackerIndex:
         return False
 
     # ──────────────────────────────────────────────────────────────────────────
+    # CSI v3.0 (A1): Helpers cross-id — devuelven los ICUs del icu_index que
+    # coinciden con CUALQUIERA de los id-types dados. Permite que la máquina
+    # de estados detecte "este torrent está en el tracker" aunque los lados
+    # local y tracker conozcan id-types distintos (tmdb-only vs imdb-only).
+    # ──────────────────────────────────────────────────────────────────────────
+
+    def _icus_matching_ids(self, tmdb=None, tvdb=None, imdb=None,
+                           is_tv: Optional[bool] = None,
+                           season_str: Optional[str] = None) -> list:
+        """
+        Return icu keys whose entry matches ANY of the given id-types.
+        Optional is_tv filter (None = both). Optional season_str filter for TV.
+        """
+        tmdb_s = str(tmdb).strip() if tmdb else ""
+        tvdb_s = str(tvdb).strip() if tvdb else ""
+        imdb_s = _norm_imdb(imdb) if imdb else ""
+        if not (tmdb_s or tvdb_s or imdb_s):
+            return []
+        out = []
+        for k, e in self.icu_index.items():
+            if is_tv is not None and bool(e.get("is_tv")) != is_tv:
+                continue
+            if season_str is not None and str(e.get("season_number") or "") != season_str:
+                continue
+            e_tmdb = str(e.get("tmdb_id") or "")
+            e_tvdb = str(e.get("tvdb_id") or "")
+            e_imdb = str(e.get("imdb_id") or "")
+            if (tmdb_s and e_tmdb and e_tmdb == tmdb_s) \
+               or (tvdb_s and e_tvdb and e_tvdb == tvdb_s) \
+               or (imdb_s and e_imdb and e_imdb == imdb_s):
+                out.append(k)
+        return out
+
+    # CSI v3.0 (A2): Exponer flag "well-configured" para callers externos
+    # (RawLoadrr/prep.py decide si confiar en los ids del tracker o invocar
+    # al id_resolver). Interim: tmdb AND (tvdb OR imdb) presentes en ingest.
+    def torrent_well_configured(self, icu: str) -> bool:
+        entry = self.icu_index.get(icu)
+        return bool(entry and entry.get("well_configured"))
+
+    # CSI v3.3 (W7): relaxed ICU match.
+    # L1 ICU exact requires byte-identical {id}|{res}|{codec}|{group}. Group
+    # tokens are the most brittle component — a re-encoded local copy or a
+    # tracker re-pack changes the trailing -GROUP suffix even when content
+    # is the same. We add a relaxed tier: ignore group when {id, res, codec}
+    # all match. Refuses to fire when res or codec is UNKNOWN — too risky.
+    # Returns the matched icu_index key or None.
+    def _icu_match_relaxed(self, local_icu: str,
+                           ignore_group: bool = True,
+                           ignore_codec: bool = False) -> Optional[str]:
+        if not local_icu:
+            return None
+        parts = local_icu.split("|")
+        if len(parts) != 4:
+            return None
+        l_id, l_res, l_cod, l_grp = parts
+        if not l_id or l_id == "0":
+            return None
+        if l_res == "UNKNOWN":
+            return None
+        if not ignore_codec and l_cod == "UNKNOWN":
+            return None
+        for k in self.icu_index:
+            kp = k.split("|")
+            if len(kp) != 4:
+                continue
+            k_id, k_res, k_cod, k_grp = kp
+            if k_id != l_id:
+                continue
+            if k_res != l_res:
+                continue
+            if not ignore_codec and k_cod != l_cod:
+                continue
+            if not ignore_group and k_grp != l_grp:
+                continue
+            return k
+        return None
+
+    # CSI v3.2 (W5): name-fallback lookup. Used by has_*_state as last resort
+    # when none of the id-sets match (id-less local content or template-bug
+    # tracker rows). Optional is_tv / season_num filter narrow the bucket.
+    # Tiered:
+    #   1. exact normalized match
+    #   2. fuzzy ≥0.90 across all keys (single best winner)
+    # Returns list of matching entries (possibly empty).
+    NAME_FUZZY_THRESHOLD = 0.90
+
+    def find_by_name(self, name: str,
+                     is_tv: Optional[bool] = None,
+                     season_num: Optional[int] = None) -> list:
+        nk = _norm_folder_key(name)
+        if not nk:
+            return []
+        bucket = self.tracker_names.get(nk, [])
+        # Fuzzy fallback when exact key misses entirely.
+        if not bucket and self.tracker_names:
+            best_key, best_ratio = "", 0.0
+            for k in self.tracker_names:
+                # cheap pre-filter: must share at least one word
+                if not (set(nk.split()) & set(k.split())):
+                    continue
+                r = difflib.SequenceMatcher(None, nk, k).ratio()
+                if r > best_ratio:
+                    best_ratio, best_key = r, k
+            if best_ratio >= self.NAME_FUZZY_THRESHOLD:
+                bucket = self.tracker_names.get(best_key, [])
+                dbg(f"[NAME_FB] fuzzy '{nk}'→'{best_key}' (ratio={best_ratio:.2f}, "
+                    f"{len(bucket)} entries)")
+
+        if not bucket:
+            return []
+
+        # Optional filters
+        out = bucket
+        if is_tv is not None:
+            out = [e for e in out if bool(e.get("is_tv")) == is_tv]
+        if season_num is not None:
+            s = str(int(season_num))
+            out = [e for e in out if str(e.get("season_number") or "") == s]
+        return out
+
+    # ──────────────────────────────────────────────────────────────────────────
     # CSI v2.0: Métodos de Máquina de Estados
     # Retornan uno de los 5 estados definidos en STATE_MACHINE section.
     # Estos métodos son la evolución de has_movie() / has_tv_season().
@@ -1257,45 +2333,77 @@ class TrackerIndex:
             else:
                 return ESTADO_FALTA_CLIENTE
 
-        # ── Nivel 2: TMDB_ID presente en tracker pero ICU diferente ──────────
-        # Misma película, versión distinta → potencial duplicado
-        if tmdb_str and tmdb_str in self.movie_tmdb:
-            # Buscar en icu_index si hay entradas con ese TMDB pero ICU diferente
-            matching_icus = [k for k in self.icu_index if k.startswith(f"{tmdb_str}|")]
+        # ── Nivel 1.5: ICU relajado (CSI v3.3 W7) ────────────────────────────
+        # Same id+res+codec, any group. Catches re-encodes and repacks where
+        # the trailing -GROUP token diverged but content is the same version.
+        relaxed = self._icu_match_relaxed(local_icu, ignore_group=True)
+        if relaxed:
+            entry = self.icu_index[relaxed]
+            dbg(f"[STATE] ICU relaxed match (ignored group): "
+                f"{local_icu} ≈ {relaxed} torrent_id={entry.get('torrent_id')}")
+            check_name = name or entry.get("name", "")
+            in_client = self._check_client_path(check_name, client_paths)
+            return ESTADO_OK if in_client else ESTADO_FALTA_CLIENTE
+
+        # ── Nivel 2: OR-match cross-id (CSI v3.0 A1) ─────────────────────────
+        # "Presente en tracker" = ANY de {tmdb, imdb} coincide con cualquier
+        # id-type del torrent en tracker. Antes (v2.0) sólo se chequeaba tmdb
+        # → ~38% de falsos NO_SUBIDO en NOBS porque algunos torrents son
+        # tmdb-only y otros imdb-only.
+        clean_imdb = _norm_imdb(imdb_id) if imdb_id else ""
+        present = (
+            (tmdb_str and tmdb_str in self.movie_tmdb)
+            or (clean_imdb and clean_imdb in self.movie_imdb)
+        )
+        if present:
+            # ICU version-match: buscamos ICUs en el índice que pertenezcan a
+            # la MISMA película (por cualquier id-type), no sólo por prefijo
+            # tmdb. Esto reemplaza el viejo startswith(f"{tmdb_str}|").
+            matching_icus = self._icus_matching_ids(
+                tmdb=tmdb_id, imdb=imdb_id, is_tv=False,
+            )
             if matching_icus and local_icu:
-                # ICU diferente confirmado → aplicar entropía de tamaño como desempate
+                # ICU diferente posible → aplicar entropía de tamaño como desempate
                 for existing_icu in matching_icus:
+                    if existing_icu == local_icu:
+                        # ICU exact (cubierto por L1, pero defensa en profundidad)
+                        in_client = self._check_client_path(name or "", client_paths)
+                        return ESTADO_OK if in_client else ESTADO_FALTA_CLIENTE
                     tracker_size = self.icu_index[existing_icu].get("size_bytes", 0)
                     if tracker_size and local_size_bytes:
                         if _size_entropy_tiebreak(local_size_bytes, tracker_size):
-                            # Tamaños muy similares → probablemente la misma versión
                             dbg(f"[STATE] Size entropy tiebreak → FALTA_CLIENTE "
                                 f"(local={local_size_bytes}, tracker={tracker_size})")
                             in_client = self._check_client_path(name or "", client_paths)
                             return ESTADO_OK if in_client else ESTADO_FALTA_CLIENTE
                 # Sin match por tamaño → dupe potencial confirmado
-                dbg(f"[STATE] DUPE POTENCIAL: tmdb={tmdb_str} local_icu={local_icu} "
-                    f"existing_icus={matching_icus}")
+                dbg(f"[STATE] DUPE POTENCIAL: tmdb={tmdb_str} imdb={clean_imdb} "
+                    f"local_icu={local_icu} existing_icus={matching_icus}")
                 return ESTADO_DUPE_POTENCIAL
             elif matching_icus and not local_icu:
-                # No tenemos ICU local para comparar → conservador, reportar como dupe potencial
+                # No tenemos ICU local para comparar → conservador
                 return ESTADO_DUPE_POTENCIAL
             else:
-                # TMDB en tracker pero sin ICU en índice (entrada de v1.x sin ICU)
-                in_client = self._check_client_path(name or "", client_paths)
-                return ESTADO_OK if in_client else ESTADO_FALTA_CLIENTE
-
-        # ── Nivel 3: IMDB_ID ─────────────────────────────────────────────────
-        if imdb_id:
-            clean = _norm_imdb(imdb_id)
-            if clean and clean in self.movie_imdb:
-                dbg(f"[STATE] IMDB match: {clean} → checking client")
+                # Presente por id pero sin entrada ICU en índice (v1.x legacy)
                 in_client = self._check_client_path(name or "", client_paths)
                 return ESTADO_OK if in_client else ESTADO_FALTA_CLIENTE
 
         # ── Nivel 4: Nombre en seeding_names (qBit path match legacy) ────────
         if name and name.lower() in self.seeding_names:
             return ESTADO_OK  # Si está seeding, asumimos subido
+
+        # ── Nivel 5 (CSI v3.2 — W5): name-fallback contra tracker_names ─────
+        # Última red de seguridad cuando ningún id local coincidió. Útil para
+        # carpetas que fallaron las 5 capas de get_movie (sin tmdb/imdb tras
+        # external resolver) pero cuyo nombre normalizado coincide con un
+        # torrent en el tracker. Filtra por is_tv=False para no chocar con
+        # series.
+        if name:
+            name_hits = self.find_by_name(name, is_tv=False)
+            if name_hits:
+                dbg(f"[STATE] name-fallback hit ({len(name_hits)} entries) for '{name}'")
+                in_client = self._check_client_path(name, client_paths)
+                return ESTADO_OK if in_client else ESTADO_FALTA_CLIENTE
 
         # ── Sin coincidencia ──────────────────────────────────────────────────
         # CSI v3.1: Si la sonda o la auth fallaron, no afirmar NO_SUBIDO
@@ -1304,17 +2412,19 @@ class TrackerIndex:
             return ESTADO_INCIDENCIA
         return ESTADO_NO_SUBIDO
 
-    def has_tv_season_state(self, tmdb_id=None, tvdb_id=None, season_num=None,
-                            name=None, local_icu: str | None = None,
+    def has_tv_season_state(self, tmdb_id=None, tvdb_id=None, imdb_id=None,
+                            season_num=None, name=None,
+                            local_icu: str | None = None,
                             client_paths: set | None = None,
                             local_size_bytes: int = 0) -> str:
         """
         CSI v2.0: Determina el estado de una temporada de TV en la triangulación.
         Análogo a has_movie_state() pero para contenido de TV.
 
+        CSI v3.0 (A1): acepta imdb_id y aplica OR-match cross-id en Nivel 2.
+
         Args:
-            tmdb_id:          TMDB ID de la serie (Sonarr/TMDB)
-            tvdb_id:          TVDB ID de la serie (Sonarr/TheTVDB)
+            tmdb_id / tvdb_id / imdb_id:  IDs de la serie (Sonarr expone los 3)
             season_num:       Número de temporada (int)
             name:             Nombre de la carpeta del show (para fallback)
             local_icu:        ICU construido desde el contenido local
@@ -1325,8 +2435,9 @@ class TrackerIndex:
             str: Uno de los 5 estados ESTADO_* definidos en la máquina de estados.
         """
         client_paths = client_paths or set()
-        tmdb_str = str(tmdb_id).strip() if tmdb_id else ""
-        tvdb_str = str(tvdb_id).strip() if tvdb_id else ""
+        tmdb_str  = str(tmdb_id).strip() if tmdb_id else ""
+        tvdb_str  = str(tvdb_id).strip() if tvdb_id else ""
+        imdb_str  = _norm_imdb(imdb_id) if imdb_id else ""
 
         # ── Nivel 1: ICU exacto ───────────────────────────────────────────────
         if local_icu and local_icu in self.icu_index:
@@ -1337,30 +2448,70 @@ class TrackerIndex:
             in_client = self._check_client_path(check_name, client_paths)
             return ESTADO_OK if in_client else ESTADO_FALTA_CLIENTE
 
-        # ── Nivel 2: TMDB/TVDB con número de temporada ───────────────────────
+        # ── Nivel 1.5: ICU relajado (CSI v3.3 W7) ────────────────────────────
+        relaxed = self._icu_match_relaxed(local_icu, ignore_group=True)
+        if relaxed:
+            entry = self.icu_index[relaxed]
+            # Only accept the relaxed match if this entry's season matches too
+            # (a different season of the same show would also have same id).
+            if season_num is not None:
+                want_s = str(int(season_num))
+                if str(entry.get("season_number") or "") != want_s:
+                    relaxed = None
+        if relaxed:
+            entry = self.icu_index[relaxed]
+            dbg(f"[STATE] TV ICU relaxed match (ignored group): "
+                f"{local_icu} ≈ {relaxed} torrent_id={entry.get('torrent_id')}")
+            check_name = name or entry.get("name", "")
+            in_client = self._check_client_path(check_name, client_paths)
+            return ESTADO_OK if in_client else ESTADO_FALTA_CLIENTE
+
+        # ── Nivel 2: OR-match cross-id con número de temporada (CSI v3.0 A1) ─
         if season_num is not None:
             s = str(int(season_num))
-            found_in_tracker = False
-            if tmdb_str and (tmdb_str, s) in self.tv_seasons:
-                found_in_tracker = True
-            if tvdb_str and (tvdb_str, s) in self.tv_tvdb:
-                found_in_tracker = True
+            found_in_tracker = (
+                (tmdb_str and (tmdb_str, s) in self.tv_seasons)
+                or (tvdb_str and (tvdb_str, s) in self.tv_tvdb)
+                or (imdb_str and (imdb_str, s) in self.tv_imdb)
+            )
 
             if found_in_tracker:
-                # Comprobar si hay ICU similar (dupe potencial de TV)
-                if local_icu:
-                    ref_id = tmdb_str or tvdb_str
-                    matching_icus = [k for k in self.icu_index if k.startswith(f"{ref_id}|")]
-                    if matching_icus:
-                        # Hay versiones en tracker pero ninguna coincide con el ICU local
-                        in_client = self._check_client_path(name or "", client_paths)
-                        return ESTADO_OK if in_client else ESTADO_FALTA_CLIENTE
+                # ICUs de la misma serie+temporada por cualquier id-type
+                matching_icus = self._icus_matching_ids(
+                    tmdb=tmdb_id, tvdb=tvdb_id, imdb=imdb_id,
+                    is_tv=True, season_str=s,
+                )
+                if matching_icus and local_icu:
+                    # Comprobar si una versión del tracker coincide en tamaño
+                    for existing_icu in matching_icus:
+                        if existing_icu == local_icu:
+                            in_client = self._check_client_path(name or "", client_paths)
+                            return ESTADO_OK if in_client else ESTADO_FALTA_CLIENTE
+                        t_size = self.icu_index[existing_icu].get("size_bytes", 0)
+                        if t_size and local_size_bytes and _size_entropy_tiebreak(local_size_bytes, t_size):
+                            in_client = self._check_client_path(name or "", client_paths)
+                            return ESTADO_OK if in_client else ESTADO_FALTA_CLIENTE
+                # Presente en tracker (cualquier id-type) — versión puede o no
+                # coincidir; comportamiento conservador previo: tratar como
+                # presente (no como DUPE) para no bloquear seeding válido.
                 in_client = self._check_client_path(name or "", client_paths)
                 return ESTADO_OK if in_client else ESTADO_FALTA_CLIENTE
 
         # ── Nivel 3: Nombre en seeding_names ─────────────────────────────────
         if name and name.lower() in self.seeding_names:
             return ESTADO_OK
+
+        # ── Nivel 4 (CSI v3.2 — W5): name-fallback contra tracker_names ─────
+        # Series sin ids tras todas las capas de get_series — comprobamos si
+        # algún torrent TV del tracker tiene nombre normalizado equivalente.
+        # Filtra por is_tv=True y, si tenemos season_num, por temporada.
+        if name:
+            name_hits = self.find_by_name(name, is_tv=True, season_num=season_num)
+            if name_hits:
+                dbg(f"[STATE] TV name-fallback hit ({len(name_hits)} entries) for "
+                    f"'{name}' S{season_num}")
+                in_client = self._check_client_path(name, client_paths)
+                return ESTADO_OK if in_client else ESTADO_FALTA_CLIENTE
 
         # CSI v3.1: Si la sonda o la auth fallaron, no afirmar NO_SUBIDO
         if self._probe_failed or self._auth_failed:
@@ -1408,17 +2559,21 @@ class TrackerIndex:
         try:
             path.parent.mkdir(parents=True, exist_ok=True)
             payload = {
-                "version":      "2.0",
+                "version":      "3.3",   # CSI v3.3: W7 relaxed ICU + W8 source/codec split
                 "last_updated": datetime.now(timezone.utc).isoformat(),
                 "tracker_url":  self.tracker_url,
                 # Conjuntos → listas para serialización JSON
                 "movie_tmdb":   sorted(list(self.movie_tmdb)),
                 "movie_imdb":   sorted(list(self.movie_imdb)),
+                "movie_tvdb":   sorted(list(self.movie_tvdb)),                       # v3.0
                 "tv_seasons":   sorted([list(t) for t in self.tv_seasons]),
                 "tv_tvdb":      sorted([list(t) for t in self.tv_tvdb]),
+                "tv_imdb":      sorted([list(t) for t in self.tv_imdb]),             # v3.0
                 "seeding_names": sorted(list(self.seeding_names)),
                 # Dicts ya son serializables directamente
                 "icu_index":    self.icu_index,
+                "categories":   self.categories,                                     # v3.1
+                "tracker_names": self.tracker_names,                                 # v3.2 (W5)
             }
             with open(path, "w", encoding="utf-8") as f:
                 json.dump(payload, f, ensure_ascii=False, indent=2)
@@ -1451,9 +2606,12 @@ class TrackerIndex:
             with open(path, "r", encoding="utf-8") as f:
                 data = json.load(f)
 
-            # Validar versión
+            # Validar versión. CSI v3.3 sólo acepta 3.3 — las versiones
+            # anteriores (3.0-3.2) tienen ICUs con SOURCE en el codec slot
+            # (bug W8), incompatibles con el matcher relajado nuevo. Forzamos
+            # un re-scan único para reconstruir ICUs limpios.
             version = data.get("version", "1.0")
-            if version not in ("2.0",):
+            if version not in ("3.3",):
                 dbg(f"[INDEX] Versión de JSON incompatible ({version}) — reconstruyendo")
                 return False
 
@@ -1472,11 +2630,15 @@ class TrackerIndex:
             # Cargar datos en los conjuntos en memoria
             self.movie_tmdb    = set(data.get("movie_tmdb", []))
             self.movie_imdb    = set(data.get("movie_imdb", []))
+            self.movie_tvdb    = set(data.get("movie_tvdb", []))                     # v3.0
             self.tv_seasons    = set(tuple(t) for t in data.get("tv_seasons", []))
             self.tv_tvdb       = set(tuple(t) for t in data.get("tv_tvdb",    []))
+            self.tv_imdb       = set(tuple(t) for t in data.get("tv_imdb",    []))   # v3.0
             self.seeding_names = set(data.get("seeding_names", []))
             self.seeding_paths = self.seeding_names  # alias v2.0
             self.icu_index     = data.get("icu_index", {})
+            self.categories    = data.get("categories", {}) or {}                    # v3.1
+            self.tracker_names = data.get("tracker_names", {}) or {}                 # v3.2 (W5)
             self.tracker_url   = saved_url
 
             last_updated = data.get("last_updated", "desconocido")
@@ -1883,7 +3045,17 @@ def forensic_scan(config: dict, meta: MetadataManager, tracker_index: TrackerInd
             update_status("CSI", "Scanning Library", "PROCESSING",
                           details=f"[{found_msg}] Scanning: {root_path}")
 
-            mkv_files = [f for f in files if f.lower().endswith(".mkv")]
+            # CSI v3.4 (W10): pre-filter extras. opening.mkv / ending.mkv /
+            # menu / sample / trailer / behind-the-scenes / etc never go up
+            # as upload candidates and pollute classification (a folder with
+            # only opening+ending would otherwise be misread as a 2-file
+            # "movie" pack). If filtering empties the folder, skip entirely.
+            mkv_files_raw = [f for f in files if f.lower().endswith(".mkv")]
+            mkv_files = [f for f in mkv_files_raw
+                         if not MetadataManager._RX_EXTRAS_FILE.search(f)]
+            dropped = len(mkv_files_raw) - len(mkv_files)
+            if dropped:
+                dbg(f"[EXTRAS] Dropped {dropped} extras file(s) from {root_path}")
             if not mkv_files:
                 continue
 
@@ -1893,23 +3065,64 @@ def forensic_scan(config: dict, meta: MetadataManager, tracker_index: TrackerInd
             # Items que están en qBit Y en tracker → ESTADO_OK (ya gestionados)
             # Items que están en tracker pero NO en qBit → ESTADO_FALTA_CLIENTE (reportar)
 
-            rel_parts = root_path.relative_to(lib_path).parts
-            is_tv = any(re.search(r"\bSeason\s+\d+|\bS\d{2}\b", part, re.I) for part in rel_parts[-2:])
+            # CSI v3.2: multi-signal classification replaces the old
+            # single-regex parent-dir check. classify_folder() considers Arr
+            # knowledge, filename patterns (incl. anime episode numbering),
+            # parent dir hints, file count, and finally external TMDB lookup.
+            # Returns media_type + a best-effort season_num + a confidence
+            # score we can route to INCIDENCIA when truly uncertain.
+            cls = meta.classify_folder(root_path, lib_path, mkv_files)
+            is_tv         = cls["media_type"] == "tv"
+            classified_mv = cls["media_type"] == "movie"
+            cls_season    = cls.get("season_num")
+            cls_conf      = cls.get("confidence", 0.0)
+            dbg(f"[CLASSIFY] {root_path} → {cls['media_type']} "
+                f"season={cls_season} conf={cls_conf:.2f} reason={cls['reason']}")
 
             if is_tv:
                 # ── TV Season ──────────────────────────────────────────────
-                season_match = re.search(r"Season\s+(\d+)|S(\d{2})", root_path.name, re.I)
-                if not season_match:
-                    continue
-                season_num  = int(season_match.group(1) or season_match.group(2))
-                if season_num == 0:
-                    continue
-                show_folder = root_path.parent.name
+                # If classify_folder didn't pin a season, try the dir name once
+                # more (covers explicit "Season N" trees that S6 didn't need).
+                season_num = cls_season
+                if season_num is None:
+                    sm = re.search(
+                        r"(?:season|temporada|saison|staffel|stagione|seizoen|sezon|сезон)\s*(\d+)|S(\d{1,2})",
+                        root_path.name, re.I,
+                    )
+                    if sm:
+                        season_num = int(sm.group(1) or sm.group(2))
+                if season_num is None:
+                    season_num = 1   # safe default; tracker lookups are id+season
+
+                # CSI v3.2: Specials (S00) NO longer skipped. Tracker may have
+                # an explicit S00 / Specials pack; let has_tv_season_state()
+                # decide presence. Worst case it returns NO_SUBIDO same as
+                # before — but the Babylon 5 / Doctor Who Specials class of
+                # folders now gets a chance.
+
+                # Show folder picker — walk up from leaf until Sonarr matches,
+                # else fall back to whichever level looks more "showy".
+                # Covers four shapes:
+                #   /Show/Season 1/        → root.parent
+                #   /Show/Specials/        → root.parent (Sonarr matches Show)
+                #   /Show/flat-episodes    → root  (Sonarr matches Show)
+                #   /[Tonoss] Anime/files  → root  (no Sonarr, name regex)
+                # W11: never let the picker descend into lib_path.name itself.
+                parent_candidate = root_path.parent.name
+                if parent_candidate == lib_path.name:
+                    parent_candidate = ""
+                if parent_candidate and meta.get_series(parent_candidate):
+                    show_folder = parent_candidate
+                elif meta._RX_PARENT_SEASON.search(root_path.name):
+                    show_folder = parent_candidate or root_path.name
+                else:
+                    show_folder = root_path.name
                 prog.update(task, description=f"TV: {show_folder} S{season_num:02d}")
 
                 series  = meta.get_series(show_folder)
                 s_tmdb  = str(series.get("tmdbId") or "") if series else None
                 s_tvdb  = str(series.get("tvdbId") or "") if series else None
+                s_imdb  = str(series.get("imdbId") or "") if series else None  # CSI v3.0 (A1)
 
                 # CSI v2.0: Construir ICU local para la temporada
                 # Usamos el primer mkv como muestra de resolución/codec
@@ -1920,7 +3133,11 @@ def forensic_scan(config: dict, meta: MetadataManager, tracker_index: TrackerInd
                 local_res = _normalize_mediainfo_res(local_res_raw)
                 local_cod = _normalize_mediainfo_codec(local_cod_raw)
                 local_grp = normalize_folder_name(show_folder).get("group", "")
-                local_icu = build_icu(s_tmdb or s_tvdb or "", local_res, local_cod, local_grp)
+                # CSI v3.0 (A1): prioridad simétrica con _ingest — tmdb→tvdb→imdb
+                local_icu = build_icu(
+                    s_tmdb or s_tvdb or _norm_imdb(s_imdb) or "",
+                    local_res, local_cod, local_grp,
+                )
 
                 # Tamaño total de la temporada
                 local_size_bytes = sum(
@@ -1929,11 +3146,13 @@ def forensic_scan(config: dict, meta: MetadataManager, tracker_index: TrackerInd
                 )
 
                 # CSI v2.0: Determinación de estado con máquina de estados
+                # CSI v3.0 (A1): se propaga s_imdb para OR-match cross-id
                 if do_global:
                     item_state = search_global_state(
                         config,
                         tmdb_id=s_tmdb or None,
                         tvdb_id=s_tvdb or None,
+                        imdb_id=s_imdb or None,
                         season_num=season_num,
                         query=show_folder,
                         local_icu=local_icu,
@@ -1945,6 +3164,7 @@ def forensic_scan(config: dict, meta: MetadataManager, tracker_index: TrackerInd
                     item_state = tracker_index.has_tv_season_state(
                         tmdb_id=s_tmdb,
                         tvdb_id=s_tvdb,
+                        imdb_id=s_imdb,
                         season_num=season_num,
                         name=show_folder,
                         local_icu=local_icu,
@@ -1953,24 +3173,29 @@ def forensic_scan(config: dict, meta: MetadataManager, tracker_index: TrackerInd
                     )
 
                 # CSI v3.1: PATH-FIRST override — evita falsos FALTA_CLIENTE
-                if item_state == ESTADO_FALTA_CLIENTE and client_path_map:
+                # CSI v3.2 (W6): también demote NO_SUBIDO → INCIDENCIA cuando
+                # la carpeta está siendo seedeada localmente. No subimos algo
+                # que el usuario ya está sembrando: o ya está en este tracker
+                # y nuestro lookup falló, o está en otro tracker — ambos
+                # escenarios son "no recomendar como uploadable".
+                if item_state in (ESTADO_FALTA_CLIENTE, ESTADO_NO_SUBIDO) and client_path_map:
+                    target = ESTADO_OK if item_state == ESTADO_FALTA_CLIENTE else ESTADO_INCIDENCIA
                     current_abs = os.path.abspath(str(root_path)).lower()
                     if current_abs in client_path_map:
-                        item_state = ESTADO_OK
-                        dbg(f"[PATH-FIRST] TV FALTA_CLIENTE→OK (exact path): {current_abs}")
+                        item_state = target
+                        dbg(f"[PATH-FIRST] TV {item_state} (exact path): {current_abs}")
                     else:
                         current_basename = os.path.basename(current_abs)
                         if current_basename and current_basename in client_basenames:
-                            item_state = ESTADO_OK
-                            dbg(f"[PATH-FIRST] TV FALTA_CLIENTE→OK (basename): {current_basename}")
+                            item_state = target
+                            dbg(f"[PATH-FIRST] TV {item_state} (basename): {current_basename}")
                         else:
                             # v3.1: Show folder substring — cubre rutas raíz diferentes
-                            # ej: librería en /HardLinks/NOBS/Show/ pero qBit en /SERIES/Show/
                             sf_lower = show_folder.lower()
                             for cp in client_path_map:
                                 if sf_lower in cp:
-                                    item_state = ESTADO_OK
-                                    dbg(f"[PATH-FIRST] TV FALTA_CLIENTE→OK (folder substr): '{sf_lower}' in '{cp[-70:]}'")
+                                    item_state = target
+                                    dbg(f"[PATH-FIRST] TV {item_state} (folder substr): '{sf_lower}' in '{cp[-70:]}'")
                                     break
 
                 # CSI v3.0: QBIT DOWN — FALTA_CLIENTE → INCIDENCIA si qBit no está disponible
@@ -2013,6 +3238,42 @@ def forensic_scan(config: dict, meta: MetadataManager, tracker_index: TrackerInd
                 # ── Movie ──────────────────────────────────────────────────
                 movie_folder = root_path.name
                 movie_data   = meta.get_movie(movie_folder)
+                # CSI v3.2 (W4): Cross-Arr safety net — when the classifier
+                # called this a movie but Radarr (incl. all 5 tiers + external
+                # resolver) has nothing, try Sonarr too. Some folders look
+                # movie-shaped (single file, no Season subdir) but are TV
+                # specials, documentaries, or anime that the user dropped in
+                # the wrong Arr. Sonarr-hit wins → switches the branch into
+                # the TV state machine on the spot rather than burning the
+                # item as NO_SUBIDO in the movie list.
+                if not movie_data:
+                    cross_series = meta.get_series(movie_folder)
+                    if cross_series:
+                        dbg(f"[CROSS_ARR] '{movie_folder}' missed Radarr but hit "
+                            f"Sonarr → re-routing as TV")
+                        s_tmdb = str(cross_series.get("tmdbId") or "")
+                        s_tvdb = str(cross_series.get("tvdbId") or "")
+                        s_imdb = str(cross_series.get("imdbId") or "")
+                        # synthesize as virtual S01 — caller has no season
+                        cls_season_xa = 1
+                        item_state = tracker_index.has_tv_season_state(
+                            tmdb_id=s_tmdb, tvdb_id=s_tvdb, imdb_id=s_imdb,
+                            season_num=cls_season_xa, name=movie_folder,
+                            local_icu=None,
+                            client_paths=client_paths,
+                            local_size_bytes=0,
+                        )
+                        abs_dir = str(root_path.absolute())
+                        state_counts[item_state] = state_counts.get(item_state, 0) + 1
+                        if item_state == ESTADO_OK:
+                            continue
+                        if item_state == ESTADO_DUPE_POTENCIAL:
+                            dupe_items.add(abs_dir); continue
+                        if item_state == ESTADO_FALTA_CLIENTE:
+                            falta_cliente.add(abs_dir); continue
+                        if item_state == ESTADO_INCIDENCIA:
+                            incidencia_items.add(abs_dir); continue
+                        # else NO_SUBIDO falls through to movie classification below
                 m_tmdb = str(movie_data.get("tmdbId") or "") if movie_data else None
                 m_imdb = str(movie_data.get("imdbId") or "") if movie_data else None
                 prog.update(task, description=f"Movie: {movie_folder}")
@@ -2024,7 +3285,11 @@ def forensic_scan(config: dict, meta: MetadataManager, tracker_index: TrackerInd
                 local_res    = _normalize_mediainfo_res(sample_info.get("res", ""))
                 local_cod    = _normalize_mediainfo_codec(sample_info.get("codec", ""))
                 local_grp    = normalize_folder_name(movie_folder).get("group", "")
-                local_icu    = build_icu(m_tmdb or "", local_res, local_cod, local_grp)
+                # CSI v3.0 (A1): prioridad simétrica con _ingest — tmdb→imdb
+                local_icu    = build_icu(
+                    m_tmdb or _norm_imdb(m_imdb) or "",
+                    local_res, local_cod, local_grp,
+                )
 
                 # Tamaño del archivo de muestra (película principal)
                 try:
@@ -2055,23 +3320,28 @@ def forensic_scan(config: dict, meta: MetadataManager, tracker_index: TrackerInd
                     )
 
                 # CSI v3.1: PATH-FIRST override — evita falsos FALTA_CLIENTE
-                if item_state == ESTADO_FALTA_CLIENTE and client_path_map:
+                # CSI v3.2 (W6): también demote NO_SUBIDO → INCIDENCIA cuando
+                # la carpeta está siendo seedeada localmente (no recomendamos
+                # subir algo ya en el cliente — el id-lookup pudo fallar pero
+                # el archivo está claramente "en uso" desde algún tracker).
+                if item_state in (ESTADO_FALTA_CLIENTE, ESTADO_NO_SUBIDO) and client_path_map:
+                    target = ESTADO_OK if item_state == ESTADO_FALTA_CLIENTE else ESTADO_INCIDENCIA
                     current_abs = os.path.abspath(str(root_path)).lower()
                     if current_abs in client_path_map:
-                        item_state = ESTADO_OK
-                        dbg(f"[PATH-FIRST] Movie FALTA_CLIENTE→OK (exact path): {current_abs}")
+                        item_state = target
+                        dbg(f"[PATH-FIRST] Movie {item_state} (exact path): {current_abs}")
                     else:
                         current_basename = os.path.basename(current_abs)
                         if current_basename and current_basename in client_basenames:
-                            item_state = ESTADO_OK
-                            dbg(f"[PATH-FIRST] Movie FALTA_CLIENTE→OK (basename): {current_basename}")
+                            item_state = target
+                            dbg(f"[PATH-FIRST] Movie {item_state} (basename): {current_basename}")
                         else:
                             # v3.1: Movie folder substring — rutas raíz diferentes
                             mf_lower = movie_folder.lower()
                             for cp in client_path_map:
                                 if mf_lower in cp:
-                                    item_state = ESTADO_OK
-                                    dbg(f"[PATH-FIRST] Movie FALTA_CLIENTE→OK (folder substr): '{mf_lower}' in '{cp[-70:]}'")
+                                    item_state = target
+                                    dbg(f"[PATH-FIRST] Movie {item_state} (folder substr): '{mf_lower}' in '{cp[-70:]}'")
                                     break
 
                 # CSI v3.0: QBIT DOWN — FALTA_CLIENTE → INCIDENCIA si qBit no está disponible
@@ -2297,7 +3567,7 @@ def _feed_singularity(report_path: Path, config: dict):
     tracker = config.get("TRACKER_DEFAULT") or "MILNU"
     cmd = [
         "python3", "auto-upload.py",
-        "--list", str(report_path), "--tracker", tracker,
+        "--list", str(Path(report_path).resolve()), "--tracker", tracker,
     ]
     console.print(f"[cyan]Launching: {' '.join(cmd)}[/cyan]")
     try:
