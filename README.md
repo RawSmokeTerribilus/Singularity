@@ -249,11 +249,11 @@ Recuperando el rigor visual de RHEL y la estética Commodore:
 
 ```text
 ─────────────────────────────────────────────────
- 🐍 Python (código puro)          34,761 líneas
- 🔧 Scripts (SH/PS1/BAT)          12,991 líneas
- 📚 Documentación (MD)             5,100 líneas  
- 📄 Datos/Logs (TXT/TSV)           3,517 líneas
- ⚙️  Configuración (YAML/JSON)     2,068 líneas
+ 🐍 Python (código puro)          39,021 líneas
+ 🔧 Scripts (SH/PS1/BAT)          13,043 líneas
+ 📚 Documentación (MD)             5,671 líneas  
+ 📄 Datos/Logs (TXT/TSV)           2,397 líneas
+ ⚙️  Configuración (YAML/JSON)     1,475 líneas
 ─────────────────────────────────────────────────
-                     TOTAL        58,437 líneas
+                     TOTAL        61,607 líneas
 ─────────────────────────────────────────────────
