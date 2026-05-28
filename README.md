@@ -10,14 +10,14 @@ Singularity Core no es “RawLoadrr con una interfaz web”. Es el stack complet
 
 ## 📖 Wiki oficial
 
-https://rawsmoke.codeberg.page/Singularity/
+[![Wiki](https://img.shields.io/badge/Wiki-Singularity-blueviolet?style=for-the-badge)](https://rawsmoke.codeberg.page/Singularity/)
 
-Docs largas:
-- `docs/setup.md`
-- `docs/index.md`
-- `docs/technical_notes.md`
-- `docs/unit3d_mass_edition/index.md`
-- `docs/rawloadrr_wiki/Home.md`
+Puertas rápidas:
+- [![Setup](https://img.shields.io/badge/Setup-Despliegue-1f6feb?style=flat-square)](https://rawsmoke.codeberg.page/Singularity/setup/)
+- [![Índice](https://img.shields.io/badge/Docs-Índice-1f6feb?style=flat-square)](https://rawsmoke.codeberg.page/Singularity/)
+- [![Notas técnicas](https://img.shields.io/badge/Docs-Notas_técnicas-1f6feb?style=flat-square)](https://rawsmoke.codeberg.page/Singularity/technical_notes/)
+- [![Mass Edition](https://img.shields.io/badge/UNIT3D-Mass_Edition-1f6feb?style=flat-square)](https://rawsmoke.codeberg.page/Singularity/unit3d_mass_edition/)
+- [![RawLoadrr Wiki](https://img.shields.io/badge/RawLoadrr-Wiki-1f6feb?style=flat-square)](https://rawsmoke.codeberg.page/Singularity/rawloadrr_wiki/Home/)
 
 ---
 
@@ -137,12 +137,11 @@ Respeto a:
 
 Este README queda en modo operativo.
 
-Lo técnico/largo:
-- `docs/setup.md`
-- `docs/index.md`
-- `docs/technical_notes.md`
-- `docs/unit3d_mass_edition/index.md`
-- `docs/rawloadrr_wiki/Home.md`
+[![Setup](https://img.shields.io/badge/Setup-Despliegue-1f6feb?style=flat-square)](https://rawsmoke.codeberg.page/Singularity/setup/)
+[![Índice](https://img.shields.io/badge/Docs-Índice-1f6feb?style=flat-square)](https://rawsmoke.codeberg.page/Singularity/)
+[![Notas técnicas](https://img.shields.io/badge/Docs-Notas_técnicas-1f6feb?style=flat-square)](https://rawsmoke.codeberg.page/Singularity/technical_notes/)
+[![Mass Edition](https://img.shields.io/badge/UNIT3D-Mass_Edition-1f6feb?style=flat-square)](https://rawsmoke.codeberg.page/Singularity/unit3d_mass_edition/)
+[![RawLoadrr Wiki](https://img.shields.io/badge/RawLoadrr-Wiki-1f6feb?style=flat-square)](https://rawsmoke.codeberg.page/Singularity/rawloadrr_wiki/Home/)
 
 Instalar sin inventar: arriba.
-Entender las tripas: esos docs.
+Entender las tripas: esos botones.
