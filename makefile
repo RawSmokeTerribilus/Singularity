@@ -8,8 +8,8 @@ pull:
 	docker compose pull
 
 build:
-	docker build -t rawsmoke/singularity-suite:v3.0.0 .
-	docker tag rawsmoke/singularity-suite:v3.0.0 rawsmoke/singularity-suite:latest
+	docker build -t rawsmoke/singularity-suite:v3.0.1 .
+	docker tag rawsmoke/singularity-suite:v3.0.1 rawsmoke/singularity-suite:latest
 
 up: prep
 	docker compose up -d
@@ -33,10 +33,16 @@ prep:
 	@mkdir -p $(WORK_TRACKERS)
 	@mkdir -p work_data/tmp/qbit_backup
 	@mkdir -p work_data/tmp/TEMP_RESCUE
-	@if [ -d "$(SCRIPTS_SRC)" ] && [ -n "$$(ls -A $(SCRIPTS_SRC) 2>/dev/null)" ]; then \
-		if [ -z "$$(ls -A $(WORK_TRACKERS))" ]; then \
-			echo "🧬 Infundiendo trackers desde el source..."; \
+	@if [ -z "$$(ls -A $(WORK_TRACKERS) 2>/dev/null)" ]; then \
+		if [ -d "$(SCRIPTS_SRC)" ] && [ -n "$$(ls -A $(SCRIPTS_SRC) 2>/dev/null)" ]; then \
+			echo "🧬 Infundiendo trackers desde el source local..."; \
 			cp -rn $(SCRIPTS_SRC)/* $(WORK_TRACKERS)/; \
+		else \
+			echo "🧬 Infundiendo trackers desde la imagen..."; \
+			docker image inspect rawsmoke/singularity-suite:latest >/dev/null 2>&1 || docker pull rawsmoke/singularity-suite:latest >/dev/null 2>&1 || true; \
+			cid=$$(docker create rawsmoke/singularity-suite:latest); \
+			docker cp $$cid:/app/RawLoadrr/src/trackers/. $(WORK_TRACKERS)/; \
+			docker rm $$cid >/dev/null; \
 		fi; \
 	fi
 	@mkdir -p config

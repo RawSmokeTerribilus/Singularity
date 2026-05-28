@@ -62,9 +62,17 @@ copy_if_missing "$BASE_DIR/config/mass_config.py.example" "$CONFIG_DIR/mass_conf
 # Si solo descargaste 3 archivos (compose + makefile + este script), se generan desde aquí.
 generate_embedded_defaults_if_missing
 
-if [ -d "$BASE_DIR/RawLoadrr/src/trackers" ] && [ -z "$(ls -A "$WORK_DIR/trackers" 2>/dev/null)" ]; then
-    echo "🧬 Infundiendo trackers desde RawLoadrr/src/trackers..."
-    cp -rn "$BASE_DIR/RawLoadrr/src/trackers"/* "$WORK_DIR/trackers"/
+if [ -z "$(ls -A "$WORK_DIR/trackers" 2>/dev/null)" ]; then
+    if [ -d "$BASE_DIR/RawLoadrr/src/trackers" ] && [ -n "$(ls -A "$BASE_DIR/RawLoadrr/src/trackers" 2>/dev/null)" ]; then
+        echo "🧬 Infundiendo trackers desde RawLoadrr/src/trackers..."
+        cp -rn "$BASE_DIR/RawLoadrr/src/trackers"/* "$WORK_DIR/trackers"/
+    else
+        echo "🧬 Infundiendo trackers desde la imagen..."
+        docker image inspect rawsmoke/singularity-suite:latest >/dev/null 2>&1 || docker pull rawsmoke/singularity-suite:latest >/dev/null 2>&1 || true
+        cid=$(docker create rawsmoke/singularity-suite:latest)
+        docker cp "$cid:/app/RawLoadrr/src/trackers/." "$WORK_DIR/trackers"/
+        docker rm "$cid" >/dev/null
+    fi
 fi
 
 for required in     "$CONFIG_DIR/.env"     "$CONFIG_DIR/singularity_config.py"     "$CONFIG_DIR/config.py"     "$CONFIG_DIR/mass_config.py"

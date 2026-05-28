@@ -921,51 +921,21 @@ class Rawncher:
 
     def _escribir_config_tracker(self, tracker: str, field: str, value) -> bool:
         """
-        Reemplaza el valor de un campo dentro del bloque de un tracker en data/config.py.
-        Devuelve True si tuvo éxito.
+        Actualiza un campo de un tracker en self.config["TRACKERS"] y persiste
+        el config completo vía _guardar_config(). Devuelve True si tuvo éxito.
         """
-        config_path = self.base_dir / "data" / "config.py"
-        if not config_path.exists():
-            console.print("[bold red]❌ No se encontró data/config.py[/bold red]")
+        trackers = self.config.get("TRACKERS")
+        if not isinstance(trackers, dict) or tracker not in trackers:
+            console.print(f"[bold yellow]⚠️  Tracker '{tracker}' no existe en TRACKERS.[/bold yellow]")
             return False
 
-        try:
-            text = config_path.read_text(encoding="utf-8")
-        except Exception as e:
-            console.print(f"[bold red]❌ No se pudo leer config.py: {e}[/bold red]")
-            return False
-
-        if isinstance(value, bool):
-            new_val_repr = "True" if value else "False"
-            pattern = (
-                r'((?:"|\')' + re.escape(tracker) + r'(?:"|\')' +
-                r'\s*:\s*\{[^}]*?' +
-                r'(?:"|\')' + re.escape(field) + r'(?:"|\')' +
-                r'\s*:\s*)(?:True|False)'
-            )
-            replacement = r'\g<1>' + new_val_repr
-        else:
-            new_val_repr = str(value)
-            pattern = (
-                r'((?:"|\')' + re.escape(tracker) + r'(?:"|\')' +
-                r'\s*:\s*\{[^}]*?' +
-                r'(?:"|\')' + re.escape(field) + r'(?:"|\')' +
-                r'\s*:\s*")([^"]*)"'
-            )
-            replacement = r'\g<1>' + new_val_repr.replace('\\', '\\\\') + '"'
-
-        new_text, count = re.subn(pattern, replacement, text, count=1, flags=re.DOTALL)
-
-        if count == 0:
+        block = trackers[tracker]
+        if not isinstance(block, dict) or field not in block:
             console.print(f"[bold yellow]⚠️  No se encontró el campo '{field}' en el bloque '{tracker}'. Nada cambió.[/bold yellow]")
             return False
 
-        try:
-            config_path.write_text(new_text, encoding="utf-8")
-        except Exception as e:
-            console.print(f"[bold red]❌ No se pudo escribir config.py: {e}[/bold red]")
-            return False
-
+        block[field] = value
+        self._guardar_config()
         return True
 
     # ------------------------------------------------------------------ #
@@ -1008,6 +978,7 @@ class Rawncher:
             announce_ok = (
                 bool(announce_url)
                 and "Custom_Announce_URL" not in announce_url
+                and "YOUR_PASSKEY" not in announce_url
                 and announce_url.startswith("https://")
             )
 
@@ -1077,7 +1048,7 @@ class Rawncher:
                 if not nueva_url.startswith("https://"):
                     console.print("[bold red]❌ Debe empezar por 'https://'.[/bold red]")
                     continue
-                if "Custom_Announce_URL" in nueva_url:
+                if "Custom_Announce_URL" in nueva_url or "YOUR_PASSKEY" in nueva_url:
                     console.print("[bold red]❌ El valor sigue siendo el placeholder, introduce la URL real.[/bold red]")
                     continue
                 break
