@@ -37,17 +37,28 @@ prep:
 			cp -rn $(SCRIPTS_SRC)/* $(WORK_TRACKERS)/; \
 		fi; \
 	fi
+	@mkdir -p config
+	@if [ ! -f config/.env ] && [ -f config/.env.example ]; then cp config/.env.example config/.env; echo "🧩 Creado config/.env desde plantilla NOBS"; fi
+	@if [ ! -f config/.env ] && [ -f .env.example ]; then cp .env.example config/.env; echo "🧩 Creado config/.env desde .env.example"; fi
+	@if [ ! -f config/singularity_config.py ] && [ -f config/singularity_config.py.example ]; then cp config/singularity_config.py.example config/singularity_config.py; echo "🧩 Creado config/singularity_config.py desde plantilla"; fi
+	@if [ ! -f config/config.py ] && [ -f config/config.py.example ]; then cp config/config.py.example config/config.py; echo "🧩 Creado config/config.py desde plantilla con bloque NOBS"; fi
+	@if [ ! -f config/mass_config.py ] && [ -f config/mass_config.py.example ]; then cp config/mass_config.py.example config/mass_config.py; echo "🧩 Creado config/mass_config.py desde plantilla NOBS"; fi
 	@touch work_data/mass_editor/completados.txt
 	@touch work_data/mass_editor/completados_img.txt
 	@touch work_data/mass_editor/ids.txt
 	@touch work_data/mass_editor/mapeo_maestro.json
 	@touch work_data/mass_editor/titulos_mapa.json
 	@touch work_data/mass_editor/mapeo_por_titulo.json
-	@mkdir -p config && touch config/.env
+	@if [ ! -f config/.env ] || [ ! -f config/singularity_config.py ] || [ ! -f config/config.py ] || [ ! -f config/mass_config.py ]; then \
+		echo "❌ Faltan archivos de config obligatorios en ./config"; \
+		echo "   Esperados: .env, singularity_config.py, config.py, mass_config.py"; \
+		echo "   Ejecuta: make install"; \
+		exit 1; \
+	fi
 	@sudo chown -R $(USER):$(USER) work_data/
 	@chmod -R 755 $(WORK_TRACKERS)
 	@chmod -R 775 work_data/tmp
-	@echo "✅ Estructura y permisos listos. Soberanía confirmada."
+	@echo "✅ Estructura, plantillas y permisos listos. Soberanía confirmada."
 
 # --- 3. Comandos de Acceso ---
 attach:

@@ -1,0 +1,85 @@
+# ==========================================
+# ⚙️ UNIT3D MASS EDITION SUITE - CONFIG
+# ==========================================
+# Namespace propio en el .env: prefijo ME_
+# Uso standalone: edita los fallbacks de os.getenv() directamente.
+# Uso via singularity/Docker: los ME_* del .env tienen prioridad.
+
+import os
+from pathlib import Path
+
+try:
+    from dotenv import load_dotenv
+    _here = Path(__file__).resolve().parent
+    for _ep in [_here / ".env", _here / "../../.env", Path("/app/.env")]:
+        if _ep.exists():
+            load_dotenv(_ep)
+            break
+except ImportError:
+    pass
+
+# ─── 1. Credenciales y Tracker (namespace ME_) ────────────────────────────────
+BASE_URL          = os.getenv("ME_TRACKER_URL",         "https://nobs.rawsmoke.net")
+USERNAME          = os.getenv("ME_TRACKER_USERNAME",    "TuUsuario")
+COOKIE_NAME       = os.getenv("ME_TRACKER_COOKIE_NAME", "nuclear_order_bit_syndicate_session")
+COOKIE_VALUE      = os.getenv("ME_TRACKER_COOKIE",      "")
+CUSTOM_USER_AGENT = os.getenv("ME_CUSTOM_USER_AGENT",   "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
+TRACKER_ABBREV    = os.getenv("ME_TRACKER_DEFAULT",     "NOBS")
+
+# ─── 2. APIs de imágenes (namespace ME_) ──────────────────────────────────────
+IMGBB_API      = os.getenv("ME_IMGBB_API",     "")
+PTSCREENS_API  = os.getenv("ME_PTSCREENS_API", "")
+
+# ─── 3. Rutas (namespace ME_) ─────────────────────────────────────────────────
+TMP_DIR_PATH = os.getenv("ME_TMP_ROOT", "/app/RawLoadrr/tmp")
+
+# ─── 4. Rango de IDs (vars ME-only, sin riesgo de colisión) ──────────────────
+ID_INICIO = int(os.getenv("ID_START", "14"))
+ID_FIN    = int(os.getenv("ID_END",   "2000"))
+ID_FILE   = os.getenv("ID_FILENAME",  "ids.txt")
+
+# ─── 5. Modo de edición y textos (vars ME-only) ───────────────────────────────
+EDIT_MODE        = os.getenv("EDIT_MODE",        "BANNER_URL")
+BANNER_URL_NUEVA = os.getenv("BANNER_URL_NUEVA", "")
+BANNER_IMG_NUEVA = os.getenv("BANNER_IMG_NUEVA", "")
+FIRMA_TEXT_NUEVA = os.getenv("FIRMA_TEXT_NUEVA", "")
+FIRMA_FULL_NUEVA = os.getenv("FIRMA_FULL_NUEVA", "")
+FIND_URL         = os.getenv("FIND_URL",         "")
+REPLACE_URL      = os.getenv("REPLACE_URL",      "")
+BLOCK_VIEJO      = os.getenv("BLOCK_VIEJO",      "")
+BLOCK_NUEVO      = os.getenv("BLOCK_NUEVO",      "")
+
+# ─── 6. Textos estáticos ──────────────────────────────────────────────────────
+MSG_VIEJO = "[center][b]PLEASE SEED MILNUEVE FAMILY[/b][/center]"
+MSG_NUEVO = "[center][b]🌱 ¡La magia del P2P eres tú! Por favor, quédate compartiendo (seeding) para mantener viva la comunidad. 🌱[/b][/center]"
+
+BANNER_VIEJO = "[center][url=https://codeberg.org/CvT/Uploadrr][img=400]https://i.ibb.co/2NVWb0c/uploadrr.webp[/img][/url][/center]"
+BANNER_NUEVO = "[center][url=https://codeberg.org/RawSmoke/Singularity][img=400]https://i.ibb.co/0RrzLmSr/RAW-bruma-servers.png[/img][/url][/center]"
+
+FIRMAS_VIEJAS = [
+    "[center][b]PLEASE SEED MILNUEVE FAMILY[/b][/center]",
+    "[center][url=https://codeberg.org/CvT/Uploadrr][img=400]https://i.ibb.co/2NVWb0c/uploadrr.webp[/img][/url][/center]",
+]
+
+# ─── 7. Settings del bot ──────────────────────────────────────────────────────
+DELAY_MIN = float(os.getenv("ME_DELAY_MIN", "4.5"))
+DELAY_MAX = float(os.getenv("ME_DELAY_MAX", "7.5"))
+
+# ─── 8. Utilidades ────────────────────────────────────────────────────────────
+def get_target_ids():
+    """Retorna la lista final de IDs a procesar (de ids.txt filtrada por rango)."""
+    ids = []
+    if os.path.exists(ID_FILE):
+        with open(ID_FILE, "r") as f:
+            for line in f:
+                stripped = line.strip()
+                if not stripped:
+                    continue
+                try:
+                    int(stripped)
+                    ids.append(stripped)
+                except ValueError:
+                    pass
+    if ids:
+        return [tid for tid in ids if ID_INICIO <= int(tid) <= ID_FIN]
+    return [str(i) for i in range(ID_INICIO, ID_FIN + 1)]

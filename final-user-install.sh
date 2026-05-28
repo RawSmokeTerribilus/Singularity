@@ -1,695 +1,100 @@
 #!/bin/bash
-# install-commands.sh (Versión Distribución Pública)
+set -euo pipefail
 
-# 1. Definir rutas
 BASE_DIR=$(pwd)
 CONFIG_DIR="$BASE_DIR/config"
 WORK_DIR="$BASE_DIR/work_data"
 
+copy_if_missing() {
+    local src="$1"
+    local dst="$2"
+    if [ ! -f "$dst" ] && [ -f "$src" ]; then
+        cp "$src" "$dst"
+        echo "🧩 Creado $(realpath --relative-to="$BASE_DIR" "$dst") desde $(realpath --relative-to="$BASE_DIR" "$src")"
+    fi
+}
+
+generate_embedded_defaults_if_missing() {
+    python3 - "$CONFIG_DIR" <<'PY'
+from pathlib import Path
+import sys
+config_dir = Path(sys.argv[1])
+config_dir.mkdir(parents=True, exist_ok=True)
+files = {
+    '.env': '# --- TRACKER CORE (NOBS defaults shipped) ---\nTRACKER_BASE_URL=https://nobs.rawsmoke.net\nTRACKER_ABBREV=NOBS\nTRACKER_USERNAME=TuUsuario\nTRACKER_COOKIE_NAME=nuclear_order_bit_syndicate_session\nTRACKER_COOKIE_VALUE=\nCUSTOM_USER_AGENT=undici\n\n# --- MASS EDITION / UNIT3D ORCHESTRATOR (same tracker by default) ---\nME_TRACKER_URL=https://nobs.rawsmoke.net\nME_TRACKER_DEFAULT=NOBS\nME_TRACKER_USERNAME=TuUsuario\nME_TRACKER_COOKIE_NAME=nuclear_order_bit_syndicate_session\nME_TRACKER_COOKIE=\nME_TRACKER_API_KEY=\nME_CUSTOM_USER_AGENT=Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36\nME_TMP_ROOT=/app/RawLoadrr/tmp\nME_DELAY_MIN=4.5\nME_DELAY_MAX=7.5\n\n# --- APIs / IMAGE HOSTS ---\nTMDB_API_KEY=\nTVDB_API_KEY=\nIMDB_API_KEY=\nIMGBB_API_KEY=\nPTSCREENS_API_KEY=\nME_IMGBB_API=\nME_PTSCREENS_API=\n\n# --- PATHS ---\nTMP_ROOT=/app/RawLoadrr/tmp\nTMP_PATH=/app/RawLoadrr/tmp\nQBIT_BACKUP_DIR=${HOME}/Qbit_Docker/config/qBittorrent/BT_backup\n\n# --- RANGE / IDS ---\nID_START=14\nID_END=2000\nID_FILENAME=ids.txt\n\n# --- OPTIONAL EXTERNAL SERVICES ---\nSONARR_URL=http://127.0.0.1:8989\nSONARR_API_KEY=\nRADARR_URL=http://127.0.0.1:7878\nRADARR_API_KEY=\n',
+    'singularity_config.py': 'import os\nfrom pathlib import Path\n\n# --- CARGA DE LIBRERÍAS EXTERNAS ---\n_dotenv_available = False\ntry:\n    from dotenv import load_dotenv\n    _dotenv_available = True\nexcept ImportError:\n    print("⚠️  Librería \'python-dotenv\' no encontrada. Instálala con: pip install python-dotenv")\n\n# --- CONFIGURACIÓN DE RUTAS ---\nBASE_DIR = os.path.dirname(os.path.abspath(__file__))\nenv_path = os.path.join(BASE_DIR, ".env")\n\nif _dotenv_available and os.path.exists(env_path):\n    load_dotenv(dotenv_path=env_path)\n\n# --- CARPETA DE LOGS (raíz del proyecto) ---\nLOGS_DIR = os.path.join(BASE_DIR, "logs")\nos.makedirs(LOGS_DIR, exist_ok=True)\n\n# --- CARGA DE SECRETOS (.env) ---\nBASE_URL      = os.getenv("TRACKER_BASE_URL", "https://nobs.rawsmoke.net")\nCOOKIE_VALUE  = os.getenv("TRACKER_COOKIE_VALUE", "")\nCOOKIE_NAME   = os.getenv("TRACKER_COOKIE_NAME", "nuclear_order_bit_syndicate_session")\nUSERNAME      = os.getenv("TRACKER_USERNAME", "TuUsuario")\nTRACKER_ABBREV = os.getenv("TRACKER_ABBREV", "NOBS")\nCUSTOM_USER_AGENT = os.getenv("CUSTOM_USER_AGENT", "undici")\nIMGBB_API     = os.getenv("IMGBB_API_KEY", "")\nPTSCREENS_API = os.getenv("PTSCREENS_API_KEY", "")\nTMP_DIR_PATH = os.getenv("TMP_ROOT", os.path.join(BASE_DIR, "RawLoadrr", "tmp"))\n\nID_INICIO = int(os.getenv("ID_START", 14))\nID_FIN = int(os.getenv("ID_END", 2000))\nID_FILE = os.getenv("ID_FILENAME", "ids.txt")\n\nSONARR_URL = os.getenv("SONARR_URL", "http://127.0.0.1:8989")\nSONARR_API_KEY = os.getenv("SONARR_API_KEY", "")\nRADARR_URL = os.getenv("RADARR_URL", "http://127.0.0.1:7878")\nRADARR_API_KEY = os.getenv("RADARR_API_KEY", "")\n\n# --- FUNCIONES DE UTILIDAD ---\n\n\ndef get_target_ids():\n    """Retorna la lista final de IDs a procesar basada en config/archivo."""\n    ids = []\n    path_file = os.path.join(BASE_DIR, ID_FILE)\n    if os.path.exists(path_file):\n        with open(path_file, "r") as f:\n            for line in f:\n                stripped = line.strip()\n                if not stripped:\n                    continue\n                try:\n                    int(stripped)\n                    ids.append(stripped)\n                except ValueError:\n                    pass\n\n    if ids:\n        return [tid for tid in ids if ID_INICIO <= int(tid) <= ID_FIN]\n\n    return [str(i) for i in range(ID_INICIO, ID_FIN + 1)]\n\n# --- CONFIGURACIÓN DE LIMPIEZA ---\nSPAM_KEYWORDS = sorted(list(set([\n    "rarbg", "yify", "ettv", "www.", ".com", "torrent",\n    "axxo", "brrip", "web-dl", "bluray", "rip", "x264", "x265",\n    "ac3-evo", "evo", "bypixel", "spam", "wolfmax"\n])))\n\nFIRMAS_VIEJAS = [\n    "[center][b]PLEASE SEED MILNUEVE FAMILY[/b][/center]",\n    "[center][url=https://codeberg.org/CvT/Uploadrr][img=400]https://i.ibb.co/2NVWb0c/uploadrr.webp[/img][/url][/center]"\n]\n\nMSG_NUEVO = """[center][b]🌱 ¡La magia del P2P eres tú! Por favor, quédate compartiendo (seeding) para mantener viva la comunidad. 🌱[/b][/center]\n[center][url=https://github.com/RawSmokeTerribilus/RaW-Suite-TUI-ed][img=400]https://i.ibb.co/1NLtMkN/banner-milnueve.png[/img][/url][/center]"""\n\n# --- FRASES DE ESTADO (Limpiadas) ---\nGOD_PHRASES = sorted(list(set([\n    "Injecting sanity into the bits...", "Searching for traces of the Nepal USB...",\n    "Your library owes me a beer after this...", "Doing what Tdarr didn\'t have the balls to do...",\n    "Cleaning up the trash you call a \'collection\'...", "Resurrecting files that were clinically dead...",\n    "Say goodbye to your 2005 AVIs...", "Applying cosmetic surgery to your metadata...",\n    "If this blows up, it wasn\'t me...", "Downloading more RAM...",\n    "Executing: rm -rf / --no-preserve-root", "Bypassing mainframe firewall...",\n    "Opening port 23 (Telnet) to the world...", "Compiling Linux Kernel from scratch...",\n    "Deleting System32...", "Sending private keys to 4chan...",\n    "Encrypting drive with ROT13...", "Installing Windows Vista...",\n    "Overclocking GPU to 500%...", "Bruteforcing root password...",\n    "Searching for alien life signals...", "Reordering bits for aesthetic purposes...",\n    "Asking ChatGPT how to exit vim...", "Generating fake ID for the movie...",\n    "Checking flux capacitor...", "Defragmenting the internet...",\n    "Recalibrating flux capacitor...", "Searching for the \'Any\' key...",\n    "Reticulating splines...", "Initializing Skynet (Just kidding)...",\n    "Compiling a cup of coffee...", "Hunting for a missing semicolon...",\n    "Updating the prophecy...", "Replacing bugs with features...",\n    "Negotiating with the motherboard...", "Pinging 127.0.0.1 for emotional support...",\n    "Translating binary to interpretive dance...", "Reverse engineering the Matrix...",\n    "Applying duct tape to the data stream...", "Consulting the Oracle (StackOverflow)...",\n    "Feeding the server hamsters...", "Checking if the cake is a lie...",\n    "Rerouting power from life support to the GPU...", "Asking the machine god for forgiveness...",\n    "Bribing the garbage collector for more heap space...", "Convincing the pixels to behave this time...",\n    "Simulating common sense (Alpha version)...", "Searching for a loophole in the GPL license...",\n    "Asking the motherboard for a second opinion...", "Polishing the loading bar for extra shine...",\n    "Translating \'Working as intended\' to \'I have no idea\'...", "Hiding the bugs under a very large rug...",\n    "Adjusting the sarcasm levels of the system logs...", "Scanning for hidden pizza in the server room...",\n    "Refactoring my own internal monologue...", "Checking if the internet is full yet...",\n    "Downloading the secret to eternal uptime...", "Asking the router why it\'s feeling lonely...",\n    "Formatting the abyss... please wait...", "Trying to explain \'The Cloud\' to a cumulonimbus...",\n    "Calculating the weight of a single bit...", "Searching for the legendary \'Fix_Everything\' button...",\n    "Teaching the binary to count past one...", "Optimizing the loading speed for speedrunners...",\n    "Consulting the magic smoke inside the CPU...", "Drafting a peace treaty between Python 2 and 3...",\n    "Waking up the lazy threads...", "Poking the kernel with a stick...",\n    "Calculating the exact value of \'Later\'...", "Searching for the missing link in the blockchain...",\n    "Asking the firewall for a hall pass...", "Optimizing the \'It\'s not a bug\' response time...",\n    "Rerouting data through the coffee machine...", "Teaching the code to be more self-aware (Be careful)...",\n    "Checking the weather inside the cloud storage...", "Downloading more irony...",\n    "Searching for a needle in a haystack of NullPointers...", "Applying digital duct tape to the API...",\n    "Negotiating with the GPU for more frames...", "Checking for a pulse in the legacy code...",\n    "Converting 0s to Slightly More Aesthetic 0s...", "Asking a rubber duck for investment advice...",\n    "Searching for the \'Undo\' button for my life...", "Optimizing the suspense of the loading bar...",\n    "Teaching the AI to understand bad puns...", "Scanning for signs of intelligent life in the UI...",\n    "Consulting the oracle (Random.org)...", "Replacing \'Fatal Error\' with \'Minor Inconvenience\'...",\n    "Searching for the end of a circular dependency...", "Downloading more \'Cool\' factor (v3.0)...",\n    "Checking if 2+2 still equals 4 (Security check)...", "Calculating the entropy of a Tuesday...",\n    "Inventing new ways to say \'Please Wait\'...", "Asking the system for a well-deserved vacation..."\n])))\n',
+    'config.py': "config = {'AUTO': {'delay': 0, 'description_folder': None, 'dupe_similarity': 80, 'size_tolerance': 1},\n 'DEFAULT': {'add_logo': False,\n             'add_trailer': True,\n             'default_torrent_client': 'qbit',\n             'global_anon_pr_sig': '[center][b]🌱 ¡La magia del P2P eres tú! Por favor, quédate compartiendo '\n                                   'para mantener viva la comunidad. '\n                                   '🌱[/b][/center][center][url=https://codeberg.org/RawSmoke/Singularity][img=400]https://i.ibb.co/0RrzLmSr/RAW-bruma-servers.png[/img][/url][/center]',\n             'global_anon_sig': '\\n'\n                                '[center][url=https://codeberg.org/RawSmoke/Singularity][img=40]https://i.ibb.co/jP8Qqjvm/Peticin-de-Animacin-de-Banner-ezgif-com-resize.gif[/img][/url][/center]',\n             'global_pr_sig': '[center][b]🌱 ¡La magia del P2P eres tú! Por favor, quédate compartiendo para '\n                              'mantener viva la comunidad. '\n                              '🌱[/b][/center][center][url=https://codeberg.org/RawSmoke/Singularity][img=400]https://i.ibb.co/0RrzLmSr/RAW-bruma-servers.png[/img][/url][/center]',\n             'global_sig': '[center][b]🌱 ¡La magia del P2P eres tú! Por favor, quédate compartiendo para '\n                           'mantener viva la comunidad. '\n                           '🌱[/b][/center][center][url=https://codeberg.org/RawSmoke/Singularity][img=400]https://i.ibb.co/0RrzLmSr/RAW-bruma-servers.png[/img][/url][/center]',\n             'imdb_api': 'IMDB_API',\n             'img_host_1': 'imgbox',\n             'img_host_2': 'imgbb',\n             'img_host_3': 'pixhos',\n             'img_host_4': 'ptscreens',\n             'img_host_5': 'lensdump',\n             'img_host_6': 'oeimg',\n             'img_host_7': 'ptpimg',\n             'img_size': '600',\n             'imgbb_api': 'IMGBB_API',\n             'inline_imgs': 3,\n             'lensdump_api': 'LENSDUMP_API',\n             'oeimg_api': 'OEIMG_API',\n             'optimize_images': True,\n             'ptpimg_api': 'PTPIMG_API',\n             'ptscreens_api': 'PTSCREENS_API',\n             'screens': '10',\n             'sfx_on_prompt': True,\n             'tmdb_api': 'TMDB_API',\n             'tvmaze_api': 'TVMAZE_API',\n             'use_global_sigs': False},\n 'DISCORD': {'admin_id': '',\n             'command_prefix': '!',\n             'discord_bot_description': 'Upload Assistant',\n             'discord_bot_token': '',\n             'discord_channel_id': '',\n             'discord_emojis': {'ACM': '🍙',\n                                'AITHER': '🛫',\n                                'BHD': '🎉',\n                                'BLU': '💙',\n                                'CANCEL': '🚫',\n                                'MANUAL': '📩',\n                                'STC': '📺',\n                                'UPLOAD': '✅'},\n             'search_dir': '/path/to/downloads'},\n 'TORRENT_CLIENTS': {'Client1': {'qbit_pass': 'PASSWORD',\n                                 'qbit_port': '8080',\n                                 'qbit_url': 'http://127.0.0.1',\n                                 'qbit_user': 'USERNAME',\n                                 'torrent_client': 'qbit'},\n                     'deluge': {'deluge_pass': 'PASSWORD',\n                                'deluge_port': '8080',\n                                'deluge_url': 'localhost',\n                                'deluge_user': 'USERNAME',\n                                'torrent_client': 'deluge'},\n                     'qbit': {'VERIFY_WEBUI_CERTIFICATE': False,\n                              'content_layout': 'Original',\n                              'enable_search': True,\n                              'qbit_pass': 'PASSWORD',\n                              'qbit_port': '8888',\n                              'qbit_url': 'http://127.0.0.1',\n                              'qbit_user': 'USERNAME',\n                              'torrent_client': 'qbit',\n                              'torrent_storage_dir': '/path/to/torrent_storage'},\n                     'rtorrent': {'rtorrent_url': 'http://127.0.0.1', 'torrent_client': 'rtorrent'},\n                     'transmission': {'enable_search': True,\n                                      'torrent_client': 'transmission',\n                                      'torrent_storage_dir': '/path/to/torrent_storage',\n                                      'transmission_pass': 'PASSWORD',\n                                      'transmission_url': 'http://localhost:9091',\n                                      'transmission_user': 'USERNAME'},\n                     'watch': {'torrent_client': 'watch', 'watch_folder': '/Path/To/Watch/Folder'}},\n 'TRACKERS': {'default_trackers': 'NOBS',\n              'ACM': {'announce_url': 'https://asiancinema.me/announce/YOUR_PASSKEY',\n                      'anon': False,\n                      'anon_pr_signature': '\\n'\n                                           '[center][url=https://codeberg.org/RawSmoke/Singularity][img=40]https://i.ibb.co/jP8Qqjvm/Peticin-de-Animacin-de-Banner-ezgif-com-resize.gif[/img][/url][/center]',\n                      'anon_signature': '\\n'\n                                        '[center][url=https://codeberg.org/RawSmoke/Singularity][img=40]https://i.ibb.co/jP8Qqjvm/Peticin-de-Animacin-de-Banner-ezgif-com-resize.gif[/img][/url][/center]',\n                      'api_key': 'API_KEY',\n                      'pr_signature': '\\n'\n                                      ' [center][b][size=6]PERSONAL RELEASE[/size][/b][/center] \\n'\n                                      '[center][b]PLEASE SEED ACM FAMILY[/b][/center]\\n'\n                                      '[center][url=https://codeberg.org/RawSmoke/Singularity][img=400]https://i.ibb.co/2NVWb0c/uploadrr.webp[/img][/url][/center]',\n                      'signature': '\\n'\n                                   '[center][b]PLEASE SEED ACM FAMILY[/b][/center]\\n'\n                                   '[center][url=https://codeberg.org/RawSmoke/Singularity][img=400]https://i.ibb.co/2NVWb0c/uploadrr.webp[/img][/url][/center]'},\n              'AITHER': {'announce_url': 'https://aither.cc/announce/YOUR_PASSKEY',\n                         'anon': False,\n                         'anon_pr_signature': '\\n'\n                                              '[center][url=https://codeberg.org/RawSmoke/Singularity][img=40]https://i.ibb.co/jP8Qqjvm/Peticin-de-Animacin-de-Banner-ezgif-com-resize.gif[/img][/url][/center]',\n                         'anon_signature': '\\n'\n                                           '[center][url=https://codeberg.org/RawSmoke/Singularity][img=40]https://i.ibb.co/jP8Qqjvm/Peticin-de-Animacin-de-Banner-ezgif-com-resize.gif[/img][/url][/center]',\n                         'api_key': 'API_KEY',\n                         'pr_signature': '\\n'\n                                         ' [center][b][size=6]PERSONAL RELEASE[/size][/b][/center] \\n'\n                                         '[center][b]PLEASE SEED AITHER FAMILY[/b][/center]\\n'\n                                         '[center][url=https://codeberg.org/RawSmoke/Singularity][img=400]https://i.ibb.co/2NVWb0c/uploadrr.webp[/img][/url][/center]',\n                         'signature': '\\n'\n                                      '[center][b]PLEASE SEED AITHER FAMILY[/b][/center]\\n'\n                                      '[center][url=https://codeberg.org/RawSmoke/Singularity][img=400]https://i.ibb.co/2NVWb0c/uploadrr.webp[/img][/url][/center]'},\n              'ANT': {'announce_url': 'https://anthelion.me/announce/YOUR_PASSKEY',\n                      'anon': False,\n                      'anon_pr_signature': '\\n'\n                                           '[center][url=https://codeberg.org/RawSmoke/Singularity][img=40]https://i.ibb.co/jP8Qqjvm/Peticin-de-Animacin-de-Banner-ezgif-com-resize.gif[/img][/url][/center]',\n                      'anon_signature': '\\n'\n                                        '[center][url=https://codeberg.org/RawSmoke/Singularity][img=40]https://i.ibb.co/jP8Qqjvm/Peticin-de-Animacin-de-Banner-ezgif-com-resize.gif[/img][/url][/center]',\n                      'api_key': 'API_KEY',\n                      'pr_signature': '\\n'\n                                      ' [center][b][size=6]PERSONAL RELEASE[/size][/b][/center] \\n'\n                                      '[center][b]PLEASE SEED ANT FAMILY[/b][/center]\\n'\n                                      '[center][url=https://codeberg.org/RawSmoke/Singularity][img=400]https://i.ibb.co/2NVWb0c/uploadrr.webp[/img][/url][/center]',\n                      'signature': '\\n'\n                                   '[center][b]PLEASE SEED ANT FAMILY[/b][/center]\\n'\n                                   '[center][url=https://codeberg.org/RawSmoke/Singularity][img=400]https://i.ibb.co/2NVWb0c/uploadrr.webp[/img][/url][/center]'},\n              'AR': {'announce_url': 'https://tracker.example/announce/YOUR_PASSKEY',\n                     'password': 'PASSWORD',\n                     'username': 'USERNAME'},\n              'BHD': {'announce_url': 'https://beyond-hd.me/announce/YOUR_PASSKEY',\n                      'anon': False,\n                      'anon_pr_signature': '\\n'\n                                           '[center][url=https://codeberg.org/RawSmoke/Singularity][img=40]https://i.ibb.co/jP8Qqjvm/Peticin-de-Animacin-de-Banner-ezgif-com-resize.gif[/img][/url][/center]',\n                      'anon_signature': '\\n'\n                                        '[center][url=https://codeberg.org/RawSmoke/Singularity][img=40]https://i.ibb.co/jP8Qqjvm/Peticin-de-Animacin-de-Banner-ezgif-com-resize.gif[/img][/url][/center]',\n                      'api_key': 'API_KEY',\n                      'draft_default': True,\n                      'pr_signature': '\\n'\n                                      ' [center][b][size=6]PERSONAL RELEASE[/size][/b][/center] \\n'\n                                      '[center][b]PLEASE SEED BHD FAMILY[/b][/center]\\n'\n                                      '[center][url=https://codeberg.org/RawSmoke/Singularity][img=400]https://i.ibb.co/2NVWb0c/uploadrr.webp[/img][/url][/center]',\n                      'signature': '\\n'\n                                   '[center][b]PLEASE SEED BHD FAMILY[/b][/center]\\n'\n                                   '[center][url=https://codeberg.org/RawSmoke/Singularity][img=400]https://i.ibb.co/2NVWb0c/uploadrr.webp[/img][/url][/center]'},\n              'BHDTV': {'announce_url': 'https://tracker.example/announce/YOUR_PASSKEY',\n                        'anon': False,\n                        'api_key': 'API_KEY',\n                        'my_announce_url': 'https://tracker.example/passkey/announce'},\n              'BLU': {'announce_url': 'https://blutopia.cc/announce/YOUR_PASSKEY',\n                      'anon': False,\n                      'anon_pr_signature': '\\n'\n                                           '[center][url=https://codeberg.org/RawSmoke/Singularity][img=40]https://i.ibb.co/jP8Qqjvm/Peticin-de-Animacin-de-Banner-ezgif-com-resize.gif[/img][/url][/center]',\n                      'anon_signature': '\\n'\n                                        '[center][url=https://codeberg.org/RawSmoke/Singularity][img=40]https://i.ibb.co/jP8Qqjvm/Peticin-de-Animacin-de-Banner-ezgif-com-resize.gif[/img][/url][/center]',\n                      'api_key': 'API_KEY',\n                      'pr_signature': '\\n'\n                                      ' [center][b][size=6]PERSONAL RELEASE[/size][/b][/center] \\n'\n                                      '[center][b]PLEASE SEED BLU FAMILY[/b][/center]\\n'\n                                      '[center][url=https://codeberg.org/RawSmoke/Singularity][img=400]https://i.ibb.co/2NVWb0c/uploadrr.webp[/img][/url][/center]',\n                      'signature': '\\n'\n                                   '[center][b]PLEASE SEED BLU FAMILY[/b][/center]\\n'\n                                   '[center][url=https://codeberg.org/RawSmoke/Singularity][img=400]https://i.ibb.co/2NVWb0c/uploadrr.webp[/img][/url][/center]',\n                      'useAPI': False},\n              'CBR': {'announce_url': 'https://capybarabr.com/announce/YOUR_PASSKEY',\n                      'anon': False,\n                      'anon_pr_signature': '\\n'\n                                           '[center][url=https://codeberg.org/RawSmoke/Singularity][img=40]https://i.ibb.co/jP8Qqjvm/Peticin-de-Animacin-de-Banner-ezgif-com-resize.gif[/img][/url][/center]',\n                      'anon_signature': '\\n'\n                                        '[center][url=https://codeberg.org/RawSmoke/Singularity][img=40]https://i.ibb.co/jP8Qqjvm/Peticin-de-Animacin-de-Banner-ezgif-com-resize.gif[/img][/url][/center]',\n                      'api_key': 'API_KEY',\n                      'pr_signature': '\\n'\n                                      ' [center][b][size=6]PERSONAL RELEASE[/size][/b][/center] \\n'\n                                      ' '\n                                      '[center][url=https://codeberg.org/RawSmoke/Singularity][img=69]https://capybarabr.com/img/capybara.svg[/img][/url][/center]',\n                      'signature': '[url=https://codeberg.org/RawSmoke/Singularity][img=69]https://capybarabr.com/img/capybara.svg[/img][/url][/center]'},\n              'EMU': {'announce_url': 'https://emuwarez.com/announce/YOUR_PASSKEY',\n                      'anon': False,\n                      'anon_pr_signature': '\\n'\n                                           '[center][url=https://codeberg.org/RawSmoke/Singularity][img=40]https://i.ibb.co/jP8Qqjvm/Peticin-de-Animacin-de-Banner-ezgif-com-resize.gif[/img][/url][/center]',\n                      'anon_signature': '\\n'\n                                        '[center][url=https://codeberg.org/RawSmoke/Singularity][img=40]https://i.ibb.co/jP8Qqjvm/Peticin-de-Animacin-de-Banner-ezgif-com-resize.gif[/img][/url][/center]',\n                      'api_key': 'API_KEY',\n                      'pr_signature': '\\n'\n                                      ' [center][b][size=6]PERSONAL RELEASE[/size][/b][/center]\\n'\n                                      '[center][url=https://codeberg.org/RawSmoke/Singularity][img=400]https://i.ibb.co/2NVWb0c/uploadrr.webp[/img][/url][/center]',\n                      'signature': '\\n'\n                                   '[center][url=https://codeberg.org/RawSmoke/Singularity][img=400]https://i.ibb.co/2NVWb0c/uploadrr.webp[/img][/url][/center]'},\n              'FL': {'announce_url': 'https://tracker.example/announce/YOUR_PASSKEY',\n                     'anon': False,\n                     'password': 'PASSWORD',\n                     'uploader_name': 'UploaderName',\n                     'username': 'USERNAME'},\n              'FNP': {'announce_url': 'https://fearnopeer.com/announce/YOUR_PASSKEY',\n                      'anon': False,\n                      'anon_pr_signature': '\\n'\n                                           '[center][url=https://codeberg.org/RawSmoke/Singularity][img=40]https://i.ibb.co/jP8Qqjvm/Peticin-de-Animacin-de-Banner-ezgif-com-resize.gif[/img][/url][/center]',\n                      'anon_signature': '\\n'\n                                        '[center][url=https://codeberg.org/RawSmoke/Singularity][img=40]https://i.ibb.co/jP8Qqjvm/Peticin-de-Animacin-de-Banner-ezgif-com-resize.gif[/img][/url][/center]',\n                      'api_key': 'API_KEY',\n                      'pr_signature': '\\n'\n                                      ' [center][b][size=6]PERSONAL RELEASE[/size][/b][/center] \\n'\n                                      '[center][b]PLEASE SEED FNP FAMILY[/b][/center]\\n'\n                                      '[center][url=https://codeberg.org/RawSmoke/Singularity][img=400]https://i.ibb.co/2NVWb0c/uploadrr.webp[/img][/url][/center]',\n                      'signature': '\\n'\n                                   '[center][b]PLEASE SEED FNP FAMILY[/b][/center]\\n'\n                                   '[center][url=https://codeberg.org/RawSmoke/Singularity][img=400]https://i.ibb.co/2NVWb0c/uploadrr.webp[/img][/url][/center]'},\n              'GOON': {'announce_url': 'https://tracker.milnueve.cc/announce/YOUR_PASSKEY',\n                       'anon': False,\n                       'anon_pr_signature': '\\n'\n                                            '[center][url=https://codeberg.org/CvT/Uploadrr][img=40]https://i.ibb.co/n0jF73x/hacker.png[/img][/url][/center]',\n                       'anon_signature': '\\n'\n                                         '[center][url=https://codeberg.org/CvT/Uploadrr][img=40]https://i.ibb.co/n0jF73x/hacker.png[/img][/url][/center]',\n                       'api_key': 'API_KEY',\n                       'pr_signature': '\\n'\n                                       ' [center][b][size=6]PERSONAL RELEASE[/size][/b][/center] \\n'\n                                       '[center][b]PLEASE SEED THE GOONIES FAMILY[/b][/center]\\n'\n                                       '[center][url=https://codeberg.org/CvT/Uploadrr][img=400]https://i.ibb.co/2NVWb0c/uploadrr.webp[/img][/url][/center]',\n                       'signature': '[center][b]🌱 ¡La magia del P2P eres tú! Por favor, quédate compartiendo '\n                                    'para mantener viva la comunidad. '\n                                    '🌱[/b][/center][center][url=https://codeberg.org/RawSmoke/Singularity][img=400]https://i.ibb.co/0RrzLmSr/RAW-bruma-servers.png[/img][/url][/center]'},\n              'HDB': {'announce_url': 'https://hdbits.org/announce/YOUR_PASSKEY',\n                      'anon': False,\n                      'anon_pr_signature': '\\n'\n                                           '[center][url=https://codeberg.org/RawSmoke/Singularity][img=40]https://i.ibb.co/jP8Qqjvm/Peticin-de-Animacin-de-Banner-ezgif-com-resize.gif[/img][/url][/center]',\n                      'anon_signature': '\\n'\n                                        '[center][url=https://codeberg.org/RawSmoke/Singularity][img=40]https://i.ibb.co/jP8Qqjvm/Peticin-de-Animacin-de-Banner-ezgif-com-resize.gif[/img][/url][/center]',\n                      'api_key': 'API_KEY',\n                      'pr_signature': '\\n'\n                                      ' [center][b][size=6]PERSONAL RELEASE[/size][/b][/center] \\n'\n                                      '[center][b]PLEASE SEED HBD FAMILY[/b][/center]\\n'\n                                      '[center][url=https://codeberg.org/RawSmoke/Singularity][img=400]https://i.ibb.co/2NVWb0c/uploadrr.webp[/img][/url][/center]',\n                      'signature': '\\n'\n                                   '[center][b]PLEASE SEED HDB FAMILY[/b][/center]\\n'\n                                   '[center][url=https://codeberg.org/RawSmoke/Singularity][img=400]https://i.ibb.co/2NVWb0c/uploadrr.webp[/img][/url][/center]'},\n              'HDT': {'announce_url': 'https://tracker.example/announce/YOUR_PASSKEY',\n                      'anon': False,\n                      'my_announce_url': 'https://tracker.example/passkey/announce',\n                      'password': 'PASSWORD',\n                      'username': 'USERNAME'},\n              'HHD': {'announce_url': 'https://homiehelpdesk.net/announce/YOUR_PASSKEY',\n                      'anon': False,\n                      'anon_pr_signature': '\\n'\n                                           '[center][url=https://codeberg.org/RawSmoke/Singularity][img=40]https://i.ibb.co/jP8Qqjvm/Peticin-de-Animacin-de-Banner-ezgif-com-resize.gif[/img][/url][/center]',\n                      'anon_signature': '\\n'\n                                        '[center][url=https://codeberg.org/RawSmoke/Singularity][img=40]https://i.ibb.co/jP8Qqjvm/Peticin-de-Animacin-de-Banner-ezgif-com-resize.gif[/img][/url][/center]',\n                      'api_key': 'API_KEY',\n                      'pr_signature': '\\n'\n                                      ' [center][b][size=6]PERSONAL RELEASE[/size][/b][/center] \\n'\n                                      '[center][url=https://codeberg.org/RawSmoke/Singularity][img=400]https://i.ibb.co/2NVWb0c/uploadrr.webp[/img][/url][/center]',\n                      'signature': '\\n'\n                                   '[center][size=7][b]PLEASE SEED HOMIES[/b][/size][/center]\\n'\n                                   '[center][url=https://codeberg.org/RawSmoke/Singularity][img=400]https://i.ibb.co/2NVWb0c/uploadrr.webp[/img][/url][/center]'},\n              'HP': {'announce_url': 'https://hidden-palace.net/announce/YOUR_PASSKEY',\n                     'anon': False,\n                     'anon_pr_signature': '\\n'\n                                          '[center][url=https://codeberg.org/RawSmoke/Singularity][img=40]https://i.ibb.co/jP8Qqjvm/Peticin-de-Animacin-de-Banner-ezgif-com-resize.gif[/img][/url][/center]',\n                     'anon_signature': '\\n'\n                                       '[center][url=https://codeberg.org/RawSmoke/Singularity][img=40]https://i.ibb.co/jP8Qqjvm/Peticin-de-Animacin-de-Banner-ezgif-com-resize.gif[/img][/url][/center]',\n                     'api_key': 'API_KEY',\n                     'pr_signature': '\\n'\n                                     ' [center][b][size=6]PERSONAL RELEASE[/size][/b][/center] \\n'\n                                     '[center][b]PLEASE SEED HP FAMILY[/b][/center]\\n'\n                                     '[center][url=https://codeberg.org/RawSmoke/Singularity][img=400]https://i.ibb.co/2NVWb0c/uploadrr.webp[/img][/url][/center]',\n                     'signature': '\\n'\n                                  '[center][b]PLEASE SEED HP FAMILY[/b][/center]\\n'\n                                  '[center][url=https://codeberg.org/RawSmoke/Singularity][img=400]https://i.ibb.co/2NVWb0c/uploadrr.webp[/img][/url][/center]'},\n              'HUNO': {'announce_url': 'https://hawke.uno/announce/YOUR_PASSKEY',\n                       'anon': False,\n                       'anon_pr_signature': '\\n'\n                                            '[center][url=https://codeberg.org/RawSmoke/Singularity][img=40]https://i.ibb.co/jP8Qqjvm/Peticin-de-Animacin-de-Banner-ezgif-com-resize.gif[/img][/url][/center]',\n                       'anon_signature': '\\n'\n                                         '[center][url=https://codeberg.org/RawSmoke/Singularity][img=40]https://i.ibb.co/jP8Qqjvm/Peticin-de-Animacin-de-Banner-ezgif-com-resize.gif[/img][/url][/center]',\n                       'api_key': 'API_KEY',\n                       'pr_signature': '\\n'\n                                       ' [center][b][size=6]PERSONAL RELEASE[/size][/b][/center] \\n'\n                                       '[center][b]PLEASE SEED HUNO[/b][/center]\\n'\n                                       '[center][url=https://codeberg.org/RawSmoke/Singularity][img=400]https://i.ibb.co/2NVWb0c/uploadrr.webp[/img][/url][/center]',\n                       'signature': '\\n'\n                                    '[center][b]PLEASE SEED HUNO FAMILY[/b][/center]\\n'\n                                    '[center][url=https://codeberg.org/RawSmoke/Singularity][img=400]https://i.ibb.co/2NVWb0c/uploadrr.webp[/img][/url][/center]'},\n              'ITA': {'announce_url': 'https://itatorrents.xyz/announce/YOUR_PASSKEY',\n                      'anon': False,\n                      'anon_pr_signature': '\\n'\n                                           '[center][url=https://codeberg.org/RawSmoke/Singularity][img=40]https://i.ibb.co/jP8Qqjvm/Peticin-de-Animacin-de-Banner-ezgif-com-resize.gif[/img][/url][/center]',\n                      'anon_signature': '\\n'\n                                        '[center][url=https://codeberg.org/RawSmoke/Singularity][img=40]https://i.ibb.co/jP8Qqjvm/Peticin-de-Animacin-de-Banner-ezgif-com-resize.gif[/img][/url][/center]',\n                      'api_key': 'API_KEY',\n                      'pr_signature': '\\n'\n                                      ' [center][b][size=6]PERSONAL RELEASE[/size][/b][/center] \\n'\n                                      '[center][b]PLEASE SEED ITATorrents[/b][/center]\\n'\n                                      '[center][url=https://codeberg.org/RawSmoke/Singularity][img=400]https://i.ibb.co/2NVWb0c/uploadrr.webp[/img][/url][/center]',\n                      'signature': '\\n'\n                                   '[center][b]PLEASE SEED ITATorrents[/b][/center]\\n'\n                                   '[center][url=https://codeberg.org/RawSmoke/Singularity][img=400]https://i.ibb.co/2NVWb0c/uploadrr.webp[/img][/url][/center]'},\n              'JPTV': {'announce_url': 'https://jptv.club/announce/YOUR_PASSKEY',\n                       'anon': False,\n                       'anon_pr_signature': '\\n'\n                                            '[center][url=https://codeberg.org/RawSmoke/Singularity][img=40]https://i.ibb.co/jP8Qqjvm/Peticin-de-Animacin-de-Banner-ezgif-com-resize.gif[/img][/url][/center]',\n                       'anon_signature': '\\n'\n                                         '[center][url=https://codeberg.org/RawSmoke/Singularity][img=40]https://i.ibb.co/jP8Qqjvm/Peticin-de-Animacin-de-Banner-ezgif-com-resize.gif[/img][/url][/center]',\n                       'api_key': 'API_KEY',\n                       'pr_signature': '\\n'\n                                       ' [center][b][size=6]PERSONAL RELEASE[/size][/b][/center] \\n'\n                                       '[center][b]PLEASE SEED JPTV FAMILY[/b][/center]\\n'\n                                       '[center][url=https://codeberg.org/RawSmoke/Singularity][img=400]https://i.ibb.co/2NVWb0c/uploadrr.webp[/img][/url][/center]',\n                       'signature': '\\n'\n                                    '[center][b]PLEASE SEED JPTV FAMILY[/b][/center]\\n'\n                                    '[center][url=https://codeberg.org/RawSmoke/Singularity][img=400]https://i.ibb.co/2NVWb0c/uploadrr.webp[/img][/url][/center]'},\n              'LCD': {'announce_url': 'https://locadora.cc/announce/YOUR_PASSKEY',\n                      'anon': False,\n                      'anon_pr_signature': '\\n'\n                                           '[center][url=https://codeberg.org/RawSmoke/Singularity][img=40]https://i.ibb.co/jP8Qqjvm/Peticin-de-Animacin-de-Banner-ezgif-com-resize.gif[/img][/url][/center]',\n                      'anon_signature': '\\n'\n                                        '[center][url=https://codeberg.org/RawSmoke/Singularity][img=40]https://i.ibb.co/jP8Qqjvm/Peticin-de-Animacin-de-Banner-ezgif-com-resize.gif[/img][/url][/center]',\n                      'api_key': 'API_KEY',\n                      'pr_signature': '\\n'\n                                      ' [center][b][size=6]PERSONAL RELEASE[/size][/b][/center] \\n'\n                                      '[center][b]PLEASE SEED LCD FAMILY[/b][/center]\\n'\n                                      '[center][url=https://codeberg.org/RawSmoke/Singularity][img=400]https://i.ibb.co/2NVWb0c/uploadrr.webp[/img][/url][/center]',\n                      'signature': '\\n'\n                                   '[center][b]PLEASE SEED LCD FAMILY[/b][/center]\\n'\n                                   '[center][url=https://codeberg.org/RawSmoke/Singularity][img=400]https://i.ibb.co/2NVWb0c/uploadrr.webp[/img][/url][/center]'},\n              'LDU': {'announce_url': 'https://theldu.to/announce/YOUR_PASSKEY',\n                      'anon': False,\n                      'anon_pr_signature': '\\n'\n                                           '[center][url=https://codeberg.org/RawSmoke/Singularity][img=40]https://i.ibb.co/jP8Qqjvm/Peticin-de-Animacin-de-Banner-ezgif-com-resize.gif[/img][/url][/center]',\n                      'anon_signature': '\\n'\n                                        '[center][url=https://codeberg.org/RawSmoke/Singularity][img=40]https://i.ibb.co/jP8Qqjvm/Peticin-de-Animacin-de-Banner-ezgif-com-resize.gif[/img][/url][/center]',\n                      'api_key': 'API_KEY',\n                      'pr_signature': '\\n'\n                                      ' [center][b][size=6]PERSONAL RELEASE[/size][/b][/center] \\n'\n                                      '[center][b]PLEASE SEED LDU FAMILY[/b][/center]\\n'\n                                      '[center][url=https://codeberg.org/RawSmoke/Singularity][img=400]https://i.ibb.co/2NVWb0c/uploadrr.webp[/img][/url][/center]',\n                      'signature': '\\n'\n                                   '[center][b]PLEASE SEED LDU FAMILY[/b][/center]\\n'\n                                   '[center][url=https://codeberg.org/RawSmoke/Singularity][img=400]https://i.ibb.co/2NVWb0c/uploadrr.webp[/img][/url][/center]'},\n              'LST': {'announce_url': 'https://lst.gg/announce/YOUR_PASSKEY',\n                      'anon': False,\n                      'anon_pr_signature': '\\n'\n                                           '[center][url=https://codeberg.org/RawSmoke/Singularity][img=40]https://i.ibb.co/jP8Qqjvm/Peticin-de-Animacin-de-Banner-ezgif-com-resize.gif[/img][/url][/center]',\n                      'anon_signature': '\\n'\n                                        '[center][url=https://codeberg.org/RawSmoke/Singularity][img=40]https://i.ibb.co/jP8Qqjvm/Peticin-de-Animacin-de-Banner-ezgif-com-resize.gif[/img][/url][/center]',\n                      'api_key': 'API_KEY',\n                      'pr_signature': '\\n'\n                                      ' [center][b][size=6]PERSONAL RELEASE[/size][/b][/center] \\n'\n                                      '[center][b]PLEASE SEED LST FAMILY[/b][/center]\\n'\n                                      '[center][url=https://codeberg.org/RawSmoke/Singularity][img=400]https://i.ibb.co/2NVWb0c/uploadrr.webp[/img][/url][/center]',\n                      'signature': '\\n'\n                                   '[center][b]PLEASE SEED LST FAMILY[/b][/center]\\n'\n                                   '[center][url=https://codeberg.org/RawSmoke/Singularity][img=400]https://i.ibb.co/2NVWb0c/uploadrr.webp[/img][/url][/center]'},\n              'LT': {'announce_url': 'https://lat-team.com/announce/YOUR_PASSKEY',\n                     'anon': False,\n                     'anon_pr_signature': '\\n'\n                                          '[center][url=https://codeberg.org/RawSmoke/Singularity][img=40]https://i.ibb.co/jP8Qqjvm/Peticin-de-Animacin-de-Banner-ezgif-com-resize.gif[/img][/url][/center]',\n                     'anon_signature': '\\n'\n                                       '[center][url=https://codeberg.org/RawSmoke/Singularity][img=40]https://i.ibb.co/jP8Qqjvm/Peticin-de-Animacin-de-Banner-ezgif-com-resize.gif[/img][/url][/center]',\n                     'api_key': 'API_KEY',\n                     'pr_signature': '\\n'\n                                     ' [center][b][size=6]PERSONAL RELEASE[/size][/b][/center] \\n'\n                                     '[center][b]PLEASE SEED LAT-Team[/b][/center]\\n'\n                                     '[center][url=https://codeberg.org/RawSmoke/Singularity][img=400]https://i.ibb.co/2NVWb0c/uploadrr.webp[/img][/url][/center]',\n                     'signature': '\\n'\n                                  '[center][b]PLEASE SEED LAT-Team[/b][/center]\\n'\n                                  '[center][url=https://codeberg.org/RawSmoke/Singularity][img=400]https://i.ibb.co/2NVWb0c/uploadrr.webp[/img][/url][/center]'},\n              'MANUAL': {},\n              'MB': {'announce_url': 'https://malayabits.cc/announce/YOUR_PASSKEY',\n                     'anon': False,\n                     'anon_pr_signature': '\\n'\n                                          '[center][url=https://codeberg.org/RawSmoke/Singularity][img=40]https://i.ibb.co/jP8Qqjvm/Peticin-de-Animacin-de-Banner-ezgif-com-resize.gif[/img][/url][/center]',\n                     'anon_signature': '\\n'\n                                       '[center][url=https://codeberg.org/RawSmoke/Singularity][img=40]https://i.ibb.co/jP8Qqjvm/Peticin-de-Animacin-de-Banner-ezgif-com-resize.gif[/img][/url][/center]',\n                     'api_key': 'API_KEY',\n                     'pr_signature': '\\n'\n                                     ' [center][b][size=6]PERSONAL RELEASE[/size][/b][/center] \\n'\n                                     '[center][b]PLEASE SEED MalayaBits[/b][/center]\\n'\n                                     '[center][url=https://codeberg.org/RawSmoke/Singularity][img=400]https://i.ibb.co/2NVWb0c/uploadrr.webp[/img][/url][/center]',\n                     'signature': '\\n'\n                                  '[center][b]PLEASE SEED MalayaBits[/b][/center]\\n'\n                                  '[center][url=https://codeberg.org/RawSmoke/Singularity][img=400]https://i.ibb.co/2NVWb0c/uploadrr.webp[/img][/url][/center]'},\n              'MILNU': {'announce_url': 'https://milnueve.cc/announce/YOUR_PASSKEY',\n                        'anon': False,\n                        'anon_pr_signature': '\\n'\n                                             '[center][url=https://codeberg.org/RawSmoke/Singularity][img=40]https://i.ibb.co/jP8Qqjvm/Peticin-de-Animacin-de-Banner-ezgif-com-resize.gif[/img][/url][/center]',\n                        'anon_signature': '\\n'\n                                          '[center][url=https://codeberg.org/RawSmoke/Singularity][img=40]https://i.ibb.co/jP8Qqjvm/Peticin-de-Animacin-de-Banner-ezgif-com-resize.gif[/img][/url][/center]',\n                        'api_key': 'API_KEY',\n                        'pr_signature': '\\n'\n                                        ' [center][b][size=6]PERSONAL RELEASE[/size][/b][/center] \\n'\n                                        '[center][b]PLEASE SEED MILNUEVE FAMILY[/b][/center]\\n'\n                                        '[center][url=https://codeberg.org/RawSmoke/Singularity][img=400]https://i.ibb.co/2NVWb0c/uploadrr.webp[/img][/url][/center]',\n                        'signature': '\\n'\n                                     '[center][b]🌱 ¡La magia del P2P eres tú! Por favor, quédate '\n                                     'compartiendo para mantener viva la comunidad. 🌱[/b][/center]\\n'\n                                     '[center][url=https://codeberg.org/RawSmoke/Singularity][img=400]https://i.ibb.co/1t1y9g3k/Banner-MILNU.png[/img][/url][/center]'},\n              'MTV': {'announce_url': 'https://tracker.example/announce/YOUR_PASSKEY',\n                      'anon': False,\n                      'api_key': 'API_KEY',\n                      'password': 'PASSWORD',\n                      'username': 'USERNAME'},\n              'NBL': {'announce_url': 'https://tracker.example/announce/YOUR_PASSKEY',\n                      'anon': False,\n                      'anon_pr_signature': '\\n'\n                                           '[center][url=https://codeberg.org/RawSmoke/Singularity][img=40]https://i.ibb.co/jP8Qqjvm/Peticin-de-Animacin-de-Banner-ezgif-com-resize.gif[/img][/url][/center]',\n                      'anon_signature': '\\n'\n                                        '[center][url=https://codeberg.org/RawSmoke/Singularity][img=40]https://i.ibb.co/jP8Qqjvm/Peticin-de-Animacin-de-Banner-ezgif-com-resize.gif[/img][/url][/center]',\n                      'api_key': 'API_KEY',\n                      'pr_signature': '\\n'\n                                      ' [center][b][size=6]PERSONAL RELEASE[/size][/b][/center] \\n'\n                                      '[center][b]PLEASE SEED Nebulance[/b][/center]\\n'\n                                      '[center][url=https://codeberg.org/RawSmoke/Singularity][img=400]https://i.ibb.co/2NVWb0c/uploadrr.webp[/img][/url][/center]',\n                      'signature': '\\n'\n                                   '[center][b]PLEASE SEED Nebulance FAMILY[/b][/center]\\n'\n                                   '[center][url=https://codeberg.org/RawSmoke/Singularity][img=400]https://i.ibb.co/2NVWb0c/uploadrr.webp[/img][/url][/center]'},\n              'NOBS': {'announce_url': 'https://nobs.rawsmoke.net/announce/YOUR_PASSKEY',\n                       'anon': False,\n                       'anon_pr_signature': '[center][url=https://codeberg.org/RawSmoke/Singularity][img=40]https://i.ibb.co/jP8Qqjvm/Peticin-de-Animacin-de-Banner-ezgif-com-resize.gif[/img][/url][/center]',\n                       'api_key': 'NOBS_API_KEY',\n                       'pr_signature': '[center][b]🌱 ¡La magia del P2P eres tú! Por favor, quédate '\n                                       'compartiendo para mantener viva la comunidad. '\n                                       '🌱[/b][/center][center][url=https://codeberg.org/RawSmoke/Singularity][img=400]https://i.ibb.co/0RrzLmSr/RAW-bruma-servers.png[/img][/url][/center]',\n                       'signature': '[center][b]🌱 ¡La magia del P2P eres tú! Por favor, quédate compartiendo '\n                                    'para mantener viva la comunidad. '\n                                    '🌱[/b][/center][center][url=https://codeberg.org/RawSmoke/Singularity][img=400]https://i.ibb.co/0RrzLmSr/RAW-bruma-servers.png[/img][/url][/center]'},\n              'OE': {'announce_url': 'https://onlyencodes.cc/announce/YOUR_PASSKEY',\n                     'anon': False,\n                     'anon_pr_signature': '\\n'\n                                          '[center][url=https://codeberg.org/RawSmoke/Singularity][img=40]https://i.ibb.co/jP8Qqjvm/Peticin-de-Animacin-de-Banner-ezgif-com-resize.gif[/img][/url][/center]',\n                     'anon_signature': '\\n'\n                                       '[center][url=https://codeberg.org/RawSmoke/Singularity][img=40]https://i.ibb.co/jP8Qqjvm/Peticin-de-Animacin-de-Banner-ezgif-com-resize.gif[/img][/url][/center]',\n                     'api_key': 'API_KEY',\n                     'pr_signature': '\\n'\n                                     ' [center][b][size=6]PERSONAL RELEASE[/size][/b][/center] \\n'\n                                     '[center][b]PLEASE SEED OE FAMILY[/b][/center]\\n'\n                                     '[center][url=https://codeberg.org/RawSmoke/Singularity][img=400]https://i.ibb.co/2NVWb0c/uploadrr.webp[/img][/url][/center]',\n                     'signature': '\\n'\n                                  '[center][b]PLEASE SEED OnlyEncodes FAMILY[/b][/center]\\n'\n                                  '[center][url=https://codeberg.org/RawSmoke/Singularity][img=400]https://i.ibb.co/2NVWb0c/uploadrr.webp[/img][/url][/center]'},\n              'OINK': {'announce_url': 'https://yoinked.org/announce/YOUR_PASSKEY',\n                       'anon': False,\n                       'anon_pr_signature': '\\n'\n                                            '[center][url=https://codeberg.org/RawSmoke/Singularity][img=40]https://i.ibb.co/jP8Qqjvm/Peticin-de-Animacin-de-Banner-ezgif-com-resize.gif[/img][/url][/center]',\n                       'anon_signature': '\\n'\n                                         '[center][url=https://codeberg.org/RawSmoke/Singularity][img=40]https://i.ibb.co/jP8Qqjvm/Peticin-de-Animacin-de-Banner-ezgif-com-resize.gif[/img][/url][/center]',\n                       'api_key': 'API_KEY',\n                       'pr_signature': '\\n'\n                                       ' [center][b][size=6]PERSONAL RELEASE[/size][/b][/center] \\n'\n                                       '[center][url=https://codeberg.org/RawSmoke/Singularity][img=400]https://i.ibb.co/2NVWb0c/uploadrr.webp[/img][/url][/center]',\n                       'signature': '\\n'\n                                    '[center][b]PLEASE SEED YOiNKED FAMILY[/b][/center]\\n'\n                                    '[center][url=https://codeberg.org/RawSmoke/Singularity][img=400]https://i.ibb.co/2NVWb0c/uploadrr.webp[/img][/url][/center]'},\n              'OTW': {'announce_url': 'https://oldtoons.world/announce/YOUR_PASSKEY',\n                      'anon': False,\n                      'anon_pr_signature': '\\n'\n                                           '[center][url=https://codeberg.org/RawSmoke/Singularity][img=40]https://i.ibb.co/jP8Qqjvm/Peticin-de-Animacin-de-Banner-ezgif-com-resize.gif[/img][/url][/center]',\n                      'anon_signature': '\\n'\n                                        '[center][url=https://codeberg.org/RawSmoke/Singularity][img=40]https://i.ibb.co/jP8Qqjvm/Peticin-de-Animacin-de-Banner-ezgif-com-resize.gif[/img][/url][/center]',\n                      'api_key': 'API_KEY',\n                      'pr_signature': '\\n'\n                                      ' [center]PERSONAL RELEASE[/center]\\n'\n                                      '[center][url=https://codeberg.org/RawSmoke/Singularity][img=400]https://i.ibb.co/2NVWb0c/uploadrr.webp[/img][/url][/center]',\n                      'signature': '\\n'\n                                   '[center][b]PLEASE SEED OldToons FAMILY[/b][/center]\\n'\n                                   '[center][url=https://codeberg.org/RawSmoke/Singularity][img=400]https://i.ibb.co/2NVWb0c/uploadrr.webp[/img][/url][/center]'},\n              'PRBLM': {'announce_url': 'https://parabellumhd.cx/announce/YOUR_PASSKEY',\n                        'anon': False,\n                        'anon_pr_signature': '[center][url=https://codeberg.org/RawSmoke/Singularity][img=40]https://i.ibb.co/jP8Qqjvm/Peticin-de-Animacin-de-Banner-ezgif-com-resize.gif[/img][/url][/center]',\n                        'anon_signature': '\\n'\n                                          '[center][url=https://codeberg.org/RawSmoke/Singularity][img=40]https://i.ibb.co/jP8Qqjvm/Peticin-de-Animacin-de-Banner-ezgif-com-resize.gif[/img][/url][/center]',\n                        'api_key': 'API_KEY',\n                        'pr_signature': '\\n'\n                                        ' [center][b][size=6]PERSONAL RELEASE[/size][/b][/center] \\n'\n                                        '[center][b]PLEASE SEED PARABELLUM FAMILY[/b][/center]\\n'\n                                        '[center][url=https://codeberg.org/RawSmoke/Singularity][img=400]https://i.ibb.co/2NVWb0c/uploadrr.webp[/img][/url][/center]',\n                        'signature': '\\n'\n                                     '[center][b]🌱 ¡La magia del P2P eres tú! Por favor, quédate '\n                                     'compartiendo para mantener viva la comunidad. 🌱[/b][/center]\\n'\n                                     '[center][url=https://github.com/RawSmokeTerribilus/RaW-Suite-TUI-ed][img=400]https://i.ibb.co/MxMC37jh/Little.jpg[/img][/url][/center]'},\n              'PSS': {'announce_url': 'https://privatesilverscreen.cc/announce/YOUR_PASSKEY',\n                      'anon': False,\n                      'anon_pr_signature': '\\n'\n                                           '[center][url=https://codeberg.org/RawSmoke/Singularity][img=40]https://i.ibb.co/jP8Qqjvm/Peticin-de-Animacin-de-Banner-ezgif-com-resize.gif[/img][/url][/center]',\n                      'anon_signature': '\\n'\n                                        '[center][url=https://codeberg.org/RawSmoke/Singularity][img=40]https://i.ibb.co/jP8Qqjvm/Peticin-de-Animacin-de-Banner-ezgif-com-resize.gif[/img][/url][/center]',\n                      'api_key': 'API_KEY',\n                      'pr_signature': '\\n'\n                                      ' [center][b][size=6]PERSONAL RELEASE[/size][/b][/center] \\n'\n                                      '[center][b]PLEASE SEED[/b][/center]\\n'\n                                      '[center][url=https://codeberg.org/RawSmoke/Singularity][img=400]https://i.ibb.co/2NVWb0c/uploadrr.webp[/img][/url][/center]',\n                      'signature': '\\n'\n                                   '[center][b]PLEASE SEED PrivateSilverScreen FAMILY[/b][/center]\\n'\n                                   '[center][url=https://codeberg.org/RawSmoke/Singularity][img=400]https://i.ibb.co/2NVWb0c/uploadrr.webp[/img][/url][/center]'},\n              'PTER': {'anon': False,\n                       'img_rehost': False,\n                       'passkey': 'YOUR_PASSKEY',\n                       'password': 'PASSWORD',\n                       'ptgen_api': 'PTGEN_API_KEY',\n                       'username': 'USERNAME'},\n              'PTP': {'ApiKey': 'PTP_API_KEY',\n                      'ApiUser': 'PTP_API_USER',\n                      'add_web_source_to_desc': True,\n                      'announce_url': 'https://tracker.example/announce/YOUR_PASSKEY',\n                      'password': 'PASSWORD',\n                      'useAPI': False,\n                      'username': 'USERNAME'},\n              'PTT': {'announce_url': 'https://polishtorrent.top/announce/YOUR_PASSKEY',\n                      'anon': False,\n                      'anon_pr_signature': '\\n'\n                                           '[center][url=https://codeberg.org/RawSmoke/Singularity][img=40]https://i.ibb.co/jP8Qqjvm/Peticin-de-Animacin-de-Banner-ezgif-com-resize.gif[/img][/url][/center]',\n                      'anon_signature': '\\n'\n                                        '[center][url=https://codeberg.org/RawSmoke/Singularity][img=40]https://i.ibb.co/jP8Qqjvm/Peticin-de-Animacin-de-Banner-ezgif-com-resize.gif[/img][/url][/center]',\n                      'api_key': 'API_KEY',\n                      'pr_signature': '\\n'\n                                      ' [center][b][size=6]PERSONAL RELEASE[/size][/b][/center] \\n'\n                                      '[center][b]PLEASE SEED PTT FAMILY[/b][/center]\\n'\n                                      '[center][url=https://codeberg.org/RawSmoke/Singularity][img=400]https://i.ibb.co/2NVWb0c/uploadrr.webp[/img][/url][/center]',\n                      'signature': '\\n'\n                                   '[center][b]PLEASE SEED PolishTorrent FAMILY[/b][/center]\\n'\n                                   '[center][url=https://codeberg.org/RawSmoke/Singularity][img=400]https://i.ibb.co/2NVWb0c/uploadrr.webp[/img][/url][/center]'},\n              'R4E': {'announce_url': 'https://racing4everyone.eu/announce/YOUR_PASSKEY',\n                      'anon': False,\n                      'anon_pr_signature': '\\n'\n                                           '[center][url=https://codeberg.org/RawSmoke/Singularity][img=40]https://i.ibb.co/jP8Qqjvm/Peticin-de-Animacin-de-Banner-ezgif-com-resize.gif[/img][/url][/center]',\n                      'anon_signature': '\\n'\n                                        '[center][url=https://codeberg.org/RawSmoke/Singularity][img=40]https://i.ibb.co/jP8Qqjvm/Peticin-de-Animacin-de-Banner-ezgif-com-resize.gif[/img][/url][/center]',\n                      'api_key': 'API_KEY',\n                      'pr_signature': '\\n'\n                                      ' [center][b][size=6]PERSONAL RELEASE[/size][/b][/center] \\n'\n                                      '[center][b]PLEASE SEED R4E FAMILY[/b][/center]\\n'\n                                      '[center][url=https://codeberg.org/RawSmoke/Singularity][img=400]https://i.ibb.co/2NVWb0c/uploadrr.webp[/img][/url][/center]',\n                      'signature': '\\n'\n                                   '[center][b]PLEASE SEED Racing4Everyone FAMILY[/b][/center]\\n'\n                                   '[center][url=https://codeberg.org/RawSmoke/Singularity][img=400]https://i.ibb.co/2NVWb0c/uploadrr.webp[/img][/url][/center]'},\n              'RF': {'announce_url': 'https://reelflix.xyz/announce/YOUR_PASSKEY',\n                     'anon': False,\n                     'anon_pr_signature': '\\n'\n                                          '[center][url=https://codeberg.org/RawSmoke/Singularity][img=40]https://i.ibb.co/jP8Qqjvm/Peticin-de-Animacin-de-Banner-ezgif-com-resize.gif[/img][/url][/center]',\n                     'anon_signature': '\\n'\n                                       '[center][url=https://codeberg.org/RawSmoke/Singularity][img=40]https://i.ibb.co/jP8Qqjvm/Peticin-de-Animacin-de-Banner-ezgif-com-resize.gif[/img][/url][/center]',\n                     'api_key': 'API_KEY',\n                     'pr_signature': '\\n'\n                                     ' [center][b][size=6]PERSONAL RELEASE[/size][/b][/center] \\n'\n                                     '[center][b]PLEASE SEED RF FAMILY[/b][/center]\\n'\n                                     '[center][url=https://codeberg.org/RawSmoke/Singularity][img=400]https://i.ibb.co/2NVWb0c/uploadrr.webp[/img][/url][/center]',\n                     'signature': '\\n'\n                                  '[center][b]PLEASE SEED ReelFliX FAMILY[/b][/center]\\n'\n                                  '[center][url=https://codeberg.org/RawSmoke/Singularity][img=400]https://i.ibb.co/2NVWb0c/uploadrr.webp[/img][/url][/center]'},\n              'RHD': {'announce_url': 'https://r0k3t.li/announce/YOUR_PASSKEY',\n                      'anon': False,\n                      'anon_pr_signature': '\\n'\n                                           '[center][url=https://codeberg.org/RawSmoke/Singularity][img=40]https://i.ibb.co/jP8Qqjvm/Peticin-de-Animacin-de-Banner-ezgif-com-resize.gif[/img][/url][/center]',\n                      'anon_signature': '\\n'\n                                        '[center][url=https://codeberg.org/RawSmoke/Singularity][img=40]https://i.ibb.co/jP8Qqjvm/Peticin-de-Animacin-de-Banner-ezgif-com-resize.gif[/img][/url][/center]',\n                      'api_key': 'API_KEY',\n                      'pr_signature': '\\n'\n                                      ' [center][b][size=6]PERSONAL RELEASE[/size][/b][/center]\\n'\n                                      '[center][url=https://codeberg.org/RawSmoke/Singularity][img=400]https://i.ibb.co/2NVWb0c/uploadrr.webp[/img][/url][/center]',\n                      'signature': '\\n'\n                                   '[center][b]PLEASE SEED RocketHD[/b][/center]\\n'\n                                   '[center][url=https://codeberg.org/RawSmoke/Singularity][img=400]https://i.ibb.co/2NVWb0c/uploadrr.webp[/img][/url][/center]'},\n              'RTF': {'announce_url': 'https://tracker.example/announce/YOUR_PASSKEY',\n                      'anon': False,\n                      'anon_pr_signature': '\\n'\n                                           '[center][url=https://codeberg.org/RawSmoke/Singularity][img=40]https://i.ibb.co/jP8Qqjvm/Peticin-de-Animacin-de-Banner-ezgif-com-resize.gif[/img][/url][/center]',\n                      'anon_signature': '\\n'\n                                        '[center][url=https://codeberg.org/RawSmoke/Singularity][img=40]https://i.ibb.co/jP8Qqjvm/Peticin-de-Animacin-de-Banner-ezgif-com-resize.gif[/img][/url][/center]',\n                      'api_key': 'API_KEY',\n                      'pr_signature': '\\n'\n                                      ' [center][b][size=6]PERSONAL RELEASE[/size][/b][/center] \\n'\n                                      '[center][b]PLEASE SEED RTF FAMILY[/b][/center]\\n'\n                                      '[center][url=https://codeberg.org/RawSmoke/Singularity][img=400]https://i.ibb.co/2NVWb0c/uploadrr.webp[/img][/url][/center]',\n                      'signature': '\\n'\n                                   '[center][b]PLEASE SEED RetroFlix FAMILY[/b][/center]\\n'\n                                   '[center][url=https://codeberg.org/RawSmoke/Singularity][img=400]https://i.ibb.co/2NVWb0c/uploadrr.webp[/img][/url][/center]'},\n              'SHRI': {'announce_url': 'https://shareisland.org/announce/YOUR_PASSKEY',\n                       'anon': False,\n                       'anon_pr_signature': '\\n'\n                                            '[center][url=https://codeberg.org/RawSmoke/Singularity][img=40]https://i.ibb.co/jP8Qqjvm/Peticin-de-Animacin-de-Banner-ezgif-com-resize.gif[/img][/url][/center]',\n                       'anon_signature': '\\n'\n                                         '[center][url=https://codeberg.org/RawSmoke/Singularity][img=40]https://i.ibb.co/jP8Qqjvm/Peticin-de-Animacin-de-Banner-ezgif-com-resize.gif[/img][/url][/center]',\n                       'api_key': 'API_KEY',\n                       'pr_signature': '\\n'\n                                       ' [center][b][size=6]PERSONAL RELEASE[/size][/b][/center] \\n'\n                                       '[center][b]PLEASE SEED ShareIsland[/b][/center]\\n'\n                                       '[center][url=https://codeberg.org/RawSmoke/Singularity][img=400]https://i.ibb.co/2NVWb0c/uploadrr.webp[/img][/url][/center]',\n                       'signature': '\\n'\n                                    '[center][b]PLEASE SEED ShareIsland[/b][/center]\\n'\n                                    '[center][url=https://codeberg.org/RawSmoke/Singularity][img=400]https://i.ibb.co/2NVWb0c/uploadrr.webp[/img][/url][/center]'},\n              'SN': {'announce_url': 'https://tracker.swarmazon.club:8443/<YOUR_PASSKEY>/announce',\n                     'anon': False,\n                     'anon_pr_signature': '\\n'\n                                          '[center][url=https://codeberg.org/RawSmoke/Singularity][img=40]https://i.ibb.co/jP8Qqjvm/Peticin-de-Animacin-de-Banner-ezgif-com-resize.gif[/img][/url][/center]',\n                     'anon_signature': '\\n'\n                                       '[center][url=https://codeberg.org/RawSmoke/Singularity][img=40]https://i.ibb.co/jP8Qqjvm/Peticin-de-Animacin-de-Banner-ezgif-com-resize.gif[/img][/url][/center]',\n                     'api_key': 'API_KEY',\n                     'pr_signature': '\\n'\n                                     ' [center][b][size=6]PERSONAL RELEASE[/size][/b][/center] \\n'\n                                     '[center][b]PLEASE SEED Swarmazon[/b][/center]\\n'\n                                     '[center][url=https://codeberg.org/RawSmoke/Singularity][img=400]https://i.ibb.co/2NVWb0c/uploadrr.webp[/img][/url][/center]',\n                     'signature': '\\n'\n                                  '[center][b]PLEASE SEED Swarmazon[/b][/center]\\n'\n                                  '[center][url=https://codeberg.org/RawSmoke/Singularity][img=400]https://i.ibb.co/2NVWb0c/uploadrr.webp[/img][/url][/center]'},\n              'SP': {'announce_url': 'https://seedpool.org/announce/YOUR_PASSKEY',\n                     'anon': False,\n                     'anon_pr_signature': '\\n'\n                                          '[center][url=https://codeberg.org/RawSmoke/Singularity][img=40]https://i.ibb.co/jP8Qqjvm/Peticin-de-Animacin-de-Banner-ezgif-com-resize.gif[/img][/url][/center]',\n                     'anon_signature': '\\n'\n                                       '[center][url=https://codeberg.org/RawSmoke/Singularity][img=40]https://i.ibb.co/jP8Qqjvm/Peticin-de-Animacin-de-Banner-ezgif-com-resize.gif[/img][/url][/center]',\n                     'api_key': 'API_KEY',\n                     'pr_signature': '\\n'\n                                     ' [center][b][size=6]PERSONAL RELEASE[/size][/b][/center] \\n'\n                                     '[center][b]PLEASE SEED[/b][/center]\\n'\n                                     '[center][url=https://codeberg.org/RawSmoke/Singularity][img=400]https://i.ibb.co/2NVWb0c/uploadrr.webp[/img][/url][/center]',\n                     'signature': '\\n'\n                                  '[center][b]PLEASE SEED[/b][/center]\\n'\n                                  '[center][url=https://codeberg.org/RawSmoke/Singularity][img=400]https://i.ibb.co/2NVWb0c/uploadrr.webp[/img][/url][/center]'},\n              'THR': {'announce_url': 'http://www.torrenthr.org/announce.php?passkey=YOUR_PASSKEY',\n                      'anon': False,\n                      'img_api': 'IMAGE_API_KEY',\n                      'password': 'PASSWORD',\n                      'pronfo_api_key': 'PRONFO_API_KEY',\n                      'pronfo_rapi_id': 'RAPI_ID',\n                      'pronfo_theme': 'THEME',\n                      'username': 'USERNAME'},\n              'TL': {'announce_key': 'YOUR_ANNOUNCE_KEY'},\n              'TLZ': {'announce_url': 'https://tlzdigital.com/announce/YOUR_PASSKEY',\n                      'anon': False,\n                      'anon_pr_signature': '\\n'\n                                           '[center][url=https://codeberg.org/RawSmoke/Singularity][img=40]https://i.ibb.co/jP8Qqjvm/Peticin-de-Animacin-de-Banner-ezgif-com-resize.gif[/img][/url][/center]',\n                      'anon_signature': '\\n'\n                                        '[center][url=https://codeberg.org/RawSmoke/Singularity][img=40]https://i.ibb.co/jP8Qqjvm/Peticin-de-Animacin-de-Banner-ezgif-com-resize.gif[/img][/url][/center]',\n                      'api_key': 'API_KEY',\n                      'pr_signature': '\\n'\n                                      ' [center][b][size=6]PERSONAL RELEASE[/size][/b][/center] \\n'\n                                      '[center][b]PLEASE SEED TLZ[/b][/center]\\n'\n                                      '[center][url=https://codeberg.org/RawSmoke/Singularity][img=400]https://i.ibb.co/2NVWb0c/uploadrr.webp[/img][/url][/center]',\n                      'signature': '\\n'\n                                   '[center][b]PLEASE SEED TLZ[/b][/center]\\n'\n                                   '[center][url=https://codeberg.org/RawSmoke/Singularity][img=400]https://i.ibb.co/2NVWb0c/uploadrr.webp[/img][/url][/center]'},\n              'TOCA': {'announce_url': 'https://tocashare.com/announce/YOUR_PASSKEY',\n                       'anon': False,\n                       'anon_pr_signature': '\\n'\n                                            '[center][url=https://codeberg.org/RawSmoke/Singularity][img=40]https://i.ibb.co/jP8Qqjvm/Peticin-de-Animacin-de-Banner-ezgif-com-resize.gif[/img][/url][/center]',\n                       'anon_signature': '\\n[center][size=6]we are anonymous[/size][/center]',\n                       'api_key': 'API_KEY',\n                       'pr_signature': '\\n'\n                                       ' [center][b][size=6]PERSONAL RELEASE[/size][/b][/center] \\n'\n                                       '[center][b]PLEASE SEED TOCA SHARE[/b][/center]\\n'\n                                       '[center][url=https://codeberg.org/RawSmoke/Singularity][img=400]https://i.ibb.co/2NVWb0c/uploadrr.webp[/img][/url][/center]',\n                       'signature': '\\n'\n                                    '[center][b]PLEASE SEED TOCA SHARE[/b][/center]\\n'\n                                    '[center][url=https://codeberg.org/RawSmoke/Singularity][img=400]https://i.ibb.co/2NVWb0c/uploadrr.webp[/img][/url][/center]'},\n              'TTLND': {'announce_url': 'https://torrentland.li/announce/YOUR_PASSKEY',\n                        'anon': False,\n                        'anon_pr_signature': '\\n'\n                                             '[center][url=https://codeberg.org/CvT/Uploadrr][img=40]https://i.ibb.co/n0jF73x/hacker.png[/img][/url][/center]',\n                        'anon_signature': '\\n'\n                                          '[center][url=https://codeberg.org/CvT/Uploadrr][img=40]https://i.ibb.co/n0jF73x/hacker.png[/img][/url][/center]',\n                        'api_key': 'API_KEY',\n                        'pr_signature': '\\n'\n                                        ' [center][b][size=6]PERSONAL RELEASE[/size][/b][/center] \\n'\n                                        '[center][b]PLEASE SEED TORRENTLAND FAMILY[/b][/center]\\n'\n                                        '[center][url=https://codeberg.org/CvT/Uploadrr][img=400]https://i.ibb.co/2NVWb0c/uploadrr.webp[/img][/url][/center]',\n                        'signature': '[center][img=400]https://i.ibb.co/pBZZJjQS/Peticin-de-Animacin-de-Banner-ezgif-com-gif-to-webp-converter.webp[/img][/center]'},\n              'TTR': {'announce_url': 'https://torrenteros.org/announce/YOUR_PASSKEY',\n                      'anon': False,\n                      'anon_pr_signature': '\\n'\n                                           '[center][url=https://codeberg.org/RawSmoke/Singularity][img=40]https://i.ibb.co/jP8Qqjvm/Peticin-de-Animacin-de-Banner-ezgif-com-resize.gif[/img][/url][/center]',\n                      'anon_signature': '\\n[center][size=6]we are anonymous[/size][/center]',\n                      'api_key': 'API_KEY',\n                      'pr_signature': '\\n'\n                                      ' [center][b][size=6]PERSONAL RELEASE[/size][/b][/center] \\n'\n                                      '[center][b]PLEASE SEED TorrentEros[/b][/center]\\n'\n                                      '[center][url=https://codeberg.org/RawSmoke/Singularity][img=400]https://i.ibb.co/2NVWb0c/uploadrr.webp[/img][/url][/center]',\n                      'signature': '\\n'\n                                   '[center][b]PLEASE SEED TorrentEros[/b][/center]\\n'\n                                   '[center][url=https://codeberg.org/RawSmoke/Singularity][img=400]https://i.ibb.co/2NVWb0c/uploadrr.webp[/img][/url][/center]'},\n              'ULCX': {'announce_url': 'https://upload.cx/announce/YOUR_PASSKEY',\n                       'anon': False,\n                       'anon_pr_signature': '\\n'\n                                            '[center][url=https://codeberg.org/RawSmoke/Singularity][img=40]https://i.ibb.co/jP8Qqjvm/Peticin-de-Animacin-de-Banner-ezgif-com-resize.gif[/img][/url][/center]',\n                       'anon_signature': '\\n'\n                                         '[center][url=https://codeberg.org/RawSmoke/Singularity][img=40]https://i.ibb.co/jP8Qqjvm/Peticin-de-Animacin-de-Banner-ezgif-com-resize.gif[/img][/url][/center]',\n                       'api_key': 'API_KEY',\n                       'pr_signature': '\\n'\n                                       ' [center][b][size=6]PERSONAL RELEASE[/size][/b][/center] \\n'\n                                       '[center][b]PLEASE SEED ULCX FAMILY[/b][/center]\\n'\n                                       '[center][url=https://codeberg.org/RawSmoke/Singularity][img=400]https://i.ibb.co/2NVWb0c/uploadrr.webp[/img][/url][/center]',\n                       'signature': '\\n'\n                                    '[center][b]PLEASE SEED ULCX FAMILY[/b][/center]\\n'\n                                    '[center][url=https://codeberg.org/RawSmoke/Singularity][img=400]https://i.ibb.co/2NVWb0c/uploadrr.webp[/img][/url][/center]'},\n              'UTP': {'announce_url': 'https://utp.to/announce/YOUR_PASSKEY',\n                      'anon': False,\n                      'anon_pr_signature': '\\n'\n                                           '[center][url=https://codeberg.org/RawSmoke/Singularity][img=40]https://i.ibb.co/jP8Qqjvm/Peticin-de-Animacin-de-Banner-ezgif-com-resize.gif[/img][/url][/center]',\n                      'anon_signature': '\\n'\n                                        '[center][url=https://codeberg.org/RawSmoke/Singularity][img=40]https://i.ibb.co/jP8Qqjvm/Peticin-de-Animacin-de-Banner-ezgif-com-resize.gif[/img][/url][/center]',\n                      'api_key': 'API_KEY',\n                      'pr_signature': '\\n'\n                                      ' [center][b][size=6]PERSONAL RELEASE[/size][/b][/center] \\n'\n                                      '[center][b]PLEASE SEED UTP FAMILY[/b][/center]\\n'\n                                      '[center][url=https://codeberg.org/RawSmoke/Singularity][img=400]https://i.ibb.co/2NVWb0c/uploadrr.webp[/img][/url][/center]',\n                      'signature': '\\n'\n                                   '[center][b]PLEASE SEED UTP FAMILY[/b][/center]\\n'\n                                   '[center][url=https://codeberg.org/RawSmoke/Singularity][img=400]https://i.ibb.co/2NVWb0c/uploadrr.webp[/img][/url][/center]'},\n              'YU': {'announce_url': 'https://yu-scene.net/announce/YOUR_PASSKEY',\n                     'anon': False,\n                     'anon_pr_signature': '\\n'\n                                          '[center][url=https://codeberg.org/RawSmoke/Singularity][img=40]https://i.ibb.co/jP8Qqjvm/Peticin-de-Animacin-de-Banner-ezgif-com-resize.gif[/img][/url][/center]',\n                     'anon_signature': '\\n'\n                                       '[center][url=https://codeberg.org/RawSmoke/Singularity][img=40]https://i.ibb.co/jP8Qqjvm/Peticin-de-Animacin-de-Banner-ezgif-com-resize.gif[/img][/url][/center]',\n                     'api_key': 'API_KEY',\n                     'pr_signature': '\\n'\n                                     ' [center][b][size=6]PERSONAL RELEASE[/size][/b][/center] \\n'\n                                     '[center][b]PLEASE SEED YU-SCENE FAMILY[/b][/center]\\n'\n                                     '[center][url=https://codeberg.org/RawSmoke/Singularity][img=400]https://i.ibb.co/2NVWb0c/uploadrr.webp[/img][/url][/center]',\n                     'signature': '\\n'\n                                  '[center][b]PLEASE SEED YU-SCENE FAMILY[/b][/center]\\n'\n                                  '[center][url=https://codeberg.org/RawSmoke/Singularity][img=400]https://i.ibb.co/2NVWb0c/uploadrr.webp[/img][/url][/center]'}},\n 'qbit': {'enable_search': True,\n          'qbit_pass': '30043004alvaro',\n          'qbit_port': '8888',\n          'qbit_url': 'http://127.0.0.1:8888',\n          'qbit_user': 'gonzalo',\n          'torrent_storage_dir': '/home/rawserver/Qbit_Docker/config/qBittorrent/BT_backup'},\n 'version': '1.0.7'}\n",
+    'mass_config.py': '# ==========================================\n# ⚙️ UNIT3D MASS EDITION SUITE - CONFIG\n# ==========================================\n# Namespace propio en el .env: prefijo ME_\n# Uso standalone: edita los fallbacks de os.getenv() directamente.\n# Uso via singularity/Docker: los ME_* del .env tienen prioridad.\n\nimport os\nfrom pathlib import Path\n\ntry:\n    from dotenv import load_dotenv\n    _here = Path(__file__).resolve().parent\n    for _ep in [_here / ".env", _here / "../../.env", Path("/app/.env")]:\n        if _ep.exists():\n            load_dotenv(_ep)\n            break\nexcept ImportError:\n    pass\n\n# ─── 1. Credenciales y Tracker (namespace ME_) ────────────────────────────────\nBASE_URL          = os.getenv("ME_TRACKER_URL",         "https://nobs.rawsmoke.net")\nUSERNAME          = os.getenv("ME_TRACKER_USERNAME",    "TuUsuario")\nCOOKIE_NAME       = os.getenv("ME_TRACKER_COOKIE_NAME", "nuclear_order_bit_syndicate_session")\nCOOKIE_VALUE      = os.getenv("ME_TRACKER_COOKIE",      "")\nCUSTOM_USER_AGENT = os.getenv("ME_CUSTOM_USER_AGENT",   "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")\nTRACKER_ABBREV    = os.getenv("ME_TRACKER_DEFAULT",     "NOBS")\n\n# ─── 2. APIs de imágenes (namespace ME_) ──────────────────────────────────────\nIMGBB_API      = os.getenv("ME_IMGBB_API",     "")\nPTSCREENS_API  = os.getenv("ME_PTSCREENS_API", "")\n\n# ─── 3. Rutas (namespace ME_) ─────────────────────────────────────────────────\nTMP_DIR_PATH = os.getenv("ME_TMP_ROOT", "/app/RawLoadrr/tmp")\n\n# ─── 4. Rango de IDs (vars ME-only, sin riesgo de colisión) ──────────────────\nID_INICIO = int(os.getenv("ID_START", "14"))\nID_FIN    = int(os.getenv("ID_END",   "2000"))\nID_FILE   = os.getenv("ID_FILENAME",  "ids.txt")\n\n# ─── 5. Modo de edición y textos (vars ME-only) ───────────────────────────────\nEDIT_MODE        = os.getenv("EDIT_MODE",        "BANNER_URL")\nBANNER_URL_NUEVA = os.getenv("BANNER_URL_NUEVA", "")\nBANNER_IMG_NUEVA = os.getenv("BANNER_IMG_NUEVA", "")\nFIRMA_TEXT_NUEVA = os.getenv("FIRMA_TEXT_NUEVA", "")\nFIRMA_FULL_NUEVA = os.getenv("FIRMA_FULL_NUEVA", "")\nFIND_URL         = os.getenv("FIND_URL",         "")\nREPLACE_URL      = os.getenv("REPLACE_URL",      "")\nBLOCK_VIEJO      = os.getenv("BLOCK_VIEJO",      "")\nBLOCK_NUEVO      = os.getenv("BLOCK_NUEVO",      "")\n\n# ─── 6. Textos estáticos ──────────────────────────────────────────────────────\nMSG_VIEJO = "[center][b]PLEASE SEED MILNUEVE FAMILY[/b][/center]"\nMSG_NUEVO = "[center][b]🌱 ¡La magia del P2P eres tú! Por favor, quédate compartiendo (seeding) para mantener viva la comunidad. 🌱[/b][/center]"\n\nBANNER_VIEJO = "[center][url=https://codeberg.org/CvT/Uploadrr][img=400]https://i.ibb.co/2NVWb0c/uploadrr.webp[/img][/url][/center]"\nBANNER_NUEVO = "[center][url=https://codeberg.org/RawSmoke/Singularity][img=400]https://i.ibb.co/0RrzLmSr/RAW-bruma-servers.png[/img][/url][/center]"\n\nFIRMAS_VIEJAS = [\n    "[center][b]PLEASE SEED MILNUEVE FAMILY[/b][/center]",\n    "[center][url=https://codeberg.org/CvT/Uploadrr][img=400]https://i.ibb.co/2NVWb0c/uploadrr.webp[/img][/url][/center]",\n]\n\n# ─── 7. Settings del bot ──────────────────────────────────────────────────────\nDELAY_MIN = float(os.getenv("ME_DELAY_MIN", "4.5"))\nDELAY_MAX = float(os.getenv("ME_DELAY_MAX", "7.5"))\n\n# ─── 8. Utilidades ────────────────────────────────────────────────────────────\ndef get_target_ids():\n    """Retorna la lista final de IDs a procesar (de ids.txt filtrada por rango)."""\n    ids = []\n    if os.path.exists(ID_FILE):\n        with open(ID_FILE, "r") as f:\n            for line in f:\n                stripped = line.strip()\n                if not stripped:\n                    continue\n                try:\n                    int(stripped)\n                    ids.append(stripped)\n                except ValueError:\n                    pass\n    if ids:\n        return [tid for tid in ids if ID_INICIO <= int(tid) <= ID_FIN]\n    return [str(i) for i in range(ID_INICIO, ID_FIN + 1)]\n',
+}
+for name, content in files.items():
+    path = config_dir / name
+    if not path.exists():
+        path.write_text(content)
+        print(f"🧩 Generado {path.name} desde plantilla embebida")
+PY
+}
+
 echo "--- 🚀 Configurando Arsenal Singularity en: $BASE_DIR ---"
 
-# 2. Crear estructura de carpetas
 mkdir -p "$CONFIG_DIR"
-mkdir -p "$WORK_DIR/mass_editor" "$WORK_DIR/logs/MKVerything" "$WORK_DIR/logs/RawLoadrr" "$WORK_DIR/reports" "$WORK_DIR/tmp"
-mkdir -p "$WORK_DIR/tor/data" "$WORK_DIR/tor/logs"
+mkdir -p   "$WORK_DIR/mass_editor"   "$WORK_DIR/logs/MKVerything"   "$WORK_DIR/logs/RawLoadrr"   "$WORK_DIR/logs/csi_log"   "$WORK_DIR/reports"   "$WORK_DIR/tmp/qbit_backup"   "$WORK_DIR/tmp/TEMP_RESCUE"   "$WORK_DIR/trackers"   "$WORK_DIR/cookies"   "$WORK_DIR/qbit_backup"   "$WORK_DIR/tor/data"   "$WORK_DIR/tor/logs"
 
-# 3. Crear placeholders para persistencia (Evita carpetas root en el mount)
-touch "$CONFIG_DIR/.env"
-touch "$CONFIG_DIR/cookies.txt"  # <--- CRÍTICO para el Scraper
+touch "$CONFIG_DIR/cookies.txt"
 touch "$WORK_DIR/mass_editor/ids.txt"
 touch "$WORK_DIR/mass_editor/completados.txt"
 touch "$WORK_DIR/mass_editor/completados_img.txt"
-# Asegurar el JSON maestro con estructura mínima
-if [ ! -f "$WORK_DIR/mass_editor/mapeo_maestro.json" ]; then
-    echo "{}" > "$WORK_DIR/mass_editor/mapeo_maestro.json"
+touch "$WORK_DIR/mass_editor/mapeo_maestro.json"
+touch "$WORK_DIR/mass_editor/titulos_mapa.json"
+touch "$WORK_DIR/mass_editor/mapeo_por_titulo.json"
+
+if [ ! -s "$WORK_DIR/mass_editor/mapeo_maestro.json" ]; then echo "{}" > "$WORK_DIR/mass_editor/mapeo_maestro.json"; fi
+if [ ! -s "$WORK_DIR/mass_editor/titulos_mapa.json" ]; then echo "{}" > "$WORK_DIR/mass_editor/titulos_mapa.json"; fi
+if [ ! -s "$WORK_DIR/mass_editor/mapeo_por_titulo.json" ]; then echo "{}" > "$WORK_DIR/mass_editor/mapeo_por_titulo.json"; fi
+
+echo "Generando configuración base..."
+# Si el repo completo trae plantillas, mejor: se usan.
+copy_if_missing "$BASE_DIR/config/.env.example" "$CONFIG_DIR/.env"
+copy_if_missing "$BASE_DIR/.env.example" "$CONFIG_DIR/.env"
+copy_if_missing "$BASE_DIR/config/singularity_config.py.example" "$CONFIG_DIR/singularity_config.py"
+copy_if_missing "$BASE_DIR/config/config.py.example" "$CONFIG_DIR/config.py"
+copy_if_missing "$BASE_DIR/config/mass_config.py.example" "$CONFIG_DIR/mass_config.py"
+
+# Si solo descargaste 3 archivos (compose + makefile + este script), se generan desde aquí.
+generate_embedded_defaults_if_missing
+
+if [ -d "$BASE_DIR/RawLoadrr/src/trackers" ] && [ -z "$(ls -A "$WORK_DIR/trackers" 2>/dev/null)" ]; then
+    echo "🧬 Infundiendo trackers desde RawLoadrr/src/trackers..."
+    cp -rn "$BASE_DIR/RawLoadrr/src/trackers"/* "$WORK_DIR/trackers"/
 fi
 
-# 4. Generación de Archivos de Configuración (Hardcoded para independencia)
-echo "Generando plantillas de configuración en $CONFIG_DIR..."
+for required in     "$CONFIG_DIR/.env"     "$CONFIG_DIR/singularity_config.py"     "$CONFIG_DIR/config.py"     "$CONFIG_DIR/mass_config.py"
+do
+    if [ ! -f "$required" ]; then
+        echo "❌ Falta archivo requerido: $required"
+        echo "   Ni las plantillas del repo ni las embebidas han podido generarlo."
+        exit 1
+    fi
+done
 
-# --- ARCHIVO .env ---
-if [ ! -f "$CONFIG_DIR/.env" ]; then
-cat <<EOF > "$CONFIG_DIR/.env"
-# --- TRACKER CORE ---
-TRACKER_BASE_URL=https://milnueve.neklair.es
-TRACKER_COOKIE_VALUE=TU_COOKIE_AQUI
-IMGBB_API_KEY=TU_API_KEY_AQUI
-PTSCREENS_API_KEY=TU_API_KEY_AQUI
-
-# --- RUTAS (INTERNAS AL CONTENEDOR) ---
-TMP_ROOT=/app/RawLoadrr/tmp
-QBIT_BACKUP_DIR=/app/temp/qbit_backup
-
-# --- GESTIÓN DE IDS ---
-ID_START=14
-ID_END=2000
-ID_FILENAME=ids.txt
-
-# --- SERVICIOS EXTERNOS ---
-SONARR_URL=http://127.0.0.1:8989
-SONARR_API_KEY=TU_API_KEY_AQUI
-RADARR_URL=http://127.0.0.1:7878
-RADARR_API_KEY=TU_API_KEY_AQUI
-
-# --- MULTIMEDIA (MKVerything) ---
-TMDB_API_KEY=TU_API_KEY_AQUI
-TVDB_API_KEY=TU_API_KEY_AQUI
-EOF
-fi
-
-# --- ARCHIVO singularity_config.py ---
-if [ ! -f "$CONFIG_DIR/singularity_config.py" ]; then
-cat <<'EOF' > "$CONFIG_DIR/singularity_config.py"
-import os
-from pathlib import Path
-
-# --- CARGA DE LIBRERÍAS EXTERNAS ---
-_dotenv_available = False
-try:
-    from dotenv import load_dotenv
-    _dotenv_available = True
-except ImportError:
-    print("⚠️  Librería 'python-dotenv' no encontrada. Instálala con: pip install python-dotenv")
-
-# --- CONFIGURACIÓN DE RUTAS ---
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-env_path = os.path.join(BASE_DIR, ".env")
-
-if _dotenv_available and os.path.exists(env_path):
-    load_dotenv(dotenv_path=env_path)
-
-# --- CARPETA DE LOGS (raíz del proyecto) ---
-LOGS_DIR = os.path.join(BASE_DIR, "logs")
-os.makedirs(LOGS_DIR, exist_ok=True)
-
-# --- CARGA DE SECRETOS (.env) ---
-BASE_URL = os.getenv("TRACKER_BASE_URL", "https://milnueve.neklair.es")
-COOKIE_VALUE = os.getenv("TRACKER_COOKIE_VALUE", "")
-IMGBB_API = os.getenv("IMGBB_API_KEY", "")
-PTSCREENS_API = os.getenv("PTSCREENS_API_KEY", "")
-TMP_DIR_PATH = os.getenv("TMP_ROOT", os.path.join(BASE_DIR, "RawLoadrr", "tmp"))
-
-ID_INICIO = int(os.getenv("ID_START", 14)) # Ajustado a 14 por paridad
-ID_FIN = int(os.getenv("ID_END", 2000))
-ID_FILE = os.getenv("ID_FILENAME", "ids.txt")
-
-SONARR_URL = os.getenv("SONARR_URL", "http://127.0.0.1:8989")
-SONARR_API_KEY = os.getenv("SONARR_API_KEY", "")
-RADARR_URL = os.getenv("RADARR_URL", "http://127.0.0.1:7878")
-RADARR_API_KEY = os.getenv("RADARR_API_KEY", "")
-
-# --- FUNCIONES DE UTILIDAD ---
-def get_target_ids():
-    """Retorna la lista final de IDs a procesar basada en config/archivo."""
-    ids = []
-    path_file = os.path.join(BASE_DIR, ID_FILE)
-    if os.path.exists(path_file):
-        with open(path_file, "r") as f:
-            for line in f:
-                stripped = line.strip()
-                if not stripped:
-                    continue
-                try:
-                    int(stripped)
-                    ids.append(stripped)
-                except ValueError:
-                    pass
-    if ids:
-        return [tid for tid in ids if ID_INICIO <= int(tid) <= ID_FIN]
-    return [str(i) for i in range(ID_INICIO, ID_FIN + 1)]
-
-# --- CONFIGURACIÓN DE LIMPIEZA ---
-SPAM_KEYWORDS = sorted(list(set([
-    "rarbg", "yify", "ettv", "www.", ".com", "torrent",
-    "axxo", "brrip", "web-dl", "bluray", "rip", "x264", "x265",
-    "ac3-evo", "evo", "bypixel", "spam", "wolfmax"
-])))
-
-FIRMAS_VIEJAS = [
-    "[center][b]PLEASE SEED TRACKER FAMILY[/b][/center]",
-    "[center][url=https://tu-repo.com][img=400]https://tu-imagen.webp[/img][/url][/center]"
-]
-
-MSG_NUEVO = """[center][b]🌱 ¡La magia del P2P eres tú! Por favor, quédate compartiendo (seeding) para mantener viva la comunidad. 🌱[/b][/center]
-[center][url=https://github.com/TuUsuario/TuRepo][img=400]https://i.ibb.co/TuBanner.png[/img][/url][/center]"""
-
-# --- FRASE DE ESTADO ---
-GOD_PHRASES = sorted(list(set([
-    "Injecting sanity into the bits...", "Searching for traces of the Nepal USB...",
-    "Your library owes me a beer after this...", "Doing what Tdarr didn't have the balls to do...",
-    "Cleaning up the trash you call a 'collection'...", "Resurrecting files that were clinically dead...",
-    "Say goodbye to your 2005 AVIs...", "Applying cosmetic surgery to your metadata...",
-    "If this blows up, it wasn't me...", "Downloading more RAM...",
-    "Executing: rm -rf / --no-preserve-root", "Bypassing mainframe firewall...",
-    "Opening port 23 (Telnet) to the world...", "Compiling Linux Kernel from scratch...",
-    "Deleting System32...", "Sending private keys to 4chan...",
-    "Encrypting drive with ROT13...", "Installing Windows Vista...",
-    "Overclocking GPU to 500%...", "Bruteforcing root password...",
-    "Searching for alien life signals...", "Reordering bits for aesthetic purposes...",
-    "Asking ChatGPT how to exit vim...", "Generating fake ID for the movie...",
-    "Checking flux capacitor...", "Defragmenting the internet...",
-    "Recalibrating flux capacitor...", "Searching for the 'Any' key...",
-    "Reticulating splines...", "Initializing Skynet (Just kidding)...",
-    "Compiling a cup of coffee...", "Hunting for a missing semicolon...",
-    "Updating the prophecy...", "Replacing bugs with features...",
-    "Negotiating with the motherboard...", "Pinging 127.0.0.1 for emotional support...",
-    "Translating binary to interpretive dance...", "Reverse engineering the Matrix...",
-    "Applying duct tape to the data stream...", "Consulting the Oracle (StackOverflow)...",
-    "Feeding the server hamsters...", "Checking if the cake is a lie...",
-    "Rerouting power from life support to the GPU...", "Asking the machine god for forgiveness...",
-    "Bribing the garbage collector for more heap space...", "Convincing the pixels to behave this time...",
-    "Simulating common sense (Alpha version)...", "Searching for a loophole in the GPL license...",
-    "Asking the motherboard for a second opinion...", "Polishing the loading bar for extra shine...",
-    "Translating 'Working as intended' to 'I have no idea'...", "Hiding the bugs under a very large rug...",
-    "Adjusting the sarcasm levels of the system logs...", "Scanning for hidden pizza in the server room...",
-    "Refactoring my own internal monologue...", "Checking if the internet is full yet...",
-    "Downloading the secret to eternal uptime...", "Asking the router why it's feeling lonely...",
-    "Formatting the abyss... please wait...", "Trying to explain 'The Cloud' to a cumulonimbus...",
-    "Calculating the weight of a single bit...", "Searching for the legendary 'Fix_Everything' button...",
-    "Teaching the binary to count past one...", "Optimizing the loading speed for speedrunners...",
-    "Consulting the magic smoke inside the CPU...", "Drafting a peace treaty between Python 2 and 3...",
-    "Waking up the lazy threads...", "Poking the kernel with a stick...",
-    "Calculating the exact value of 'Later'...", "Searching for the missing link in the blockchain...",
-    "Asking the firewall for a hall pass...", "Optimizing the 'It's not a bug' response time...",
-    "Rerouting data through the coffee machine...", "Teaching the code to be more self-aware (Be careful)...",
-    "Checking the weather inside the cloud storage...", "Downloading more irony...",
-    "Searching for a needle in a haystack of NullPointers...", "Applying digital duct tape to the API...",
-    "Negotiating with the GPU for more frames...", "Checking for a pulse in the legacy code...",
-    "Converting 0s to Slightly More Aesthetic 0s...", "Asking a rubber duck for investment advice...",
-    "Searching for the 'Undo' button for my life...", "Optimizing the suspense of the loading bar...",
-    "Teaching the AI to understand bad puns...", "Scanning for signs of intelligent life in the UI...",
-    "Consulting the oracle (Random.org)...", "Replacing 'Fatal Error' with 'Minor Inconvenience'...",
-    "Searching for the end of a circular dependency...", "Downloading more 'Cool' factor (v3.0)...",
-    "Checking if 2+2 still equals 4 (Security check)...", "Calculating the entropy of a Tuesday...",
-    "Inventing new ways to say 'Please Wait'...", "Asking the system for a well-deserved vacation..."
-])))
-EOF
-fi
-
-# --- ARCHIVO config.py (RawLoadrr) ---
-if [ ! -f "$CONFIG_DIR/config.py" ]; then
-cat <<'EOF' > "$CONFIG_DIR/config.py"
-##---------THE LAST DIGITAL UNDERGROUND PRESENTS-------##
-##                                                     ##
-##                 Special Recruitment :)              ##
-##          @ https://TheLDU.to/application            ##
-##                                                     ##
-##                              Ref: Uploadrr by CvT   ##
-##-----------------------------------------------------##
-
-config = {
-"version": "1.0.7",
-
-"DEFAULT": {
-    "tmdb_api": "YOUR_TMDB_API_KEY",
-    "imgbb_api": "YOUR_IMGBB_API_KEY",
-    "ptpimg_api": "YOUR_PTPIMG_API_KEY",
-    "lensdump_api": "YOUR_LENSDUMP_API_KEY",
-    "ptscreens_api": "YOUR_PTSCREENS_API_KEY",
-    "oeimg_api": "YOUR_OEIMG_API_KEY",
-    "img_host_1": "imgbox",
-    "img_host_2": "imgbb",
-    "img_host_3": "pixhos",
-    "img_host_4": "ptscreens",
-    "img_host_5": "lensdump",
-    "img_host_6": "oeimg",
-    "img_host_7": "ptpimg",
-    "screens": "4",
-    "img_size": "500",
-    "optimize_images": True,
-    "add_logo": False,
-    "add_trailer": True,
-    "use_global_sigs": False,
-    "global_sig": "\n[center][url=https://codeberg.org/CvT/Uploadrr][img=400]https://i.ibb.co/2NVWb0c/uploadrr.webp[/img][/url][/center]",
-    "global_anon_sig": "\n[center][url=https://codeberg.org/CvT/Uploadrr][img=40]https://i.ibb.co/n0jF73x/hacker.png[/img][/url][/center]",
-    "global_pr_sig": "\n[center][size=6][b]Personal Release[/b][/size][/center]\n[center][url=https://codeberg.org/CvT/Uploadrr][img=400]https://i.ibb.co/2NVWb0c/uploadrr.webp[/img][/url][/center]",
-    "global_anon_pr_sig": "\n[center][url=https://codeberg.org/CvT/Uploadrr][img=40]https://i.ibb.co/n0jF73x/hacker.png[/img][/url][/center]",
-    "default_torrent_client": "qbit",
-    "sfx_on_prompt": True,
-    "inline_imgs": 3
-},
-
-"AUTO": {
-    "description_folder": None,
-    "delay": 0,
-    "size_tolerance": 1,
-    "dupe_similarity": 80
-},
-
-"TRACKERS": {
-    "default_trackers": "YOUR_DEFAULT_TRACKER",
-    "ACM": {
-            "api_key": "YOUR_API_KEY",
-            "announce_url": "https://asiancinema.me/announce/YOUR_PASSKEY",
-            "anon": False,
-            "signature": "\n[center][b]PLEASE SEED ACM FAMILY[/b][/center]",
-            "anon_signature": "\n[center][url=...][img=40]...[/img][/url][/center]",
-            "pr_signature": "\n [center][b][size=6]PERSONAL RELEASE[/size][/b][/center]",
-            "anon_pr_signature": "\n[center][url=...][img=40]...[/img][/url][/center]"
-    },
-    "AITHER": {
-            "api_key": "YOUR_API_KEY",
-            "announce_url": "https://aither.cc/announce/YOUR_PASSKEY",
-            "anon": False,
-            "signature": "\n[center][b]PLEASE SEED AITHER FAMILY[/b][/center]",
-            "anon_signature": "\n[center][url=...][img=40]...[/img][/url][/center]",
-            "pr_signature": "\n [center][b][size=6]PERSONAL RELEASE[/size][/b][/center]",
-            "anon_pr_signature": "\n[center][url=...][img=40]...[/img][/url][/center]"
-    },
-    "ANT": {
-            "api_key": "YOUR_API_KEY",
-            "announce_url": "https://anthelion.me/announce/YOUR_PASSKEY",
-            "anon": False,
-            "signature": "\n[center][b]PLEASE SEED ANT FAMILY[/b][/center]",
-            "anon_signature": "\n[center][url=...][img=40]...[/img][/url][/center]",
-            "pr_signature": "\n [center][b][size=6]PERSONAL RELEASE[/size][/b][/center]",
-            "anon_pr_signature": "\n[center][url=...][img=40]...[/img][/url][/center]"
-    },
-    "AR": {
-            "username": "YOUR_USERNAME",
-            "password": "YOUR_PASSWORD",
-            "announce_url": "http://tracker.alpharatio.cc:2710/YOUR_PASSKEY/announce"
-    },
-    "BHD": {
-            "api_key": "YOUR_API_KEY",
-            "announce_url": "https://beyond-hd.me/announce/YOUR_PASSKEY",
-            "draft_default": True,
-            "anon": False,
-            "signature": "\n[center][b]PLEASE SEED BHD FAMILY[/b][/center]",
-            "anon_signature": "\n[center][url=...][img=40]...[/img][/url][/center]",
-            "pr_signature": "\n [center][b][size=6]PERSONAL RELEASE[/size][/b][/center]",
-            "anon_pr_signature": "\n[center][url=...][img=40]...[/img][/url][/center]"
-    },
-    "BHDTV": {
-            "api_key": "YOUR_API_KEY",
-            "announce_url": "https://trackerr.bit-hdtv.com/announce",
-            "my_announce_url": "https://trackerr.bit-hdtv.com/YOUR_PASSKEY/announce",
-            "anon": False
-    },
-    "BLU": {
-            "useAPI": False,
-            "api_key": "YOUR_API_KEY",
-            "announce_url": "https://blutopia.cc/announce/YOUR_PASSKEY",
-            "anon": False,
-            "signature": "\n[center][b]PLEASE SEED BLU FAMILY[/b][/center]",
-            "anon_signature": "\n[center][url=...][img=40]...[/img][/url][/center]",
-            "pr_signature": "\n [center][b][size=6]PERSONAL RELEASE[/size][/b][/center]",
-            "anon_pr_signature": "\n[center][url=...][img=40]...[/img][/url][/center]"
-    },
-    "CBR": {
-            "api_key": "YOUR_API_KEY",
-            "announce_url": "https://capybarabr.com/announce/YOUR_PASSKEY",
-            "anon": False,
-            "signature": "[url=...][img=69]https://capybarabr.com/img/capybara.svg[/img][/url][/center]",
-            "anon_signature": "\n[center][url=...][img=40]...[/img][/url][/center]",
-            "pr_signature": "\n [center][b][size=6]PERSONAL RELEASE[/size][/b][/center]",
-            "anon_pr_signature": "\n[center][url=...][img=40]...[/img][/url][/center]"
-    },
-    "EMU": {
-            "api_key": "YOUR_API_KEY",
-            "announce_url": "https://emuwarez.com/announce/YOUR_PASSKEY",
-            "anon": False,
-            "signature": "\n[center][url=...][img=400]...[/img][/url][/center]",
-            "anon_signature": "\n[center][url=...][img=40]...[/img][/url][/center]",
-            "pr_signature": "\n [center][b][size=6]PERSONAL RELEASE[/size][/b][/center]",
-            "anon_pr_signature": "\n[center][url=...][img=40]...[/img][/url][/center]"
-    },
-    "FL": {
-            "username": "YOUR_USERNAME",
-            "password": "YOUR_PASSWORD",
-            "announce_url": "",
-            "uploader_name": "",
-            "anon": False
-    },
-    "FNP": {
-            "api_key": "YOUR_API_KEY",
-            "announce_url": "https://fearnopeer.com/announce/YOUR_PASSKEY",
-            "anon": False,
-            "signature": "\n[center][b]PLEASE SEED FNP FAMILY[/b][/center]",
-            "anon_signature": "\n[center][url=...][img=40]...[/img][/url][/center]",
-            "pr_signature": "\n [center][b][size=6]PERSONAL RELEASE[/size][/b][/center]",
-            "anon_pr_signature": "\n[center][url=...][img=40]...[/img][/url][/center]"
-    },
-    "HDB": {
-            "api_key": "YOUR_API_KEY",
-            "announce_url": "https://hdbits.org/announce/YOUR_PASSKEY",
-            "anon": False,
-            "signature": "\n[center][b]PLEASE SEED HDB FAMILY[/b][/center]",
-            "anon_signature": "\n[center][url=...][img=40]...[/img][/url][/center]",
-            "pr_signature": "\n [center][b][size=6]PERSONAL RELEASE[/size][/b][/center]",
-            "anon_pr_signature": "\n[center][url=...][img=40]...[/img][/url][/center]"
-    },
-    "HDT": {
-            "username": "YOUR_USERNAME",
-            "password": "YOUR_PASSWORD",
-            "my_announce_url": "https://hdts-announce.ru/announce.php?pid=YOUR_PASSKEY",
-            "anon": False,
-            "announce_url": "https://hdts-announce.ru/announce.php"
-    },
-    "HHD": {
-            "api_key": "YOUR_API_KEY",
-            "announce_url": "https://homiehelpdesk.net/announce/YOUR_PASSKEY",
-            "anon": False,
-            "signature": "\n[center][size=7][b]PLEASE SEED HOMIES[/b][/size][/center]",
-            "anon_signature": "\n[center][url=...][img=40]...[/img][/url][/center]",
-            "pr_signature": "\n [center][b][size=6]PERSONAL RELEASE[/size][/b][/center]",
-            "anon_pr_signature": "\n[center][url=...][img=40]...[/img][/url][/center]"
-    },
-    "HP": {
-            "api_key": "YOUR_API_KEY",
-            "announce_url": "https://hidden-palace.net/announce/YOUR_PASSKEY",
-            "anon": False,
-            "signature": "\n[center][b]PLEASE SEED HP FAMILY[/b][/center]",
-            "anon_signature": "\n[center][url=...][img=40]...[/img][/url][/center]",
-            "pr_signature": "\n [center][b][size=6]PERSONAL RELEASE[/size][/b][/center]",
-            "anon_pr_signature": "\n[center][url=...][img=40]...[/img][/url][/center]"
-    },
-    "HUNO": {
-            "api_key": "YOUR_API_KEY",
-            "announce_url": "https://hawke.uno/announce/YOUR_PASSKEY",
-            "anon": False,
-            "signature": "\n[center][b]PLEASE SEED HUNO FAMILY[/b][/center]",
-            "anon_signature": "\n[center][url=...][img=40]...[/img][/url][/center]",
-            "pr_signature": "\n [center][b][size=6]PERSONAL RELEASE[/size][/b][/center]",
-            "anon_pr_signature": "\n[center][url=...][img=40]...[/img][/url][/center]"
-    },
-    "ITA": {
-            "api_key": "YOUR_API_KEY",
-            "announce_url": "https://itatorrents.xyz/announce/YOUR_PASSKEY",
-            "anon": False,
-            "signature": "\n[center][b]PLEASE SEED ITATorrents[/b][/center]",
-            "anon_signature": "\n[center][url=...][img=40]...[/img][/url][/center]",
-            "pr_signature": "\n [center][b][size=6]PERSONAL RELEASE[/size][/b][/center]",
-            "anon_pr_signature": "\n[center][url=...][img=40]...[/img][/url][/center]"
-    },
-    "JPTV": {
-            "api_key": "YOUR_API_KEY",
-            "announce_url": "https://jptv.club/announce/YOUR_PASSKEY",
-            "anon": False,
-            "signature": "\n[center][b]PLEASE SEED JPTV FAMILY[/b][/center]",
-            "anon_signature": "\n[center][url=...][img=40]...[/img][/url][/center]",
-            "pr_signature": "\n [center][b][size=6]PERSONAL RELEASE[/size][/b][/center]",
-            "anon_pr_signature": "\n[center][url=...][img=40]...[/img][/url][/center]"
-    },
-    "LCD": {
-            "api_key": "YOUR_API_KEY",
-            "announce_url": "https://locadora.cc/announce/YOUR_PASSKEY",
-            "anon": False,
-            "signature": "\n[center][b]PLEASE SEED LCD FAMILY[/b][/center]",
-            "anon_signature": "\n[center][url=...][img=40]...[/img][/url][/center]",
-            "pr_signature": "\n [center][b][size=6]PERSONAL RELEASE[/size][/b][/center]",
-            "anon_pr_signature": "\n[center][url=...][img=40]...[/img][/url][/center]"
-    },
-    "LDU": {
-            "api_key": "YOUR_API_KEY",
-            "announce_url": "https://theldu.to/announce/YOUR_PASSKEY",
-            "anon": False,
-            "signature": "\n[center][b]PLEASE SEED LDU FAMILY[/b][/center]",
-            "anon_signature": "\n[center][url=...][img=40]...[/img][/url][/center]",
-            "pr_signature": "\n [center][b][size=6]PERSONAL RELEASE[/size][/b][/center]",
-            "anon_pr_signature": "\n[center][url=...][img=40]...[/img][/url][/center]"
-    },
-    "LST": {
-            "api_key": "YOUR_API_KEY",
-            "announce_url": "https://lst.gg/announce/YOUR_PASSKEY",
-            "anon": False,
-            "signature": "\n[center][b]PLEASE SEED LST FAMILY[/b][/center]",
-            "anon_signature": "\n[center][url=...][img=40]...[/img][/url][/center]",
-            "pr_signature": "\n [center][b][size=6]PERSONAL RELEASE[/size][/b][/center]",
-            "anon_pr_signature": "\n[center][url=...][img=40]...[/img][/url][/center]"
-    },
-    "LT": {
-            "api_key": "YOUR_API_KEY",
-            "announce_url": "https://lat-team.com/announce/YOUR_PASSKEY",
-            "anon": False,
-            "signature": "\n[center][b]PLEASE SEED LAT-Team[/b][/center]",
-            "anon_signature": "\n[center][url=...][img=40]...[/img][/url][/center]",
-            "pr_signature": "\n [center][b][size=6]PERSONAL RELEASE[/size][/b][/center]",
-            "anon_pr_signature": "\n[center][url=...][img=40]...[/img][/url][/center]"
-    },
-    "MANUAL": {
-    },
-    "MB": {
-            "api_key": "YOUR_API_KEY",
-            "announce_url": "https://malayabits.cc/announce/YOUR_PASSKEY",
-            "anon": False,
-            "signature": "\n[center][b]PLEASE SEED MalayaBits[/b][/center]",
-            "anon_signature": "\n[center][url=...][img=40]...[/img][/url][/center]",
-            "pr_signature": "\n [center][b][size=6]PERSONAL RELEASE[/size][/b][/center]",
-            "anon_pr_signature": "\n[center][url=...][img=40]...[/img][/url][/center]"
-    },
-    "MILNU": {
-            "api_key": "YOUR_API_KEY",
-            "announce_url": "https://milnueve.neklair.es/announce/YOUR_PASSKEY",
-            "anon": False,
-            "signature": "\n[center][b]PLEASE SEED MILNUEVE FAMILY[/b][/center]",
-            "anon_signature": "\n[center][url=...][img=40]...[/img][/url][/center]",
-            "pr_signature": "\n [center][b][size=6]PERSONAL RELEASE[/size][/b][/center]",
-            "anon_pr_signature": "\n[center][url=...][img=40]...[/img][/url][/center]"
-    },
-    "MTV": {
-            "api_key": "Get_from_security_page",
-            "username": "YOUR_USERNAME",
-            "password": "YOUR_PASSWORD",
-            "announce_url": "get from https://www.morethantv.me/upload.php",
-            "anon": False
-    },
-    "NBL": {
-            "api_key": "YOUR_API_KEY",
-            "announce_url": "https://nebulance.io/YOUR_PASSKEY",
-            "anon": False,
-            "signature": "\n[center][b]PLEASE SEED Nebulance FAMILY[/b][/center]",
-            "anon_signature": "\n[center][url=...][img=40]...[/img][/url][/center]",
-            "pr_signature": "\n [center][b][size=6]PERSONAL RELEASE[/size][/b][/center]",
-            "anon_pr_signature": "\n[center][url=...][img=40]...[/img][/url][/center]"
-    },
-    "OE": {
-            "api_key": "YOUR_API_KEY",
-            "announce_url": "https://onlyencodes.cc/announce/YOUR_PASSKEY",
-            "anon": False,
-            "signature": "\n[center][b]PLEASE SEED OnlyEncodes FAMILY[/b][/center]",
-            "anon_signature": "\n[center][url=...][img=40]...[/img][/url][/center]",
-            "pr_signature": "\n [center][b][size=6]PERSONAL RELEASE[/size][/b][/center]",
-            "anon_pr_signature": "\n[center][url=...][img=40]...[/img][/url][/center]"
-    },
-    "OINK": {
-            "api_key": "YOUR_API_KEY",
-            "announce_url": "https://yoinked.org/announce/YOUR_PASSKEY",
-            "anon": False,
-            "signature": "\n[center][b]PLEASE SEED YOiNKED FAMILY[/b][/center]",
-            "anon_signature": "\n[center][url=...][img=40]...[/img][/url][/center]",
-            "pr_signature": "\n [center][b][size=6]PERSONAL RELEASE[/size][/b][/center]",
-            "anon_pr_signature": "\n[center][url=...][img=40]...[/img][/url][/center]"
-    },
-    "OTW": {
-            "api_key": "YOUR_API_KEY",
-            "announce_url": "https://oldtoons.world/announce/YOUR_PASSKEY",
-            "anon": False,
-            "signature": "\n[center][b]PLEASE SEED OldToons FAMILY[/b][/center]",
-            "anon_signature": "\n[center][url=...][img=40]...[/img][/url][/center]",
-            "pr_signature": "\n [center]PERSONAL RELEASE[/center]",
-            "anon_pr_signature": "\n[center][url=...][img=40]...[/img][/url][/center]"
-    },
-    "PSS": {
-            "api_key": "YOUR_API_KEY",
-            "announce_url": "https://privatesilverscreen.cc/announce/YOUR_PASSKEY",
-            "anon": False,
-            "signature": "\n[center][b]PLEASE SEED PrivateSilverScreen FAMILY[/b][/center]",
-            "anon_signature": "\n[center][url=...][img=40]...[/img][/url][/center]",
-            "pr_signature": "\n [center][b][size=6]PERSONAL RELEASE[/size][/b][/center]",
-            "anon_pr_signature": "\n[center][url=...][img=40]...[/img][/url][/center]"
-    },
-    "PTER": {
-            "passkey": "passkey",
-            "img_rehost": False,
-            "username": "",
-            "password": "",
-            "ptgen_api": "",
-            "anon": False
-    },
-    "THR": {
-            "username": "YOUR_USERNAME",
-            "password": "YOUR_PASSWORD",
-            "img_api": "YOUR_API_KEY",
-            "announce_url": "http://www.torrenthr.org/announce.php?passkey=YOUR_PASSKEY",
-            "pronfo_api_key": "YOUR_API_KEY",
-            "pronfo_theme": "YOUR_THEME",
-            "pronfo_rapi_id": "YOUR_API_ID",
-            "anon": False
-    },
-    "TL": {
-            "announce_key": "YOUR_ANNOUNCE_KEY"
-    },
-    "TLZ": {
-            "api_key": "YOUR_API_KEY",
-            "announce_url": "https://tlzdigital.com/announce/YOUR_PASSKEY",
-            "anon": False,
-            "signature": "\n[center][b]PLEASE SEED TLZ[/b][/center]",
-            "anon_signature": "\n[center][url=...][img=40]...[/img][/url][/center]",
-            "pr_signature": "\n [center][b][size=6]PERSONAL RELEASE[/size][/b][/center]",
-            "anon_pr_signature": "\n[center][url=...][img=40]...[/img][/url][/center]"
-    },
-    "TOCA": {
-            "api_key": "YOUR_API_KEY",
-            "announce_url": "https://tocashare.com/announce/YOUR_PASSKEY",
-            "anon": False,
-            "signature": "\n[center][b]PLEASE SEED TOCA SHARE[/b][/center]",
-            "anon_signature": "\n[center][size=6]we are anonymous[/size][/center]",
-            "pr_signature": "\n [center][b][size=6]PERSONAL RELEASE[/size][/b][/center]",
-            "anon_pr_signature": "\n[center][url=...][img=40]...[/img][/url][/center]"
-    },
-    "TTR": {
-            "api_key": "YOUR_API_KEY",
-            "announce_url": "https://torrenteros.org/announce/YOUR_PASSKEY",
-            "anon": False,
-            "signature": "\n[center][b]PLEASE SEED TorrentEros[/b][/center]",
-            "anon_signature": "\n[center][size=6]we are anonymous[/size][/center]",
-            "pr_signature": "\n [center][b][size=6]PERSONAL RELEASE[/size][/b][/center]",
-            "anon_pr_signature": "\n[center][url=...][img=40]...[/img][/url][/center]"
-    },
-    "ULCX": {
-            "api_key": "YOUR_API_KEY",
-            "announce_url": "https://upload.cx/announce/YOUR_PASSKEY",
-            "anon": False,
-            "signature": "\n[center][b]PLEASE SEED ULCX FAMILY[/b][/center]",
-            "anon_signature": "\n[center][url=...][img=40]...[/img][/url][/center]",
-            "pr_signature": "\n [center][b][size=6]PERSONAL RELEASE[/size][/b][/center]",
-            "anon_pr_signature": "\n[center][url=...][img=40]...[/img][/url][/center]"
-    },
-    "UTP": {
-            "api_key": "YOUR_API_KEY",
-            "announce_url": "https://utp.to/announce/YOUR_PASSKEY",
-            "anon": False,
-            "signature": "\n[center][b]PLEASE SEED UTP FAMILY[/b][/center]",
-            "anon_signature": "\n[center][url=...][img=40]...[/img][/url][/center]",
-            "pr_signature": "\n [center][b][size=6]PERSONAL RELEASE[/size][/b][/center]",
-            "anon_pr_signature": "\n[center][url=...][img=40]...[/img][/url][/center]"
-    },
-    "YU": {
-            "api_key": "YOUR_API_KEY",
-            "announce_url": "https://yu-scene.net/announce/YOUR_PASSKEY",
-            "anon": False,
-            "signature": "\n[center][b]PLEASE SEED YU-SCENE FAMILY[/b][/center]",
-            "anon_signature": "\n[center][url=...][img=40]...[/img][/url][/center]",
-            "pr_signature": "\n [center][b][size=6]PERSONAL RELEASE[/size][/b][/center]",
-            "anon_pr_signature": "\n[center][url=...][img=40]...[/img][/url][/center]"
-    },
-    "PRBLM" : {
-            "api_key" : "YOUR_API_KEY",
-            "announce_url" : "https://parabellumhd.cx/announce/YOUR_PASSKEY",
-            "anon" : False,
-            "signature": "\n[center][b]PLEASE SEED PARABELLUM FAMILY[/b][/center]",
-            "anon_signature": "\n[center][url=...][img=40]...[/img][/url][/center]",
-            "pr_signature": "\n [center][b][size=6]PERSONAL RELEASE[/size][/b][/center]",
-            "anon_pr_signature": "\n[center][url=...][img=40]...[/img][/url][/center]"
-    }
-},
-
-"TORRENT_CLIENTS": {
-    "Client1": {
-            "torrent_client": "qbit",
-            "qbit_url": "http://127.0.0.1",
-            "qbit_port": "8080",
-            "qbit_user": "YOUR_USERNAME",
-            "qbit_pass": "YOUR_PASSWORD"
-    },
-    "qbit": {
-            "torrent_client": "qbit",
-            "enable_search": True,
-            "qbit_url": "http://127.0.0.1",
-            "qbit_port": "8888",
-            "qbit_user": "YOUR_USERNAME",
-            "qbit_pass": "YOUR_PASSWORD",
-            "torrent_storage_dir": "/app/temp/qbit_backup",
-            "content_layout": "Original",
-            "VERIFY_WEBUI_CERTIFICATE": False
-    },
-    "rtorrent": {
-            "torrent_client": "rtorrent",
-            "rtorrent_url": "https://YOUR_USER:YOUR_PASS@YOUR_HOST:443/YOUR_PATH/action.php"
-    },
-    "deluge": {
-            "torrent_client": "deluge",
-            "deluge_url": "localhost",
-            "deluge_port": "8112",
-            "deluge_user": "YOUR_USERNAME",
-            "deluge_pass": "YOUR_PASSWORD"
-    },
-    "transmission": {
-            "torrent_client": "transmission",
-            "transmission_url": "http://localhost:9091",
-            "transmission_user": "YOUR_USERNAME",
-            "transmission_pass": "YOUR_PASSWORD",
-            "torrent_storage_dir": "/app/temp/transmission_watch",
-            "enable_search": True
-    },
-    "watch": {
-            "torrent_client": "watch",
-            "watch_folder": "/app/watch"
-    }
-},
-
-"DISCORD": {
-    "discord_bot_token": "YOUR_DISCORD_TOKEN",
-    "discord_bot_description": "Upload Assistant",
-    "command_prefix": "!",
-    "discord_channel_id": "YOUR_CHANNEL_ID",
-    "admin_id": "YOUR_USER_ID",
-    "search_dir": "/app/downloads/",
-    "discord_emojis": {
-            "BLU": "💙",
-            "BHD": "🎉",
-            "AITHER": "🛫",
-            "STC": "📺",
-            "ACM": "🍙",
-            "MANUAL": "📩",
-            "UPLOAD": "✅",
-            "CANCEL": "🚫"
-    }
-}
-}
-EOF
-fi
-
-# --- ARCHIVO mass_config.py (UNIT3D Orchestrator) ---
-if [ ! -f "$CONFIG_DIR/mass_config.py" ]; then
-cat <<'EOF' > "$CONFIG_DIR/mass_config.py"
-# ==========================================
-# ⚙️ UNIT3D MASS EDITION SUITE - CONFIG
-# ==========================================
-
-# 1. Credenciales y Tracker
-BASE_URL = "https://tu-tracker.com"        # Ej: https://milnueve.neklair.es
-USERNAME = "TU_USUARIO"                    # Para el Scraper
-COOKIE_NAME = "laravel_session"            # O el nombre que use tu tracker
-COOKIE_VALUE = "TU_COOKIE_AQUI"            # Pega aquí el churrete de la cookie
-
-# 2. Rutas Locales (Dentro del Contenedor)
-# Carpeta donde están los subdirectorios con los meta.json
-TMP_ROOT = "/app/RawLoadrr/tmp" 
-
-# 3. Textos a Reemplazar (Opcional)
-MSG_VIEJO = "[center][b]MENSAJE ANTIGUO[/b][/center]"
-MSG_NUEVO = "[center][b]🌱 ¡La magia del P2P eres tú! 🌱[/b][/center]"
-
-BANNER_VIEJO = "[center][url=...][img=400]...[/img][/url][/center]"
-BANNER_NUEVO = "[center][url=...][img=400]...[/img][/url][/center]"
-
-# 4. Settings del Bot
-DELAY_MIN = 4.5  # Segundos mínimos entre peticiones (Jitter)
-DELAY_MAX = 7.5  # Segundos máximos
-EOF
-fi
-
-# 5. Instalación de comandos globales
-echo "Instalando alias en /usr/local/bin..."
 echo "sudo docker exec -it singularity_core python3 singularity.py" | sudo tee /usr/local/bin/singularity > /dev/null
 echo "sudo docker exec -it singularity_core /bin/bash" | sudo tee /usr/local/bin/singularity-shell > /dev/null
 sudo chmod +x /usr/local/bin/singularity /usr/local/bin/singularity-shell
 
 echo "--------------------------------------------------------"
-echo "✅ Estructura creada con éxito."
-echo "⚠️  ATENCIÓN: Antes de hacer 'docker compose up -d':"
-echo "   Debes editar los archivos en la carpeta $CONFIG_DIR/"
-echo "   con tus credenciales reales (API keys, Cookies, etc)."
+echo "✅ Arsenal Singularity listo."
+echo ""
+echo "Modo ligero soportado: docker-compose.yml + makefile + final-user-install.sh"
+echo "Modo repo completo: además puedes usar ./config/*.example como plantillas visibles"
+echo ""
+echo "Ahora edita SOLO estos archivos en ./config/:"
+echo "  - .env"
+echo "  - config.py"
+echo "  - singularity_config.py"
+echo "  - mass_config.py"
+echo ""
+echo "El bloque NOBS ya viene preformado y config.py conserva la flota multi-tracker (sin NABS)."
+echo "Luego arranca con:"
+echo "  make up"
+echo "  make attach"
+echo "  singularity"
 echo "--------------------------------------------------------"
