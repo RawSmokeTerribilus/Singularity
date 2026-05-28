@@ -53,6 +53,36 @@ Solo la imagen publicada + esos 3 archivos.
 
 ---
 
+## 🐣 Si nunca has tocado esto (paso a paso, sin prisa)
+
+1. **Instala Docker** (Docker Engine + el plugin `docker compose`). En tu propio Linux, sobre
+   tu usuario normal. Nada de servidores raros.
+2. **Crea una carpeta vacía** en tu `HOME`, por ejemplo `~/Singularity`. Ahí dentro va a vivir
+   todo: tu config y tus datos de trabajo. **No la pongas en `/`, ni en `/opt`, ni en discos
+   montados de forma rara.** Tu `~/` y punto.
+3. **Mete dentro esos 3 archivos**: `docker-compose.yml`, `makefile`, `final-user-install.sh`.
+4. Abre una terminal **en esa carpeta** y lanza, en este orden:
+
+   ```bash
+   make install   # crea config/ y work_data/, genera las plantillas, instala el lanzador
+   make up         # baja la imagen si hace falta y arranca el contenedor
+   make attach     # entra a la TUI
+   ```
+
+5. La primera vez, **antes de subir nada**, edita tus claves en `config/` (ver más abajo
+   “Qué configurar para que funcione de verdad”). Si te saltas esto, la identificación y las
+   imágenes fallarán.
+6. A partir de ahí, el comando `singularity` te abre la TUI cuando quieras.
+
+**Qué evitar (te ahorra dolores):**
+- No ejecutes los `make` con `sudo`. El usuario normal basta. Si algo pide permisos, es el
+  propio script quien los pide cuando toca.
+- No muevas `config/` ni `work_data/` a otra ruta después de instalar. El contenedor los busca
+  donde los dejó `make install`.
+- No bajes solo `RawLoadrr/` por tu cuenta. Esto es un tanque, no una pieza suelta.
+
+---
+
 ## 🧩 Config shipping-ready
 
 El instalador deja preparada una base funcional con:
@@ -86,6 +116,36 @@ Si esos archivos no existen tras `make install`, para ahí. No lances la suite t
 
 ---
 
+## 🔑 Qué configurar para que funcione de verdad
+
+Poner solo el tracker no basta. La suite necesita claves para **identificar** la película/serie
+y para **subir las imágenes**. Si te falta alguna, el upload se queda a medias.
+
+**Identificación (lo más importante):** se decide por **consenso entre proveedores**, no por uno
+solo. Hace falta que **al menos dos coincidan**.
+- `tmdb_api` — TMDB (gratis, registro).
+- `imdb_api` — en realidad es la clave de **OMDb** (gratis, te la mandan por email).
+- TVmaze — **sin clave**, pero **solo sirve para series**.
+
+Consecuencia práctica:
+- **Solo TMDB → la identificación falla** (un único voto no confirma nada). Verás cosas tipo
+  “ID not confirmed — providers disagree”.
+- **Películas:** necesitas **TMDB + OMDb** sí o sí (TVmaze no vota en cine).
+- **Series:** TMDB + OMDb + TVmaze.
+- **Anime:** además entran MAL/AniList cuando el release parece anime.
+
+**Image hosts:** configura **varios**, no uno. Los planes gratuitos tienen límites de subida y
+si uno te corta el grifo a media tanda, el upload se cae. Campos disponibles: `imgbb_api`,
+imgbox, `ptscreens_api`, `ptpimg_api`, `lensdump_api`, `oeimg_api`. Pon dos o tres como mínimo.
+
+**Cliente torrent (qBittorrent):** url, puerto, usuario, contraseña y la ruta de sesión
+(`torrent_storage_dir` / `BT_backup`). Sin esto, el `.torrent` se genera pero no se siembra.
+
+> Regla simple: **TMDB + OMDb + un par de image hosts + qBit**. Eso es el mínimo para que un
+> upload termine entero.
+
+---
+
 ## ⚠️ Qué NO hacer
 
 - bajar `RawLoadrr/` suelto y montarte una movida paralela
@@ -94,6 +154,20 @@ Si esos archivos no existen tras `make install`, para ahí. No lances la suite t
 - tunear menús sin haber corrido `make install`
 
 Si haces eso, luego aparecen fantasmas tipo “falta NOBS” cuando en realidad faltan piezas del tanque.
+
+**Sobre meter capas (VM, LXC, otro Docker dentro de otro…):** corre esto en tu `~/` directo.
+El motivo no es manía: **en una VM o un LXC la aceleración hardware no funciona, sin más.** Todo
+el trabajo pesado cae sobre la CPU. MKVerything (normalizar, rescatar, transcodificar) pasa de
+minutos a **horas o días** — directamente inusable. La única excepción es un hipervisor con
+passthrough de HW real (gente de NAS/Proxmox que sabe lo que hace), y casi nadie monta eso.
+
+Si **aun así** vas a virtualizar, asúmelo: irás por CPU y será lento. Y antes de arrancar, ten
+plan para **lo compartido** — carpetas de medios (mounts NFS/CIFS), devices y la red hacia
+qBittorrent. Si no defines cómo ven los datos y el cliente las distintas capas, el contenedor
+arranca pero no encuentra ni los archivos ni qBit. Lo que falle ahí es tuyo.
+
+(Workarounds concretos para desatascar el arranque en VM/LXC más abajo, mientras preparamos la
+versión *lite*.)
 
 ---
 
@@ -130,6 +204,33 @@ Respeto a:
 - MKVToolNix
 - FFmpeg
 - The TOR Project
+
+---
+
+## 🧪 Workarounds para VM/LXC (mientras llega la *lite*)
+
+No es escenario soportado. **Esto NO arregla el rendimiento** — seguirás en CPU y MKVerything
+seguirá siendo lento. Solo sirve para que el stack al menos arranque y se deje usar:
+
+- **El rendimiento no se arregla.** No hay flag ni truco: sin HW accel, normalizar/transcodificar
+  va por CPU. Para lotes grandes, no virtualices.
+- **Permisos / UID.** El contenedor corre como `uid 1000`. Si tu usuario host (o el desplazamiento
+  de UID del LXC) no es 1000, los directorios montados (`work_data`, `logs`, `config`) salen
+  inaccesibles → `PermissionError`. Workaround: crea esos dirs a mano y `chown -R 1000:1000`
+  sobre ellos, o corre el stack desde un usuario host que sea `uid 1000`.
+- **Trackers que “desaparecen”** (`ModuleNotFoundError: src.trackers.PTP`). El bind-mount de
+  `work_data/trackers` vacío tapa los trackers que trae la imagen. Déjalo que se auto-rellene
+  (`make up` lo siembra desde la imagen) o, si tu capa lo impide, copia los trackers a mano:
+  `docker cp singularity_core:/app/RawLoadrr/src/trackers/. work_data/trackers/`.
+- **`INCORRECT QBIT LOGIN CREDENTIALS` con qBit que sí funciona.** Suele ser puerto/bloque qBit
+  equivocado en `config.py`, no la contraseña. Revisa que apuntas al puerto real del WebUI y que
+  no estás usando un bloque legacy.
+- **qBittorrent inalcanzable.** Dentro de otra capa, `127.0.0.1` no es el qBit del host. Usa una
+  IP que el contenedor pueda alcanzar (la de la bridge, o `host.docker.internal` donde exista).
+- **Dashboard solo en localhost.** Escucha en loopback **a propósito**: no lleva auth, así que no
+  está hecho para exponerse. Si lo necesitas desde fuera de la capa, **túnel SSH** (o un reverse
+  proxy con autenticación delante). **Nunca lo bindees a `0.0.0.0`** — eso publica un panel sin
+  contraseña en la red.
 
 ---
 
