@@ -28,6 +28,8 @@ prep:
 	@echo "🔧 Verificando integridad de archivos de persistencia..."
 	@mkdir -p work_data/mass_editor
 	@mkdir -p work_data/logs/csi_log
+	@mkdir -p work_data/logs/rawloadrr
+	@mkdir -p work_data/logs/mkverything
 	@mkdir -p $(WORK_TRACKERS)
 	@mkdir -p work_data/tmp/qbit_backup
 	@mkdir -p work_data/tmp/TEMP_RESCUE
