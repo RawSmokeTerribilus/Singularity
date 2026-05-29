@@ -23,63 +23,65 @@ Puertas rápidas:
 
 ## 🚀 Instalación rápida (la de siempre)
 
-Si solo quieres arrancar la suite, basta con estos archivos:
-- `docker-compose.yml`
-- `makefile`
-- `final-user-install.sh`
+No tienes que cazar archivos sueltos por el repo. Cada plataforma tiene su carpeta lista para
+descargar, con **todo lo necesario dentro**:
 
-Y luego:
+| Plataforma | Carpeta | Contenido |
+|---|---|---|
+| 🐧 Linux | [`linux-installer/`](linux-installer/) | `docker-compose.yml` · `makefile` · `final-user-install.sh` |
+| 🪟 Windows | [`windows-installer/`](windows-installer/) | `docker-compose.yml` · `install-windows.bat` · `setup-windows.ps1` |
 
-```bash
-make install
-make up
-make attach
-singularity
-```
-
-Ése sigue siendo el flujo principal.
-
-Qué hace `make install`:
-- crea `./config/`
-- crea `./work_data/`
-- instala `singularity` y `singularity-shell`
-- genera `.env`, `config.py`, `singularity_config.py` y `mass_config.py`
-- deja `NOBS` preformado
-- conserva `config.py` multi-tracker para tirar contra cualquier UNIT3D serio
-
-No hace falta bajar el repo completo para usar el modo ligero.
-No hace falta reconstruir la imagen.
-Solo la imagen publicada + esos 3 archivos.
+Baja la carpeta de tu sistema (o solo esos archivos), mételos en una carpeta vacía en tu `HOME`
+y sigue los pasos de abajo. No hace falta clonar el repo entero ni reconstruir la imagen: solo la
+imagen publicada + esos archivos. Las plantillas de config **y los 53 módulos de tracker** se
+extraen solos desde la imagen.
 
 ---
 
-## 🐣 Si nunca has tocado esto (paso a paso, sin prisa)
+### 🐧 Linux
 
-1. **Instala Docker** (Docker Engine + el plugin `docker compose`). En tu propio Linux, sobre
-   tu usuario normal. Nada de servidores raros.
-2. **Crea una carpeta vacía** en tu `HOME`, por ejemplo `~/Singularity`. Ahí dentro va a vivir
-   todo: tu config y tus datos de trabajo. **No la pongas en `/`, ni en `/opt`, ni en discos
-   montados de forma rara.** Tu `~/` y punto.
-3. **Mete dentro esos 3 archivos**: `docker-compose.yml`, `makefile`, `final-user-install.sh`.
-4. Abre una terminal **en esa carpeta** y lanza, en este orden:
+```bash
+make install   # crea config/ y work_data/, genera plantillas, siembra trackers, instala el lanzador
+make up        # baja la imagen si hace falta y arranca el contenedor
+make attach    # entra a la TUI
+singularity    # y a partir de aquí, este comando abre la TUI cuando quieras
+```
 
-   ```bash
-   make install   # crea config/ y work_data/, genera las plantillas, instala el lanzador
-   make up         # baja la imagen si hace falta y arranca el contenedor
-   make attach     # entra a la TUI
-   ```
+Qué hace `make install`:
+- crea `./config/` y `./work_data/`
+- instala `singularity` y `singularity-shell`
+- genera `.env`, `config.py`, `singularity_config.py` y `mass_config.py`
+- siembra `work_data/trackers` desde la imagen (si no, verías `ModuleNotFoundError: src.trackers.PTP`)
+- deja `NOBS` preformado y `config.py` multi-tracker para cualquier UNIT3D serio
 
-5. La primera vez, **antes de subir nada**, edita tus claves en `config/` (ver más abajo
-   “Qué configurar para que funcione de verdad”). Si te saltas esto, la identificación y las
-   imágenes fallarán.
-6. A partir de ahí, el comando `singularity` te abre la TUI cuando quieras.
+**Qué evitar:** no ejecutes los `make` con `sudo` (el script pide permisos solo cuando toca); no
+muevas `config/` ni `work_data/` tras instalar; no bajes `RawLoadrr/` suelto — esto es un tanque,
+no una pieza suelta.
 
-**Qué evitar (te ahorra dolores):**
-- No ejecutes los `make` con `sudo`. El usuario normal basta. Si algo pide permisos, es el
-  propio script quien los pide cuando toca.
-- No muevas `config/` ni `work_data/` a otra ruta después de instalar. El contenedor los busca
-  donde los dejó `make install`.
-- No bajes solo `RawLoadrr/` por tu cuenta. Esto es un tanque, no una pieza suelta.
+---
+
+### 🪟 Windows (Docker Desktop)
+
+1. Instala **Docker Desktop** y déjalo arrancado (WSL2 backend).
+2. Crea una carpeta vacía, por ejemplo `C:\Singularity`, y mete dentro los 3 archivos de
+   [`windows-installer/`](windows-installer/).
+3. **Doble clic en `install-windows.bat`** (o botón derecho → Ejecutar). Hace lo mismo que
+   `make install`: crea `config/` y `work_data/`, extrae las plantillas y los trackers desde la
+   imagen, y genera los lanzadores `up.bat` / `singularity.bat` / `singularity-shell.bat`.
+4. Edita tus claves en `config/` (ver “Qué configurar…”). **En Windows, el qBit/Sonarr/Radarr de
+   tu host se alcanzan por `host.docker.internal`, no por `127.0.0.1`** — cámbialo en
+   `config/config.py`.
+5. `up.bat` para arrancar el contenedor → `singularity.bat` para entrar a la TUI.
+
+**Realidad de Windows (no es magia):**
+- **Sin aceleración hardware.** WSL2 es virtualización: MKVerything transcodifica por CPU (lento).
+  Sirve para probar la lógica de subida, no para lotes de transcode.
+- **Medios:** por defecto se monta la carpeta `media` que el instalador crea junto al compose —
+  suelta ahí tus pelis/series y listo. Para apuntar a tu carpeta real, **abre
+  `docker-compose.yml` con el Bloc de notas** y edita la línea marcada (ej. `- D:\Pelis:/media`).
+  Sin terminal, sin variables de entorno.
+- El compose de Windows va **sin** `privileged`, `/dev/dri`, `group_add`, `:z` ni `network_mode:
+  host` (ninguno aplica en Docker Desktop).
 
 ---
 
