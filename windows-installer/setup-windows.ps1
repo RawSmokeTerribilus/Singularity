@@ -85,19 +85,32 @@ $needConfig = -not (Test-Path -LiteralPath "$ConfigDir\config.py")
 $needTrackers = (Get-ChildItem -LiteralPath "$WorkDir\trackers" -ErrorAction SilentlyContinue | Measure-Object).Count -eq 0
 
 if ($needConfig -or $needTrackers) {
-    # Imagen local? si no, baja (mismo guard que el Bug 2 de Linux: no clobber del build local)
-    docker image inspect $Image 2>$null | Out-Null
+    # IMPORTANTE: redirigir stderr (2>&1 / 2>$null) en TODAS las llamadas nativas a docker.
+    # docker escribe el progreso a stderr; con $ErrorActionPreference='Stop', Windows
+    # PowerShell 5.1 (el que lanza install-windows.bat) lo convierte en NativeCommandError
+    # y aborta el script a mitad del pull -> la imagen no baja -> docker cp falla.
+
+    # Siempre pull: idempotente; un tester de Windows no tiene build local que pisar.
+    Write-Host "Asegurando imagen $Image (docker pull)..." -ForegroundColor Cyan
+    docker pull $Image 2>&1 | Out-Null
     if ($LASTEXITCODE -ne 0) {
-        Write-Host "Bajando imagen $Image ..." -ForegroundColor Cyan
-        docker pull $Image | Out-Null
+        Write-Host "ERROR: no se pudo bajar la imagen $Image." -ForegroundColor Red
+        Write-Host "       Verifica que Docker Desktop este arrancado y que haya conexion." -ForegroundColor Red
+        exit 1
     }
 
     $ExtractDir = Join-Path $env:TEMP ("sing_extract_" + [guid]::NewGuid().ToString("N"))
     New-Item -ItemType Directory -Path $ExtractDir -Force | Out-Null
-    $Cid = (docker create $Image).Trim()
+
+    $Cid = (docker create $Image 2>$null)
+    if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($Cid)) {
+        Write-Host "ERROR: 'docker create' fallo. La imagen no quedo disponible." -ForegroundColor Red
+        exit 1
+    }
+    $Cid = $Cid.Trim()
     try {
         # 3a. Plantillas de config (visibles + para copy_if_missing)
-        docker cp "${Cid}:/app/config/." $ExtractDir | Out-Null
+        docker cp "${Cid}:/app/config/." $ExtractDir 2>&1 | Out-Null
         Get-ChildItem -LiteralPath $ExtractDir -Filter "*.example" | ForEach-Object {
             $dst = Join-Path $ConfigDir $_.Name
             if (-not (Test-Path -LiteralPath $dst)) { Copy-Item $_.FullName $dst }
@@ -106,11 +119,11 @@ if ($needConfig -or $needTrackers) {
         # 3b. SIEMBRA DE TRACKERS (fix Bug 1: dir vacio enmascara los modulos del image)
         if ($needTrackers) {
             Write-Host "Infundiendo trackers desde la imagen..." -ForegroundColor Cyan
-            docker cp "${Cid}:/app/RawLoadrr/src/trackers/." "$WorkDir\trackers" | Out-Null
+            docker cp "${Cid}:/app/RawLoadrr/src/trackers/." "$WorkDir\trackers" 2>&1 | Out-Null
         }
     }
     finally {
-        docker rm $Cid | Out-Null
+        if (-not [string]::IsNullOrWhiteSpace($Cid)) { docker rm $Cid 2>&1 | Out-Null }
         Remove-Item -LiteralPath $ExtractDir -Recurse -Force -ErrorAction SilentlyContinue
     }
 }
