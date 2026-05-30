@@ -711,9 +711,9 @@ config = {'AUTO': {'delay': 0, 'description_folder': None, 'dupe_similarity': 80
                                   '[center][b]PLEASE SEED YU-SCENE FAMILY[/b][/center]\n'
                                   '[center][url=https://codeberg.org/RawSmoke/Singularity][img=400]https://i.ibb.co/2NVWb0c/uploadrr.webp[/img][/url][/center]'}},
  'qbit': {'enable_search': True,
-          'qbit_pass': '30043004alvaro',
+          'qbit_pass': 'PASSWORD',
           'qbit_port': '8888',
           'qbit_url': 'http://127.0.0.1:8888',
-          'qbit_user': 'gonzalo',
+          'qbit_user': 'USERNAME',
           'torrent_storage_dir': '/app/RawLoadrr/qbit_backup'},
  'version': '1.0.7'}
