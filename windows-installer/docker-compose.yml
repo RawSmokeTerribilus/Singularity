@@ -1,6 +1,6 @@
 services:
   singularity:
-    # Singularity Suite v3.0.1 — WINDOWS variant (Docker Desktop / WSL2)
+    # Singularity Suite v3.0.2 — WINDOWS variant (Docker Desktop / WSL2)
     # Differences vs the Linux compose (intentional):
     #   - NO privileged / NO /dev/dri / NO group_add  -> HW accel does not exist
     #     under WSL2 virtualization. MKVerything transcodes run on CPU (slow, fine

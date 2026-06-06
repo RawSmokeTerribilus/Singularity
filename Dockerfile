@@ -170,7 +170,7 @@ LABEL org.opencontainers.image.title="Singularity Suite" \
       org.opencontainers.image.authors="RawSmoke" \
       org.opencontainers.image.vendor="RawSmoke" \
       org.opencontainers.image.base.name="python:3.11-bookworm" \
-      org.opencontainers.image.version="3.0.1"
+      org.opencontainers.image.version="3.0.2"
 
 # Dashboard port. EXPOSE doesn't publish on host-net mode, but it
 # self-documents the listening service for `docker inspect`/`docker ps`.

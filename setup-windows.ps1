@@ -1,4 +1,4 @@
-# setup-windows.ps1  —  Singularity Suite v3.0.1 Windows installer
+# setup-windows.ps1  —  Singularity Suite v3.0.2 Windows installer
 # ----------------------------------------------------------------------------
 # Omnipotent 3-file install (parity with final-user-install.sh):
 #   docker-compose.yml + install-windows.bat + setup-windows.ps1  +  the image.
