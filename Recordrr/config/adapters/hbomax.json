@@ -1,0 +1,83 @@
+{
+  "service": "hbomax",
+  "display": "HBO Max",
+  "url": "https://play.max.com/",
+  "_untuned": true,
+  "_note": "STUB — selectors cloned from pluto, NOT tuned for HBO Max. Run drift (Proveedores -> drift) against the live DOM and edit. Anchor on role/aria/text, not layout classes.",
+  "timing": {
+    "play_settle": 8,
+    "ad_poll": 3,
+    "end_pad": 2,
+    "max_runtime_factor": 2.2
+  },
+  "controls": {
+    "play": [
+      {
+        "role": "button",
+        "name": "(?i)^play"
+      },
+      {
+        "css": "button[aria-label*='Play' i]"
+      },
+      {
+        "css": "[data-testid*='play' i], .video-player__play"
+      }
+    ],
+    "skip_intro": [
+      {
+        "role": "button",
+        "name": "(?i)skip intro|skip recap"
+      },
+      {
+        "text": "(?i)skip intro"
+      },
+      {
+        "css": "button[class*='skip' i], [class*='skip-intro' i] button"
+      }
+    ],
+    "next_episode": [
+      {
+        "role": "button",
+        "name": "(?i)next episode|up next|play next"
+      },
+      {
+        "text": "(?i)next episode|up next"
+      },
+      {
+        "css": "[data-testid*='next' i], [class*='next-episode' i]"
+      }
+    ],
+    "ad_marker": [
+      {
+        "text": "(?i)advertisement|commercial|ad break"
+      },
+      {
+        "css": "[class*='ad-countdown' i], [data-testid*='ad' i], [class*='advertisement' i]"
+      }
+    ],
+    "fullscreen": [
+      {
+        "role": "button",
+        "name": "(?i)full ?screen"
+      },
+      {
+        "css": "button[aria-label*='full' i]"
+      }
+    ],
+    "unmute": [
+      {
+        "role": "button",
+        "name": "(?i)unmute|^mute"
+      },
+      {
+        "css": "button[aria-label*='unmute' i]"
+      },
+      {
+        "css": "button[aria-label*='mute' i]"
+      },
+      {
+        "css": "[data-testid*='mute' i], [class*='mute' i] button"
+      }
+    ]
+  }
+}

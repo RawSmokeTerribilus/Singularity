@@ -38,6 +38,12 @@ torf
 tmdbsimple
 unidecode
 
+# Recordrr — automatización de captura por navegador
+# (usa Google Chrome del sistema vía channel="chrome"; NO descargar Chromium)
+playwright
+opencv-python-headless
+simpleobsws
+
 # Procesamiento de Video (VapourSynth)
 # Nota: En Docker instalaremos la base por apt-get, 
 # pero estas librerías de python son los puentes.

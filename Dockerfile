@@ -131,6 +131,23 @@ RUN if [ -f /etc/apt/sources.list.d/debian.sources ]; then \
     vainfo \
     && rm -rf /var/lib/apt/lists/*
 
+# --- 8b. RECORDRR: navegador real + display virtual + audio + login VNC ---
+# Aditivo: NO toca la forja zimg/VapourSynth/L-SMASH de arriba.
+# google-chrome-stable trae el CDM de Widevine (el Chromium de Playwright NO).
+# Xvfb = display virtual headless; x11vnc = ver el navegador una vez para el
+# login manual; pulseaudio = sink nulo cuyo monitor graba ffmpeg.
+RUN apt-get update && apt-get install -y --no-install-recommends gnupg ca-certificates && \
+    curl -fsSL https://dl.google.com/linux/linux_signing_key.pub \
+        | gpg --dearmor -o /usr/share/keyrings/google-chrome.gpg && \
+    echo "deb [arch=amd64 signed-by=/usr/share/keyrings/google-chrome.gpg] http://dl.google.com/linux/chrome/deb/ stable main" \
+        > /etc/apt/sources.list.d/google-chrome.list && \
+    apt-get update && apt-get install -y --no-install-recommends \
+    google-chrome-stable \
+    xvfb x11-utils x11vnc xauth \
+    pulseaudio pulseaudio-utils \
+    fonts-liberation && \
+    rm -rf /var/lib/apt/lists/*
+
 # Variable de entorno de seguridad (luego el Agente la puede pisar)
 ENV MOZ_X11_EGL=1
 

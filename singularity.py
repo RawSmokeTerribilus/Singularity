@@ -763,11 +763,12 @@ def main_menu():
         menu.add_row("6", "SINGULARIDAD (Goddess Mode - Fast Check)", "[magenta]VUELO[/magenta]")
         menu.add_row("7", "Mantenimiento & Limpieza", "[red]PELIGRO[/red]")
         menu.add_row("8", "Download more RAM", "[magenta]GRATIS[/magenta]") # <--- Desplazada al 8
+        menu.add_row("9", "Recordrr (Captura por navegador)", "[magenta]GRABA[/magenta]")
         menu.add_row("0", "Cerrar Conexión", "")
 
         console.print(Align.center(Panel(menu, border_style="cyan", padding=(1, 5))))
 
-        sel = Prompt.ask("root@singularidad", choices=["1", "2", "3", "4", "5", "6", "7", "8", "0"])
+        sel = Prompt.ask("root@singularidad", choices=["1", "2", "3", "4", "5", "6", "7", "8", "9", "0"])
         log.info(f"Main menu selection: {sel}")
 
         if sel == "1":
@@ -785,6 +786,8 @@ def main_menu():
             _submenu_mantenimiento()
         elif sel == "8":
             _run(["python3", "RawLoadrr/data/reconfig.py"])
+        elif sel == "9":
+            _run(["python3", "-m", "Recordrr.launcher"])
         elif sel == "0":
             log.info("User exited Singularity")
             break

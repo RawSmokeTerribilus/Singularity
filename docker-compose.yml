@@ -5,6 +5,8 @@ services:
     container_name: singularity_core
     restart: unless-stopped
     privileged: true
+    # Recordrr: Chrome se cae con el /dev/shm por defecto (64MB).
+    shm_size: "2gb"
     user: "${PUID:-1000}:${PGID:-1000}"
     group_add:
       - "997"         # Acceso directo al grupo 'render' (AMD/Intel)
@@ -55,6 +57,11 @@ services:
       - ./work_data/logs/rawloadrr:/app/RawLoadrr/logs:z
       - ./work_data/logs/mkverything:/app/MKVerything/logs:z
       - ./work_data/qbit_backup:/app/RawLoadrr/qbit_backup:z
+
+      # --- 3b. RECORDRR: perfiles Chrome por-usuario, packs de selectores, logs ---
+      - ./work_data/recordrr/profiles:/app/Recordrr/profiles:z
+      - ./work_data/recordrr/adapters:/app/Recordrr/config/adapters:z
+      - ./work_data/logs/recordrr:/app/Recordrr/logs:z
 
       # --- 4. EL ARSENAL (30TB) ---
       - /run/media/${USER}:/run/media/${USER}:z
