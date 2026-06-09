@@ -19,7 +19,7 @@ player's REAL state (= what (b) must use). If the `unmute` control never matches
 (`matched: False`), the selector is wrong and that's the whole bug.
 
 Run (live session, navigate + press play in VNC first):
-    docker exec -e DISPLAY=:99 -e RECORDRR_DEBUG_PORT=9222 singularity_core \
+    docker exec -e DISPLAY=:77 -e RECORDRR_DEBUG_PORT=9222 singularity_core \
         python3 -m Recordrr.modules.audiodiag pluto pluto
 
 With RECORDRR_DEBUG_PORT set you can ALSO open http://localhost:9222 in your real

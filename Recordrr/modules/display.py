@@ -70,6 +70,45 @@ def _kill(name: str):
         pf.unlink(missing_ok=True)
 
 
+def _make_xauth() -> str:
+    """Create the per-session Xauthority cookie for :99 and return its path.
+
+    Replaces Xvfb's old `-ac` (access control OFF, accepted any client). The leak:
+    a host Flatpak VLC/AyuGram launched from a DISPLAY=:99 shell connected to :99
+    and its window got captured. With a cookie only OUR clients hold, those host
+    apps (carrying their own /run/flatpak/Xauthority) are refused. NOT netns (that
+    breaks Chrome's abstract-socket-only X client — see history below).
+
+    Written in pure Python: the container has `mcookie` but not the `xauth`
+    binary, and adding it would mean a Dockerfile rebuild. The .Xauthority format
+    is trivial, so we emit it directly and keep the fix dev-syncable. Two entries
+    with the SAME cookie — FamilyLocal(hostname) (what xvfb-run/Xlib looks up for a
+    local connection) and FamilyWild (matches any address) — so whichever lookup a
+    client does, it finds the cookie; Xvfb loads both as valid by name+data."""
+    import socket
+    import struct
+    xauth = cfg.XAUTHORITY
+    Path(xauth).parent.mkdir(parents=True, exist_ok=True)
+    cookie = os.urandom(16)                       # 16-byte MIT-MAGIC-COOKIE-1
+    num = cfg.DISPLAY.lstrip(":").split(".")[0].encode()   # b"99"
+    name = b"MIT-MAGIC-COOKIE-1"
+
+    def _f(b):                                    # length-prefixed field (big-endian)
+        return struct.pack(">H", len(b)) + b
+
+    def _entry(family, addr):
+        return (struct.pack(">H", family) + _f(addr) + _f(num)
+                + _f(name) + _f(cookie))
+
+    FAMILY_LOCAL, FAMILY_WILD = 256, 0xFFFF
+    blob = (_entry(FAMILY_LOCAL, socket.gethostname().encode())
+            + _entry(FAMILY_WILD, b""))
+    with open(xauth, "wb") as f:                  # truncate → fresh cookie each up
+        f.write(blob)
+    os.chmod(xauth, 0o600)
+    return xauth
+
+
 def start_xvfb() -> str:
     if _alive("xvfb"):
         return cfg.DISPLAY
@@ -77,11 +116,16 @@ def start_xvfb() -> str:
     # NOTE: netns isolation of Xvfb (unshare --net) was tried to stop the host
     # netns X11-abstract-socket leak, but Chrome's X client only uses the
     # abstract socket and won't fall back to the filesystem one -> "Missing X
-    # server". So Xvfb must stay in the shared netns. The leak is handled
-    # operationally for now (bring :99 down when not recording); the real fix
-    # (task #5) is a bridge-networked sidecar, not netns isolation here.
-    cmd = ["Xvfb", cfg.DISPLAY, "-screen", "0", screen, "-nolisten", "tcp", "-ac"]
-    _spawn("xvfb", cmd)
+    # server". So Xvfb must stay in the shared netns. The leak is now closed with
+    # xauth (below): drop -ac, require our cookie. A stray host app reaching :99
+    # is refused for lack of the cookie. (Replaces the old operational workaround
+    # of bringing :99 down when not recording.)
+    xauth = _make_xauth()
+    cmd = ["Xvfb", cfg.DISPLAY, "-screen", "0", screen,
+           "-nolisten", "tcp", "-auth", xauth]
+    env = os.environ.copy()
+    env["XAUTHORITY"] = xauth
+    _spawn("xvfb", cmd, env=env)
     # Wait for the display socket to exist.
     sock = f"/tmp/.X11-unix/X{cfg.DISPLAY.lstrip(':')}"
     for _ in range(50):
@@ -116,8 +160,10 @@ def start_vnc():
         return cfg.VNC_PORT
     env = os.environ.copy()
     env["DISPLAY"] = cfg.DISPLAY
+    env["XAUTHORITY"] = cfg.XAUTHORITY        # cookie to attach to the now-auth'd :99
     cmd = [
         "x11vnc", "-display", cfg.DISPLAY, "-rfbport", str(cfg.VNC_PORT),
+        "-auth", cfg.XAUTHORITY,
         "-localhost", "-forever", "-shared", "-nopw", "-quiet",
         # Chrome's GPU-composited repaints often emit no XDAMAGE, so the injected
         # bar/clock didn't refresh live until reconnect. Poll instead.

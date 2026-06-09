@@ -16,7 +16,7 @@ whole ad break and an episode-end → related-videos transition; copy the real
 class/testid names straight into config/adapters/<svc>.json ad_marker.
 
 Run (live session — navigate + press play in VNC first):
-    docker exec -e DISPLAY=:99 -e RECORDRR_DEBUG_PORT=9222 singularity_core \
+    docker exec -e DISPLAY=:77 -e RECORDRR_DEBUG_PORT=9222 singularity_core \
         python3 -m Recordrr.modules.layerdiag pluto pluto
 
 With RECORDRR_DEBUG_PORT set you can ALSO open http://localhost:9222 in your real

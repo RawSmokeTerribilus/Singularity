@@ -11,7 +11,18 @@ RECORDRR_ROOT = Path(__file__).resolve().parent.parent        # /app/Recordrr
 APP_ROOT = RECORDRR_ROOT.parent                                # /app
 
 # --- Display / capture geometry (Xvfb screen must match capture size) ---
-DISPLAY = os.getenv("RECORDRR_DISPLAY", ":99")
+# NOTE: NOT :99 — Flatpak hardcodes :99 for every sandbox (it remaps the host
+# display to :99 inside the bubble). With the container on --network host the
+# abstract X socket @/tmp/.X11-unix/X99 collides, so any host Flatpak app (VLC,
+# AyuGram, OBS, LosslessCut…) launched while Recordrr's :99 was up landed on OUR
+# Xvfb and got baked into the capture. :77 is collision-free (host owns :0/:1,
+# Flatpak owns :99). See vault: recordrr-display-99-collision.md.
+DISPLAY = os.getenv("RECORDRR_DISPLAY", ":77")
+# Xauthority cookie file for :99. Xvfb runs with -auth (NOT -ac), so only clients
+# holding this MIT-MAGIC-COOKIE-1 (our Chrome, ffmpeg x11grab, x11vnc) may draw —
+# a stray host Flatpak app pointed at :99 carries its own cookie and is refused,
+# killing the display leak that baked VLC/AyuGram windows into recordings.
+XAUTHORITY = os.getenv("RECORDRR_XAUTH", "/tmp/recordrr/Xauthority")
 SCREEN_W = int(os.getenv("RECORDRR_W", "1920"))
 SCREEN_H = int(os.getenv("RECORDRR_H", "1080"))
 SCREEN_DEPTH = int(os.getenv("RECORDRR_DEPTH", "24"))
@@ -68,12 +79,19 @@ OUTPUT_DIR = Path(os.getenv("RECORDRR_OUTPUT", str(RECORDRR_ROOT / "output")))
 # --- Logs (own dir, dashboard-visible via the recordrr logs volume) ---
 LOGS_DIR = Path(os.getenv("RECORDRR_LOGS", str(RECORDRR_ROOT / "logs")))
 
+# --- Flight recorder: passive per-poll JSONL timeline of every record run, in
+# LOGS_DIR/flight/. Always on; never throws into the record loop. Set
+# RECORDRR_FLIGHT=0 to disable. The post-mortem trail E10 never had.
+FLIGHT_ENABLED = os.getenv("RECORDRR_FLIGHT", "1").lower() not in ("0", "false", "no", "off")
+
 # --- Adapter strategy packs (JSON, volume-mounted so edits need no rebuild) ---
 ADAPTERS_DIR = Path(os.getenv("RECORDRR_ADAPTERS", str(RECORDRR_ROOT / "config" / "adapters")))
 
 # --- Metadata sources (reuse Singularity's existing services) ---
 SONARR_URL = os.getenv("SONARR_URL", "http://127.0.0.1:8989")
 SONARR_API_KEY = os.getenv("SONARR_API_KEY", "")
+RADARR_URL = os.getenv("RADARR_URL", "http://127.0.0.1:7878")
+RADARR_API_KEY = os.getenv("RADARR_API_KEY", "")
 TMDB_API_KEY = os.getenv("TMDB_API_KEY", "")
 
 # --- Capture backend selection: "xvfb" (primary) | "obs" (fallback) ---

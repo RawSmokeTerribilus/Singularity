@@ -4,9 +4,20 @@
   "_note": "Strategies are ordered; first match wins. Tune against the live DOM using the drift report (option in the Recordrr menu). Anchor on role/aria/text, not layout classes.",
   "timing": {
     "play_settle": 8,
-    "ad_poll": 3,
+    "ad_poll": 1,
     "end_pad": 2,
     "max_runtime_factor": 2.2
+  },
+  "live": {
+    "_note": "Linear-TV (live channels). Primary signals come from the page's own Redux store (window.appStore) via modules/guide.py — EPG, ad/mute/fit state. The DOM controls below stay as fallbacks. See recordrr-asbuilt §20.",
+    "url": "https://pluto.tv/en/live-tv",
+    "store": true,
+    "timing": {
+      "ad_poll": 2,
+      "play_settle": 6,
+      "max_runtime_factor": 1.6,
+      "login_wait": 900
+    }
   },
   "controls": {
     "play": [

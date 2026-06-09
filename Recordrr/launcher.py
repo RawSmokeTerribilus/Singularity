@@ -18,6 +18,7 @@ Display owner contract
 - Leaving Recordrr ([0]): always tears the display down — nothing needs :99 once
   you're out.
 """
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -188,14 +189,78 @@ def _grabar(adapter_name=None):
 
 
 def _grabar_pelicula(adapter_name=None):
-    """Movie capture — placeholder. Movie mode needs a single-asset record path
-    (no season/episode loop) + Radarr metadata for naming. Wired in a later step;
-    the ad-pause + segment-concat engine it will reuse is already done. For now
-    use [1] Grabar Serie for episodic content."""
-    console.print("[yellow]Grabar Película — WIP (próximamente).[/yellow]")
-    console.print("[dim]Falta: modo asset único + metadatos Radarr. La captura "
-                  "(pausa de anuncios + concat de segmentos) ya está lista y se "
-                  "reutilizará. Para series usa [1] Grabar Serie.[/dim]")
+    """Movie capture — single asset, Radarr metadata, same ad-pause + segment-concat
+    engine as series. No season/episode loop; the player has no autoplay-next so the
+    record ends on the movie's own near_end (the boundary backstop still covers a
+    credits→'Up Next' src-swap)."""
+    name = adapter_name or _pick_provider("Grabar con")
+    if not name:
+        return
+    adapter = Adapter.load(name)
+    if adapter.untuned:
+        console.print(f"[yellow]Aviso: '{adapter.display}' es un STUB sin tunear — "
+                      "los selectores casi seguro fallan. Útil para probar login/DOM.[/yellow]")
+    movie = Prompt.ask("Película  [dim](como en Radarr)[/dim]").strip()
+    if not movie:
+        return
+    profile = Prompt.ask("Perfil Chrome", default=name).strip() or name
+    args = [movie, "--movie", "--adapter", name, "--profile", profile]
+
+    _ensure_display()
+    console.print("[yellow]Chrome arrancará en el display virtual. VNC in, login si "
+                  "hace falta, navega a la película, dale PLAY y pulsa ⏺ REC.[/yellow]")
+    try:
+        _run_module("Recordrr.modules.orchestrator", *args)
+    finally:
+        _display_down()
+    Prompt.ask("\nEnter para volver", default="")
+
+
+def _grabar_tv(adapter_name=None):
+    """Live-TV capture — linear channel, EPG wall-clock boundaries. Reuses the
+    same capture + ad-pause + flight engine as series/movie; the index is the
+    provider's in-page guide (no arr). Triage: channel → modo → nombrado."""
+    name = adapter_name or _pick_provider("Grabar TV con")
+    if not name:
+        return
+    adapter = Adapter.load(name)
+    channel = Prompt.ask(
+        "Canal  [dim](nombre/número, o Enter = lo sintonizo yo en VNC)[/dim]",
+        default="").strip() or "auto"
+    console.print(
+        "  [bold]Modo[/bold]: "
+        "[cyan]1[/cyan] un programa  ·  "
+        "[cyan]2[/cyan] por reloj (trozos de N min)  ·  "
+        "[cyan]3[/cyan] hasta que vuelva (archivo continuo, corta por programa)")
+    mode_sel = Prompt.ask("Modo", choices=["1", "2", "3"], default="3")
+    mode = {"1": "single", "2": "clock", "3": "till"}[mode_sel]
+    chunk = "30"
+    if mode == "clock":
+        chunk = Prompt.ask("Minutos por archivo", default="30").strip() or "30"
+    nm_sel = Prompt.ask("Nombrado  [dim](1 = adivinar de la guía+TMDB, 2 = lo nombro yo)[/dim]",
+                        choices=["1", "2"], default="1")
+    naming = "guess" if nm_sel == "1" else "name"
+    override = ""
+    if naming == "name":
+        override = Prompt.ask("Nombre base").strip()
+    profile = Prompt.ask("Perfil Chrome", default=name).strip() or name
+
+    args = [channel, "--live", "--adapter", name, "--mode", mode,
+            "--naming", naming, "--profile", profile]
+    if mode == "clock":
+        args += ["--chunk", chunk]
+    if naming == "name" and override:
+        args += ["--override", override]
+
+    _ensure_display()
+    console.print("[yellow]Chrome arrancará en el display virtual. VNC in (127.0.0.1:5900), "
+                  "login si hace falta, espera a que cargue el canal y pulsa ⏺ REC.[/yellow]")
+    console.print("[dim]Continuo: pulsa REC una vez y déjalo; corta y nombra cada programa "
+                  "solo. Parar: 'q' o ⏹ STOP (NUNCA Ctrl-C).[/dim]")
+    try:
+        _run_module("Recordrr.modules.orchestrator", *args)
+    finally:
+        _display_down()
     Prompt.ask("\nEnter para volver", default="")
 
 
@@ -243,8 +308,8 @@ def _manage_provider(name):
             f"  Estado    : {'[yellow]STUB sin tunear[/yellow]' if a.untuned else '[green]listo[/green]'}\n"
             f"  Controles : [cyan]{ctl}[/cyan]\n"
             f"  JSON      : [dim]{cfg.ADAPTERS_DIR / (name + '.json')}[/dim]\n\n"
-            "  [bold green][g][/bold green] Grabar    [bold cyan][s][/bold cyan] Sesión/login\n"
-            "  [bold cyan][d][/bold cyan] Drift (abrir y comprobar selectores)\n"
+            "  [bold green]\\[g][/bold green] Grabar    [bold cyan]\\[s][/bold cyan] Sesión/login\n"
+            "  [bold cyan]\\[d][/bold cyan] Drift (abrir y comprobar selectores)\n"
             "  [bold cyan][0][/bold cyan] Volver",
             title=f"[bold magenta]Proveedor — {a.display}[/bold magenta]", border_style="magenta"))
         sel = Prompt.ask("acción", choices=["g", "s", "d", "0"], default="0")
@@ -288,19 +353,33 @@ def _providers_menu():
             _manage_provider(rows[int(sel) - 1][0])
 
 
-# ---- Diagnóstico submenu (the old POC primitives) ------------------------
+# ---- Diagnóstico submenu: display primitives + the analytics/recon suite ---
+def _flight_logs():
+    """All flight .jsonl, newest first."""
+    d = cfg.LOGS_DIR / "flight"
+    return sorted(d.glob("*.jsonl"), reverse=True) if d.exists() else []
+
+
 def _diag_menu():
     while True:
         console.print()
         console.print(Panel(
             f"  display :09  [{'[green]ARRIBA[/green]' if _display_up() else '[dim]abajo[/dim]'}]\n\n"
+            "  [dim]— Display / captura —[/dim]\n"
             "  [bold cyan][1][/bold cyan] Levantar display + audio + VNC\n"
             "  [bold cyan][2][/bold cyan] Bajar display\n"
             "  [bold cyan][3][/bold cyan] Capturar N segundos  [dim](prueba manual)[/dim]\n"
-            "  [bold cyan][4][/bold cyan] Abrir Chrome en una URL libre\n"
+            "  [bold cyan][4][/bold cyan] Abrir Chrome en una URL libre\n\n"
+            "  [dim]— Análisis (pasivo, sin display) —[/dim]\n"
+            "  [bold cyan][5][/bold cyan] Veredictos de vuelo  [dim](flightcheck — revisa todas las grabaciones)[/dim]\n"
+            "  [bold cyan][6][/bold cyan] Ver un log de vuelo  [dim](timeline poll-a-poll)[/dim]\n\n"
+            "  [dim]— Recon en vivo (necesita VNC + reproducción) —[/dim]\n"
+            "  [bold cyan][7][/bold cyan] Diag de audio    [dim](audiodiag — qué acción quita el mute real)[/dim]\n"
+            "  [bold cyan][8][/bold cyan] Diag de capas    [dim](layerdiag — DOM de anuncios/overlays en vivo)[/dim]\n"
+            "  [bold cyan][9][/bold cyan] Sondear selectores [dim](probe — vuelca los controles del player)[/dim]\n\n"
             "  [bold cyan][0][/bold cyan] Volver",
             title="[bold cyan]RECORDRR — Diagnóstico[/bold cyan]", border_style="cyan"))
-        sel = Prompt.ask("diag", choices=["1", "2", "3", "4", "0"], default="0")
+        sel = Prompt.ask("diag", choices=[str(i) for i in range(10)], default="0")
         if sel == "0":
             return
         elif sel == "1":
@@ -324,10 +403,71 @@ def _diag_menu():
             finally:
                 if raised:
                     _display_down()
+        elif sel == "5":
+            # flightcheck: pure offline read of LOGS_DIR/flight — no display.
+            verbose = Prompt.ask("¿Detalle por hallazgo? (s/n)", default="n").strip().lower()
+            args = ["--verbose"] if verbose.startswith("s") else []
+            _run_module("Recordrr.modules.flightcheck", *args)
+            Prompt.ask("\nEnter", default="")
+        elif sel == "6":
+            logs = _flight_logs()
+            if not logs:
+                console.print(f"[yellow]No hay logs de vuelo en {cfg.LOGS_DIR / 'flight'}.[/yellow]")
+                Prompt.ask("\nEnter", default=""); continue
+            t = Table(box=None, show_header=True, header_style="bold cyan")
+            t.add_column("#", justify="right"); t.add_column("Log (más reciente primero)")
+            for i, p in enumerate(logs[:20], 1):
+                t.add_row(str(i), p.name)
+            console.print(t)
+            pick = Prompt.ask("Log #", choices=[str(i) for i in range(1, min(len(logs), 20) + 1)], default="1")
+            _run_module("Recordrr.modules.flightrecorder", str(logs[int(pick) - 1]))
+            Prompt.ask("\nEnter", default="")
+        elif sel in ("7", "8", "9"):
+            # Live recon: these own their display (raise+teardown per the owner
+            # contract), so we DON'T raise it here. They wait for VNC playback.
+            name = _pick_provider("Proveedor a inspeccionar")
+            if not name:
+                continue
+            profile = Prompt.ask("Perfil Chrome", default=name).strip() or name
+            if sel == "7":
+                _run_module("Recordrr.modules.audiodiag", name, profile)
+            elif sel == "8":
+                _run_module("Recordrr.modules.layerdiag", name, profile)
+            else:
+                # probe is browser-side, gated by RECORDRR_PROBE in the POC loop.
+                os.environ["RECORDRR_PROBE"] = name
+                adapter = Adapter.load(name)
+                raised = _ensure_display()
+                try:
+                    _run_module("Recordrr.modules.browser", adapter.url, profile)
+                finally:
+                    os.environ.pop("RECORDRR_PROBE", None)
+                    if raised:
+                        _display_down()
+            Prompt.ask("\nEnter", default="")
 
 
-# ---- Ajustes (config) ----------------------------------------------------
-def _config_menu():
+# ---- Ajustes (config + proveedores) --------------------------------------
+def _ajustes_menu():
+    """Ajustes = the env config editor + Proveedores (moved in here so the top
+    menu stays all-numeric: 1/2/3 grabar, 4 ajustes, 5 diag — no letter keys)."""
+    while True:
+        console.print()
+        console.print(Panel(
+            "  [bold cyan][1][/bold cyan] Configuración  [dim](.env: salida, códec, claves…)[/dim]\n"
+            "  [bold cyan][2][/bold cyan] Proveedores    [dim](gestionar / añadir / drift / sesión)[/dim]\n"
+            "  [bold cyan][0][/bold cyan] Volver",
+            title="[bold yellow]RECORDRR — Ajustes[/bold yellow]", border_style="yellow"))
+        sel = Prompt.ask("ajustes", choices=["1", "2", "0"], default="0")
+        if sel == "0":
+            return
+        elif sel == "1":
+            _env_config_menu()
+        elif sel == "2":
+            _providers_menu()
+
+
+def _env_config_menu():
     while True:
         t = Table(box=None, show_header=True, header_style="bold yellow")
         t.add_column("#", justify="right"); t.add_column("Ajuste"); t.add_column("Valor")
@@ -361,9 +501,9 @@ def _banner():
         f"  Provs    : {_providers_inline()}\n\n"
         "  [bold green][1][/bold green]  Grabar Serie           [dim](proveedor → serie)[/dim]\n"
         "  [bold green][2][/bold green]  Grabar Película        [dim](proveedor → película)[/dim] [yellow][WIP][/yellow]\n"
-        "  [bold magenta][3][/bold magenta]  Proveedores            [dim](gestionar / añadir / drift / sesión)[/dim]\n"
-        "  [bold yellow][a][/bold yellow]  Ajustes\n"
-        "  [bold cyan][d][/bold cyan]  Diagnóstico            [dim](display / captura manual)[/dim]\n"
+        "  [bold green][3][/bold green]  Grabar TV              [dim](canal en vivo → modo → nombrado)[/dim]\n"
+        "  [bold yellow][4][/bold yellow]  Ajustes                [dim](configuración / proveedores)[/dim]\n"
+        "  [bold cyan][5][/bold cyan]  Diagnóstico            [dim](display / captura manual)[/dim]\n"
         "  [bold cyan][0][/bold cyan]  Atrás\n"
         "  [dim]Salir de Recordrr: [0]. Parar una grabación: tecla 'q' (NUNCA Ctrl-C).[/dim]",
         title="[bold magenta]RECORDRR — captura por navegador[/bold magenta]",
@@ -378,7 +518,7 @@ def main():
         while True:
             _banner()
             sel = Prompt.ask("root@singularidad:recordrr",
-                             choices=["1", "2", "3", "a", "d", "0"], default="0")
+                             choices=["1", "2", "3", "4", "5", "0"], default="0")
             if sel == "0":
                 break
             elif sel == "1":
@@ -386,10 +526,10 @@ def main():
             elif sel == "2":
                 _grabar_pelicula()
             elif sel == "3":
-                _providers_menu()
-            elif sel == "a":
-                _config_menu()
-            elif sel == "d":
+                _grabar_tv()
+            elif sel == "4":
+                _ajustes_menu()
+            elif sel == "5":
                 _diag_menu()
     finally:
         # leaving Recordrr → tear down the display so the netns-leak window closes.

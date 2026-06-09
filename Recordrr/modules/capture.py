@@ -21,7 +21,7 @@ The orchestrator decides WHEN to pause/resume off the adapter's is_ad signal;
 the capturer just owns the segment list.
 
 Run standalone (POC):
-    DISPLAY=:99 python3 -m Recordrr.modules.capture out.mkv 60
+    DISPLAY=:77 python3 -m Recordrr.modules.capture out.mkv 60
 """
 import os
 import subprocess
@@ -154,7 +154,11 @@ class XvfbFfmpegCapturer:
         work = self._segment_path(self._seg_idx)
         self._seg_work = work
         cmd = self._vaapi_cmd(work) if self._mode == "vaapi" else self._sw_cmd(work)
-        self._proc = subprocess.Popen(cmd, stdin=subprocess.PIPE)
+        # :99 is auth'd (Xvfb -auth, not -ac) to stop the host-app display leak;
+        # x11grab must present the cookie or it can't grab the framebuffer.
+        env = os.environ.copy()
+        env.setdefault("XAUTHORITY", cfg.XAUTHORITY)
+        self._proc = subprocess.Popen(cmd, stdin=subprocess.PIPE, env=env)
         return self._proc.pid
 
     def _stop_proc(self, timeout: float = 10.0):
@@ -223,6 +227,7 @@ class XvfbFfmpegCapturer:
         segs = [s for s in self._segments if os.path.exists(s)]
         if not segs:
             return
+        listfile = None
         if len(segs) == 1:
             # no ads paused (or all dropped): straight remux of the lone segment
             subprocess.run([
@@ -233,12 +238,25 @@ class XvfbFfmpegCapturer:
             listfile = self.outfile + ".concat.txt"
             with open(listfile, "w") as f:
                 for seg in segs:
-                    f.write(f"file '{os.path.abspath(seg)}'\n")
+                    # concat demuxer: a literal ' inside the quoted path must be
+                    # written as '\'' or ffmpeg ends the path early (apostrophes in
+                    # episode titles — "Neptune's Ocean" — silently lost E10 once).
+                    safe = os.path.abspath(seg).replace("'", r"'\''")
+                    f.write(f"file '{safe}'\n")
             subprocess.run([
                 "ffmpeg", "-hide_banner", "-loglevel", "warning", "-y",
                 "-f", "concat", "-safe", "0", "-i", listfile,
                 "-c", "copy", self.outfile,
             ], check=False)
+        # Preservation law: only drop the source segments once the muxed output
+        # actually exists and is non-empty. If concat/remux failed, KEEP the .ts
+        # (and the concat list) so the footage is recoverable by hand.
+        ok = os.path.exists(self.outfile) and os.path.getsize(self.outfile) > 0
+        if not ok:
+            print(f"[recordrr] FINALIZE FAILED — keeping {len(segs)} segment(s) "
+                  f"for manual recovery: {segs[0]} ...")
+            return
+        if listfile:
             try:
                 os.remove(listfile)
             except OSError:

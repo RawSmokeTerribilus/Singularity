@@ -18,7 +18,9 @@ CODE=(
   config/__init__.py config/recordrr_config.py
   modules/__init__.py modules/display.py modules/capture.py modules/browser.py
   modules/metadata.py modules/adapter.py modules/orchestrator.py
+  modules/guide.py
   modules/audiodiag.py modules/layerdiag.py
+  modules/flightrecorder.py modules/flightcheck.py
 )
 for f in "${CODE[@]}"; do
   docker cp "$SRC/$f" "$CONTAINER:$DEST/$f" >/dev/null && echo "  ✓ $f"

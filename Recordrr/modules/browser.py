@@ -11,7 +11,7 @@ currentTime / duration / ended / paused. That's the primary cut signal; OpenCV i
 a documented fallback only.
 
 Run standalone (POC): open a URL and leave Chrome up for manual login/playback:
-    DISPLAY=:99 python3 -m Recordrr.modules.browser https://www.pluto.tv/ poc
+    DISPLAY=:77 python3 -m Recordrr.modules.browser https://www.pluto.tv/ poc
 """
 import os
 import sys
@@ -37,6 +37,7 @@ _VIDEO_STATE_JS = r"""
   return {
     currentTime: v.currentTime,
     duration: isFinite(v.duration) ? v.duration : null,
+    src: v.currentSrc || v.src || '',
     ended: v.ended,
     paused: v.paused,
     readyState: v.readyState,
@@ -50,6 +51,10 @@ _VIDEO_STATE_JS = r"""
 class RecordrrBrowser:
     def __init__(self, profile: str = "default"):
         os.environ.setdefault("DISPLAY", cfg.DISPLAY)
+        # :99 is now auth'd (Xvfb -auth, not -ac). Chrome — launched by Playwright
+        # as a child inheriting this env — needs the cookie to connect, else it'd
+        # hit "Missing X server". setdefault: don't clobber an explicit override.
+        os.environ.setdefault("XAUTHORITY", cfg.XAUTHORITY)
         self.profile_dir = cfg.PROFILES_DIR / profile
         self.profile_dir.mkdir(parents=True, exist_ok=True)
         self._pw = None
