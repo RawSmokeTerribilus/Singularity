@@ -10,7 +10,7 @@
   "player_fullscreen": false,
   "timing": {
     "play_settle": 8,
-    "ad_poll": 3,
+    "ad_poll": 1,
     "end_pad": 2,
     "max_runtime_factor": 2.2
   },
