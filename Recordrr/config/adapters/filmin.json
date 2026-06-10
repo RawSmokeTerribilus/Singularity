@@ -1,0 +1,53 @@
+{
+  "service": "filmin",
+  "display": "Filmin",
+  "url": "https://www.filmin.es/",
+  "_untuned": true,
+  "_note": "BLIND STUB authored 2026-06-10 — never seen live DOM. Filmin (Spanish indie/arthouse catalog) uses a custom HTML5 player; no public selector convention known. Spanish-first UI. Mostly movies plus some series — skip_intro/next_episode may simply never exist here; movie-mode (Grabar Película) is the expected main path. Run the 20.5d playbook on first login. Untuned ad-guard active.",
+  "_drm_note": "Subscription tier is ad-free, so ad_marker is near-theoretical. DRM is Widevine; should behave like Prime did, but verify video_state first.",
+  "timing": {
+    "play_settle": 8,
+    "ad_poll": 3,
+    "end_pad": 2,
+    "max_runtime_factor": 2.2
+  },
+  "controls": {
+    "play": [
+      {
+        "role": "button",
+        "name": "(?i)^(reproducir|pausar?|play|pause|ver ahora|reanudar)"
+      },
+      {
+        "css": "[class*='play' i][role='button'], button[aria-label*='eproduc' i]"
+      }
+    ],
+    "skip_intro": [
+      {
+        "text": "(?i)omitir (intro|introducci|resumen)|saltar intro|skip intro"
+      }
+    ],
+    "next_episode": [
+      {
+        "text": "(?i)siguiente episodio|pr[óo]ximo episodio|siguiente cap[íi]tulo|next episode"
+      }
+    ],
+    "ad_marker": [
+      {
+        "text": "(?i)anuncio \\d+ de \\d+|publicidad|pausa publicitaria|ad break"
+      }
+    ],
+    "fullscreen": [
+      {
+        "role": "button",
+        "name": "(?i)pantalla completa|full ?screen"
+      }
+    ],
+    "unmute": [
+      {
+        "role": "button",
+        "name": "(?i)volumen|activar sonido|silenciar|un-?mute|^mute|volume"
+      }
+    ]
+  },
+  "mute_key": "m"
+}

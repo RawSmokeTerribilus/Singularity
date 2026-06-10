@@ -2,8 +2,10 @@
   "service": "prime",
   "display": "Prime Video",
   "url": "https://www.primevideo.com/",
-  "_untuned": true,
-  "_note": "STUB — selectors cloned from pluto, NOT tuned for Prime Video. Run drift (Proveedores -> drift) against the live DOM and edit. Anchor on role/aria/text, not layout classes.",
+  "_note": "TUNED from live DOM 2026-06-09 (real episode playing, container Chrome+Widevine — Prime PLAYS, full automation, no OBS). VOD only (Grabar Serie/Película); no live/EPG block. Prime UI hashed FluentUI classes (fqye4e3…) are volatile — anchor aria-label (English, stable) + visible text. Player controls expose ENGLISH aria (Fullscreen/Volume/Pause/Close Player/Seek); skip-intro/next-episode are visible TEXT with no aria/testid. Account UI was English; selectors also cover Spanish (es_ES) for group-shipped users.",
+  "_audio_note": "Prime does NOT decouple <video>.muted from its UI the way Pluto's React player did — element-level unmute (orchestrator._ensure_audible) is the real lever and just works (video.muted=false observed live with sound). Player mute toggle aria='Volume' carries no mute/unmute substring, so adapter.mute_state() returns None on Prime → the 'm'-press durability net stays idle, which is fine here. mute_key='m' kept as belt-and-suspenders.",
+  "_skip_next_note": "skip_intro + next_episode CONFIRMED LIVE 2026-06-10 (Fallout). skip_intro: button.atvwebplayersdk-skipelement-button, text 'Omitir resumen' (recap) — same button class handles intro/recap, locale-immune class is primary. next_episode: the 'A continuación' card mounts at credits — click target is [class*='atvwebplayersdk-nextupcard-button'] (text 'E 6…'); DO NOT match the sibling atvwebplayersdk-nextupcardHIDE-button ('Ocultar'/dismiss) — the [class*='nextupcard-button'] substring excludes 'nextupcardhide-button' cleanly. Both gated with :visible because the nextupcard-wrapper stays mounted (vis:false) between uses. Card title 'A continuación' kept as text fallback. Prime autoplays the next ep if the card is left alone (boundary_src covers it).",
+  "_ad_note": "AD MARKER LIVE-PROVEN 2026-06-10 on an ad-tier account (3 breaks/episode, breaks STACK — 20s then 35s back-to-back). Prime uses SERVER-SIDE ad stitching: the SAME <video> blob plays, content dur stays full-length (~3815s) and currentTime keeps advancing THROUGH the ad — so duration/blob heuristics are useless, the DOM overlay is the only signal. Stable marker (atvwebplayersdk-* prefix is locale-immune; the hashed FluentUI classes are not): 'atvwebplayersdk-ad-timer' is the container, with aria 'Reproduciendo anuncio. El contenido se reanudará dentro de N minutos y M segundos.' and visible text 'Anuncio0:20'; children atvwebplayersdk-ad-timer-text / -ad-text ('Anuncio') / -remaining-time ('0:20', counts down). CSS-visibility matters: the trap had to filter visibility:hidden/opacity nodes (e.g. atvwebplayersdk-ad-resume-message reports a non-zero rect while CSS-hidden = false positive). 'Continuar sin anuncios' (atvwebplayersdk-go-ad-free-button) is the UPSELL, present always — NEVER match it.",
   "timing": {
     "play_settle": 8,
     "ad_poll": 3,
@@ -13,71 +15,72 @@
   "controls": {
     "play": [
       {
+        "css": "a[data-testid='dp-atf-play-button']"
+      },
+      {
+        "css": "a[data-testid='episodes-playbutton']"
+      },
+      {
         "role": "button",
-        "name": "(?i)^play"
+        "name": "(?i)reproducir|reanudar|resume|^play\\b|watch now"
       },
       {
-        "css": "button[aria-label*='Play' i]"
-      },
-      {
-        "css": "[data-testid*='play' i], .video-player__play"
+        "css": "a[aria-label*='reproducir' i], a[aria-label*='reanudar' i], a[aria-label*='resume' i], a[aria-label*='watch' i]"
       }
     ],
     "skip_intro": [
       {
+        "css": "button[class*='atvwebplayersdk-skipelement-button']:visible"
+      },
+      {
+        "text": "(?i)omitir (introducci|resumen|intro)|skip (intro|recap)|^omitir"
+      },
+      {
         "role": "button",
-        "name": "(?i)skip intro|skip recap"
-      },
-      {
-        "text": "(?i)skip intro"
-      },
-      {
-        "css": "button[class*='skip' i], [class*='skip-intro' i] button"
+        "name": "(?i)omitir (introducci|resumen|intro)|skip (intro|recap)"
       }
     ],
     "next_episode": [
       {
+        "css": "[class*='atvwebplayersdk-nextupcard-button']:visible"
+      },
+      {
+        "text": "(?i)a continuaci[óo]n|pr[óo]ximo episodio|siguiente episodio|next episode|up next"
+      },
+      {
         "role": "button",
-        "name": "(?i)next episode|up next|play next"
-      },
-      {
-        "text": "(?i)next episode|up next"
-      },
-      {
-        "css": "[data-testid*='next' i], [class*='next-episode' i]"
+        "name": "(?i)a continuaci[óo]n|pr[óo]ximo episodio|siguiente episodio|next episode"
       }
     ],
     "ad_marker": [
       {
-        "text": "(?i)advertisement|commercial|ad break"
+        "css": "[class*='atvwebplayersdk-ad-timer']:visible"
       },
       {
-        "css": "[class*='ad-countdown' i], [data-testid*='ad' i], [class*='advertisement' i]"
+        "css": "[aria-label*='reproduciendo anuncio' i]:visible, [aria-label*='playing ad' i]:visible"
       }
     ],
     "fullscreen": [
       {
         "role": "button",
-        "name": "(?i)full ?screen"
+        "name": "(?i)full ?screen|pantalla completa"
       },
       {
-        "css": "button[aria-label*='full' i]"
+        "css": "button[aria-label*='fullscreen' i], button[aria-label*='pantalla completa' i]"
       }
     ],
     "unmute": [
       {
+        "css": "button[aria-label='Volume' i]"
+      },
+      {
         "role": "button",
-        "name": "(?i)unmute|^mute"
+        "name": "(?i)un-?mute|^mute|activar sonido|silenciar"
       },
       {
-        "css": "button[aria-label*='unmute' i]"
-      },
-      {
-        "css": "button[aria-label*='mute' i]"
-      },
-      {
-        "css": "[data-testid*='mute' i], [class*='mute' i] button"
+        "css": "button[aria-label*='mute' i], button[aria-label*='activar sonido' i], button[aria-label*='silenciar' i]"
       }
     ]
-  }
+  },
+  "mute_key": "m"
 }

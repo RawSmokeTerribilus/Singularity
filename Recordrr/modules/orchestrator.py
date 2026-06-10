@@ -257,6 +257,7 @@ class Orchestrator:
         start_t = time.time()
         ad_seen = 0
         ad_active = False
+        untuned_ad_logged = False   # one-shot console/flight note (see ad gate)
         last_ct = 0.0       # last content currentTime, for reset detection
         last_src = None     # last <video> src, for swap detection
         peak_ct = 0.0       # deepest we've reached this episode
@@ -285,7 +286,18 @@ class Orchestrator:
                     # ── ad gate: pause the capture across the break, resume after.
                     # Edge-triggered so pause()/resume() fire once per transition.
                     # The segment is dropped from the file; stop() concats the rest.
+                    # UNTUNED adapters never pause: a cloned ad_marker false-positive
+                    # holds the capture paused for the whole run (Disney 2026-06-10:
+                    # [data-testid*='ad'] matched the UI, 76s run → 2.8s of file).
+                    # Log the first hit so the flight trail still shows what fired.
                     in_ad = self.adapter.is_ad(page)
+                    if in_ad and self.adapter.untuned:
+                        if not untuned_ad_logged:
+                            untuned_ad_logged = True
+                            _log(f"{ep.code} — ad_marker (STUB sin tunear) disparó; "
+                                 "IGNORADO — la captura sigue. Tunea el adapter.")
+                            fr.event("ad_marker_untuned", secs=secs)
+                        in_ad = False
                     if in_ad and not ad_active:
                         ad_active = True
                         ad_seen += 1

@@ -8,6 +8,17 @@
  *   window.__recordrr.status  -> the orchestrator pushes {state, ep, secs, audio};
  *                                the bar renders it.
  *
+ * DURABLE CHANNEL: window.__recordrr is a per-DOCUMENT global — a full page
+ * navigation (Prime's player->home are real document reloads) wipes it and the
+ * init-script recreates it as {cmd:null, status:idle}, so the bar would show a
+ * stale 'idle' (REC button) and a STOP click would set cmd='rec' the loop drops.
+ * So the channel is MIRRORED through localStorage (per-ORIGIN, survives same-site
+ * navigation): the button writes the cmd key, status is read from the status key.
+ * The orchestrator reads/writes the SAME keys (browser.bar_cmd/bar_status). The
+ * window global stays as a same-document fast path; localStorage is the truth that
+ * outlives a reload. (Cross-origin nav — provider->amazon login — still resets it,
+ * but record-time the page stays on the provider origin.)
+ *
  * Premise: "if it fits in the browser, it stays in the browser." Add controls by
  * appending to BUTTONS below — render + command plumbing are generic.
  */
@@ -15,7 +26,17 @@
   if (window.__recordrrBarInit) return;            // idempotent per document
   window.__recordrrBarInit = true;
   const NS = window.__recordrr = window.__recordrr || { cmd: null, status: { state: 'idle' } };
-  const LS = 'recordrrBar';
+  const LS = 'recordrrBar';           // saved bar geometry
+  const LS_CMD = 'recordrrCmd';       // durable cmd channel (button -> orchestrator)
+  const LS_STAT = 'recordrrStatus';   // durable status channel (orchestrator -> bar)
+
+  // Channel helpers — write through BOTH the window global (same-doc fast path)
+  // and localStorage (survives a navigation/reload).
+  const setCmd = (c) => { NS.cmd = c; try { localStorage.setItem(LS_CMD, c); } catch (e) {} };
+  const readStatus = () => {
+    try { const j = localStorage.getItem(LS_STAT); if (j) return JSON.parse(j); } catch (e) {}
+    return NS.status || { state: 'idle' };
+  };
   // Popover API → the bar renders in the browser TOP LAYER, above the player's
   // fullscreen video, while living on <body> (NOT inside Pluto's React subtree,
   // which prunes foreign nodes on every re-render). Feature-detected: on a Chrome
@@ -28,9 +49,9 @@
   // --- control registry: extend here as the workflow grows --------------
   const BUTTONS = [
     { id: 'rec',  label: '⏺ REC',  title: 'Empezar a grabar el vídeo en reproducción',
-      kind: 'rec',  show: s => s.state !== 'rec', on: () => { NS.cmd = 'rec'; } },
+      kind: 'rec',  show: s => s.state !== 'rec', on: () => { setCmd('rec'); } },
     { id: 'stop', label: '⏹ STOP', title: 'Parar la grabación actual',
-      kind: 'stop', show: s => s.state === 'rec', on: () => { NS.cmd = 'stop'; } },
+      kind: 'stop', show: s => s.state === 'rec', on: () => { setCmd('stop'); } },
   ];
 
   const fmt = (s) => { s = Math.max(0, s | 0); const m = (s / 60) | 0; return m + ':' + String(s % 60).padStart(2, '0'); };
@@ -101,7 +122,7 @@
       const host = document.fullscreenElement || document.body;   // legacy fallback
       if (host && bar.parentElement !== host) host.appendChild(bar);
     }
-    const s = NS.status || { state: 'idle' };
+    const s = readStatus();
     // While recording, fade the bar out when idle so it stays OUT of the capture
     // (x11grab records the framebuffer). Move the mouse to bring it back.
     bar.style.transition = 'opacity .35s';

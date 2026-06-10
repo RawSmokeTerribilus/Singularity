@@ -1,0 +1,61 @@
+{
+  "service": "atresplayer",
+  "display": "Atresplayer",
+  "url": "https://www.atresplayer.com/",
+  "_untuned": true,
+  "_note": "BLIND STUB authored 2026-06-10 — never seen live DOM (named in asbuilt future-adapters list). Atresmedia's player has historically been video.js-based, so vjs-* class fallbacks are included after the role/text guesses. Free tier is HEAVILY ad-funded — ad_marker matters here more than anywhere; expect real telemetry fast. Spanish-only UI. Run the 20.5d playbook on first login. Untuned ad-guard active.",
+  "timing": {
+    "play_settle": 8,
+    "ad_poll": 2,
+    "end_pad": 2,
+    "max_runtime_factor": 2.5
+  },
+  "controls": {
+    "play": [
+      {
+        "role": "button",
+        "name": "(?i)^(reproducir|pausar?|play|pause|reanudar)"
+      },
+      {
+        "css": ".vjs-play-control, .vjs-big-play-button"
+      }
+    ],
+    "skip_intro": [
+      {
+        "text": "(?i)omitir (intro|introducci|resumen|cabecera)|saltar (intro|cabecera)"
+      }
+    ],
+    "next_episode": [
+      {
+        "text": "(?i)siguiente episodio|pr[óo]ximo episodio|siguiente cap[íi]tulo|next episode"
+      }
+    ],
+    "ad_marker": [
+      {
+        "text": "(?i)anuncio \\d+ de \\d+|publicidad \\d|pausa publicitaria|la publicidad terminar[áa]"
+      },
+      {
+        "css": ".vjs-ad-playing"
+      }
+    ],
+    "fullscreen": [
+      {
+        "role": "button",
+        "name": "(?i)pantalla completa|full ?screen"
+      },
+      {
+        "css": ".vjs-fullscreen-control"
+      }
+    ],
+    "unmute": [
+      {
+        "role": "button",
+        "name": "(?i)volumen|activar sonido|silenciar|un-?mute|^mute|volume"
+      },
+      {
+        "css": ".vjs-mute-control"
+      }
+    ]
+  },
+  "mute_key": "m"
+}

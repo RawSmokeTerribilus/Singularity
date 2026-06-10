@@ -1,83 +1,72 @@
 {
   "service": "hbomax",
   "display": "HBO Max",
-  "url": "https://play.max.com/",
-  "_untuned": true,
-  "_note": "STUB — selectors cloned from pluto, NOT tuned for HBO Max. Run drift (Proveedores -> drift) against the live DOM and edit. Anchor on role/aria/text, not layout classes.",
+  "url": "https://play.hbomax.com/",
+  "_note": "TUNED from live DOM 2026-06-10 (real episode playing in container Chrome+Widevine — HBO Max PLAYS, full automation, no OBS). React + styled-components: classes are hashed (PlayerButton-Fuse-Web-Play__sc-…) = volatile, but every player control carries a STABLE data-testid 'player-ux-*' — those are the primary anchors and they are locale-immune (aria labels are localized; this account is es-ES: 'Pausar', 'Pantalla completa', 'Volumen 100 %'). No shadow DOM, no custom elements — plain querySelector territory.",
+  "_video_note": "Single <video>, FINITE duration (4562.21s observed) → near_end end-detection WORKS on HBO (unlike Disney/Pluto-live). blob src on play.hbomax.com. Audio element-level clean (muted=false, vol=1 with sound). Volume button aria='Volumen 100 %' — no mute/unmute substring → adapter.mute_state() returns None, 'm'-net idle, element unmute covers (same shape as Prime/Disney). NOTE: clicking the volume button may open the slider popup rather than toggle mute — last-resort path only.",
+  "_skip_note": "player-ux-skip-button is ALWAYS in the DOM (hidden via styles when not applicable) — selector uses Playwright's :visible pseudo so present()/click() only fire when the overlay is actually shown (otherwise click() burns its 3s timeout on an invisible node every call).",
+  "_next_note": "AUTOPLAY-NEXT LIVE-PROVEN 2026-06-10 (Banshee T1E2→E3): at ~10s from end the up_next overlay mounts — container [data-testid='player-ux-up-next-container'] holds button [data-testid='player-ux-up-next-button'] (THE click target), label span 'Siguiente episodio', season-episode span ('T1, E3'), countdown timer, and a dismiss button [data-testid='player-ux-up-next-dismiss'] (aria 'Cancelar reproducción automática'). Left alone HBO AUTOPLAYS = page NAVIGATES to the next ep's own /video/watch/<show>/<ep>/ URL (cur resets, new blob, new dur) — like RTVE. So next_episode click is a fast-forward, not required; boundary_src + the page surviving navigation cover the rollover. NOTE: the up_next container reports visibility:visible but a zero bounding-rect at credit-time, so a ':visible' pseudo would MISS it — bare testid selector is correct (resolve() uses count>0).",
+  "_unverified_note": "ad_marker: recon account is AD-FREE (5+ show changes, logout/login, timeline seeks → zero breaks; HBO ad tier is occasional/optional). A hidden empty <div data-testid='ad'> + <div data-testid='pause_ad'> exist but never populate, so NO DOM ad marker is confirmable here. If a future account serves real ads, the observed proxy is the duration dip — content blob swaps to a short ad/bumper blob (dur ~4-30s vs episode's thousands of seconds); that needs an engine-side video_state guard, not a selector. skip_intro confirmed: label literally 'Saltar'.",
+  "_bumper_note": "RECON 2026-06-10: HBO swaps blob src in the SINGLE <video> for transitions — every playback start runs a ~4.0s bumper blob (dur=4.01) before the content blob loads, and the 30s house promo behaves the same way. Expect src churn at episode starts; skip-intro label is literally just 'Saltar' (StyledSkipLabel), covered by the ^saltar$ text fallback.",
   "timing": {
     "play_settle": 8,
-    "ad_poll": 3,
+    "ad_poll": 1,
     "end_pad": 2,
     "max_runtime_factor": 2.2
   },
   "controls": {
     "play": [
       {
+        "css": "[data-testid='player-ux-play-pause-button']"
+      },
+      {
         "role": "button",
-        "name": "(?i)^play"
-      },
-      {
-        "css": "button[aria-label*='Play' i]"
-      },
-      {
-        "css": "[data-testid*='play' i], .video-player__play"
+        "name": "(?i)^(reproducir|pausar|play|pause)$"
       }
     ],
     "skip_intro": [
       {
-        "role": "button",
-        "name": "(?i)skip intro|skip recap"
+        "css": "[data-testid='player-ux-skip-button']:visible"
       },
       {
-        "text": "(?i)skip intro"
-      },
-      {
-        "css": "button[class*='skip' i], [class*='skip-intro' i] button"
+        "text": "(?i)^saltar$|omitir (intro|introducci|resumen|cr[eé]ditos)|saltar intro|skip (intro|recap|credits)"
       }
     ],
     "next_episode": [
       {
+        "css": "[data-testid='player-ux-up-next-button']"
+      },
+      {
+        "text": "(?i)siguiente episodio|next episode"
+      },
+      {
         "role": "button",
-        "name": "(?i)next episode|up next|play next"
-      },
-      {
-        "text": "(?i)next episode|up next"
-      },
-      {
-        "css": "[data-testid*='next' i], [class*='next-episode' i]"
+        "name": "(?i)siguiente episodio|next episode|up next"
       }
     ],
     "ad_marker": [
       {
-        "text": "(?i)advertisement|commercial|ad break"
-      },
-      {
-        "css": "[class*='ad-countdown' i], [data-testid*='ad' i], [class*='advertisement' i]"
+        "text": "(?i)anuncio \\d+ de \\d+|ad \\d+ of \\d+|pausa publicitaria|ad break"
       }
     ],
     "fullscreen": [
       {
-        "role": "button",
-        "name": "(?i)full ?screen"
+        "css": "[data-testid='player-ux-fullscreen-button']"
       },
       {
-        "css": "button[aria-label*='full' i]"
+        "role": "button",
+        "name": "(?i)pantalla completa|full ?screen"
       }
     ],
     "unmute": [
       {
+        "css": "[data-testid='player-ux-volume-button']"
+      },
+      {
         "role": "button",
-        "name": "(?i)unmute|^mute"
-      },
-      {
-        "css": "button[aria-label*='unmute' i]"
-      },
-      {
-        "css": "button[aria-label*='mute' i]"
-      },
-      {
-        "css": "[data-testid*='mute' i], [class*='mute' i] button"
+        "name": "(?i)volumen|activar sonido|silenciar|un-?mute|^mute|volume"
       }
     ]
-  }
+  },
+  "mute_key": "m"
 }

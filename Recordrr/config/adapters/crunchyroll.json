@@ -1,0 +1,61 @@
+{
+  "service": "crunchyroll",
+  "display": "Crunchyroll",
+  "url": "https://www.crunchyroll.com/",
+  "_untuned": true,
+  "_note": "BLIND STUB authored 2026-06-10 — never seen live DOM. STRUCTURAL CAVEAT before any tuning: Crunchyroll's player (Vilos) lives inside an IFRAME, and the adapter engine's page-level locators (get_by_role/get_by_text/locator) do NOT pierce iframes. If recon confirms the iframe, the engine needs a small additive change (e.g. optional 'frame' key per adapter resolved via page.frame_locator) before any control below can fire — capture itself (Xvfb x11grab) is unaffected. Selectors below assume in-frame context and are guesses. Untuned ad-guard active.",
+  "timing": {
+    "play_settle": 8,
+    "ad_poll": 3,
+    "end_pad": 2,
+    "max_runtime_factor": 2.2
+  },
+  "controls": {
+    "play": [
+      {
+        "role": "button",
+        "name": "(?i)^(reproducir|pausar?|play|pause)"
+      },
+      {
+        "css": "[data-testid*='vilos-play' i], [class*='play-pause' i]"
+      }
+    ],
+    "skip_intro": [
+      {
+        "text": "(?i)omitir (intro|introducci|resumen)|saltar intro|skip (intro|recap)"
+      },
+      {
+        "css": "[data-testid*='skip' i]:visible"
+      }
+    ],
+    "next_episode": [
+      {
+        "text": "(?i)siguiente episodio|next episode|up next"
+      }
+    ],
+    "ad_marker": [
+      {
+        "text": "(?i)anuncio \\d+ de \\d+|ad \\d+ of \\d+|pausa publicitaria|ad break"
+      }
+    ],
+    "fullscreen": [
+      {
+        "role": "button",
+        "name": "(?i)pantalla completa|full ?screen"
+      },
+      {
+        "css": "[data-testid*='fullscreen' i]"
+      }
+    ],
+    "unmute": [
+      {
+        "role": "button",
+        "name": "(?i)volumen|activar sonido|silenciar|un-?mute|^mute|volume"
+      },
+      {
+        "css": "[data-testid*='volume' i], [data-testid*='mute' i]"
+      }
+    ]
+  },
+  "mute_key": "m"
+}

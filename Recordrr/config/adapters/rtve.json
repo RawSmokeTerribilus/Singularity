@@ -1,0 +1,61 @@
+{
+  "service": "rtve",
+  "display": "RTVE Play",
+  "url": "https://www.rtve.es/play/",
+  "_note": "TUNED from live DOM 2026-06-10 (La Promesa S05E851 playing in container — free, NO login, NO DRM, 1080p blob, FINITE duration 3722s → near_end works). Player = THEOplayer wearing the video.js skin: stable vjs-* control classes on #vjs_video_1, NO aria-label/title on buttons (accessible name comes from the inner .vjs-control-text span, Spanish: 'Pausa', 'Desactivar volumen', 'Pantalla completa') → role/name fallbacks ride on that text. Two .vjs-play-control nodes exist (control bar + custom-big-play-pause-button); resolve() takes .first — both toggle the same player.",
+  "_ad_note": "ADS LIVE-PROVEN: Google IMA via theoplayer-ima-wrapper. During a break the player ROOT gains class 'theo-ad-playing' (observed ON 28.7s, OFF on resume — exact, no flicker), the content <video> goes display:none + paused WITH ITS SRC INTACT (no boundary_src false positive), and a separate visible <video title='Advertisement'> (plain https mp4, springserve) plays in the wrapper. NO countdown text, NO 'Omitir anuncio' on the observed spot — text selectors would never fire here; the root class is the ONLY reliable marker. Seeking deep into the episode provokes an instant mid-roll (useful for testing).",
+  "_audio_note": "Buttons expose no aria → adapter.mute_state() returns None ('m'-net idle, element unmute covers — Prime/HBO shape). Player's own mute state is machine-readable via the vjs-vol-N class on .vjs-mute-control (vjs-vol-0 = muted, vjs-vol-3 = full) if ever needed.",
+  "_end_note": "AUTOPLAY-NEXT LIVE-PROVEN (Águila Roja E01→E02): at content end RTVE NAVIGATES the page to the next episode's own URL (new location.href, new blob src) after an ad break, then prerolls, then content — no click needed, next_episode control idles in normal flow. boundary_src + ad-pause cover the rollover; the page object survives the navigation. CAVEAT: when NO successor exists (observed on La Promesa ep 851 = daily-soap tip) the player just stops with 'vjs-ended' + an EMPTY theo-related-grid → engine's ended/near_end closes the file cleanly. skip_intro never observed (likely absent).",
+  "_live_note": "RTVE also has live linear channels (La 1, La 2, Teledeporte…) under /play/videos/directo/ — future live-TV candidate like Pluto.",
+  "timing": {
+    "play_settle": 8,
+    "ad_poll": 1,
+    "end_pad": 2,
+    "max_runtime_factor": 2.2
+  },
+  "controls": {
+    "play": [
+      {
+        "css": ".vjs-play-control"
+      },
+      {
+        "role": "button",
+        "name": "(?i)^(reproducir|pausa|play|pause)"
+      }
+    ],
+    "skip_intro": [
+      {
+        "text": "(?i)omitir (intro|introducci|resumen|cabecera)|saltar (intro|cabecera)"
+      }
+    ],
+    "next_episode": [
+      {
+        "text": "(?i)siguiente episodio|pr[óo]ximo episodio|siguiente cap[íi]tulo|next episode"
+      }
+    ],
+    "ad_marker": [
+      {
+        "css": ".video-js.theo-ad-playing"
+      }
+    ],
+    "fullscreen": [
+      {
+        "css": ".vjs-fullscreen-control"
+      },
+      {
+        "role": "button",
+        "name": "(?i)pantalla completa|full ?screen"
+      }
+    ],
+    "unmute": [
+      {
+        "css": ".vjs-mute-control"
+      },
+      {
+        "role": "button",
+        "name": "(?i)(des)?activar volumen|volumen|silenciar|un-?mute|^mute|volume"
+      }
+    ]
+  },
+  "mute_key": "m"
+}

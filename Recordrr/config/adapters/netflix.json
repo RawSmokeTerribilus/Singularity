@@ -1,0 +1,72 @@
+{
+  "service": "netflix",
+  "display": "Netflix",
+  "url": "https://www.netflix.com/",
+  "_untuned": true,
+  "_note": "BLIND STUB authored 2026-06-10 — never seen live DOM. Netflix's web player is the best-documented of the blind set: every control carries a stable 'data-uia' attribute (their in-house testid), locale-immune. Selectors below are platform-convention guesses from public knowledge, NOT recon. Run the 20.5d playbook (RECORDRR_PROBE + CDP 9222 + layerdiag) on first login before trusting anything beyond play. Untuned ad-guard active (orchestrator logs ad_marker_untuned, never pauses).",
+  "_drm_note": "Netflix on Linux Chrome = Widevine L3 → capped at 720p (1080p only via L1/Edge tricks). Expect the cap; it is not a container bug. Playback itself should work like Prime/Disney did.",
+  "_ad_note": "ad_marker is for the ad-supported tier only ('Anuncio 1 de 2' style badge + data-uia ad nodes). Unverified — confirm on a real ad-tier account before un-stubbing.",
+  "timing": {
+    "play_settle": 8,
+    "ad_poll": 3,
+    "end_pad": 2,
+    "max_runtime_factor": 2.2
+  },
+  "controls": {
+    "play": [
+      {
+        "css": "[data-uia^='control-play-pause']"
+      },
+      {
+        "css": "[data-uia='player-blocked-play'], [data-uia='play-button']"
+      },
+      {
+        "role": "button",
+        "name": "(?i)^(reproducir|pausar|play|pause)$"
+      }
+    ],
+    "skip_intro": [
+      {
+        "css": "[data-uia='player-skip-intro']:visible, [data-uia='player-skip-recap']:visible"
+      },
+      {
+        "text": "(?i)omitir (intro|introducci|resumen)|saltar intro|skip (intro|recap)"
+      }
+    ],
+    "next_episode": [
+      {
+        "css": "[data-uia='next-episode-seamless-button']:visible, [data-uia='next-episode-seamless-button-draining']:visible"
+      },
+      {
+        "css": "[data-uia='control-next']"
+      },
+      {
+        "text": "(?i)siguiente episodio|next episode"
+      }
+    ],
+    "ad_marker": [
+      {
+        "text": "(?i)anuncio \\d+ de \\d+|ad \\d+ of \\d+|pausa publicitaria|ad break"
+      }
+    ],
+    "fullscreen": [
+      {
+        "css": "[data-uia='control-fullscreen-enter']"
+      },
+      {
+        "role": "button",
+        "name": "(?i)pantalla completa|full ?screen"
+      }
+    ],
+    "unmute": [
+      {
+        "css": "[data-uia^='control-volume']"
+      },
+      {
+        "role": "button",
+        "name": "(?i)volumen|activar sonido|silenciar|un-?mute|^mute|volume"
+      }
+    ]
+  },
+  "mute_key": "m"
+}

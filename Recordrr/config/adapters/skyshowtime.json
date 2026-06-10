@@ -1,0 +1,62 @@
+{
+  "service": "skyshowtime",
+  "display": "SkyShowtime",
+  "url": "https://www.skyshowtime.com/",
+  "_untuned": true,
+  "_note": "BLIND STUB authored 2026-06-10 — never seen live DOM. SkyShowtime runs the Peacock/Sky 'Core Video SDK' web player; some builds carry data-testid / data-t attributes on playback controls, but the names are unverified — role/text strategies lead, attribute guesses trail. Localized es-ES UI expected. Run the 20.5d playbook on first login. Untuned ad-guard active.",
+  "timing": {
+    "play_settle": 8,
+    "ad_poll": 3,
+    "end_pad": 2,
+    "max_runtime_factor": 2.2
+  },
+  "controls": {
+    "play": [
+      {
+        "role": "button",
+        "name": "(?i)^(reproducir|pausar?|play|pause|reanudar|resume)"
+      },
+      {
+        "css": "[data-testid*='play-pause' i], [data-t*='play' i]"
+      }
+    ],
+    "skip_intro": [
+      {
+        "text": "(?i)omitir (intro|introducci|resumen)|saltar intro|skip (intro|recap)"
+      }
+    ],
+    "next_episode": [
+      {
+        "text": "(?i)siguiente episodio|pr[óo]ximo episodio|next episode|up next"
+      },
+      {
+        "role": "button",
+        "name": "(?i)siguiente episodio|next episode"
+      }
+    ],
+    "ad_marker": [
+      {
+        "text": "(?i)anuncio \\d+ de \\d+|ad \\d+ of \\d+|pausa publicitaria|ad break"
+      }
+    ],
+    "fullscreen": [
+      {
+        "role": "button",
+        "name": "(?i)pantalla completa|full ?screen"
+      },
+      {
+        "css": "[data-testid*='fullscreen' i]"
+      }
+    ],
+    "unmute": [
+      {
+        "role": "button",
+        "name": "(?i)volumen|activar sonido|silenciar|un-?mute|^mute|volume"
+      },
+      {
+        "css": "[data-testid*='volume' i], [data-testid*='mute' i]"
+      }
+    ]
+  },
+  "mute_key": "m"
+}

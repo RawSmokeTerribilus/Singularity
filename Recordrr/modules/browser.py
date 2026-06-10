@@ -168,23 +168,42 @@ class RecordrrBrowser:
             self.page.evaluate(js)
         except Exception:
             pass
+        # Clear any stale durable-channel keys left by a prior/crashed session
+        # (localStorage is per-origin and outlives a process) so a leftover 'stop'
+        # or 'rec' can't false-trigger this session's REC gate.
+        try:
+            self.page.evaluate(
+                "() => { try { localStorage.removeItem('recordrrCmd');"
+                " localStorage.removeItem('recordrrStatus'); } catch(e){} }")
+        except Exception:
+            pass
 
     def bar_cmd(self):
-        """Read AND clear the pending command set by a bar button ('rec'|'stop'|…)."""
+        """Read AND clear the pending command set by a bar button ('rec'|'stop'|…).
+        Reads the durable localStorage channel FIRST (survives a page navigation —
+        Prime reloads the document on player<->home, which wipes window.__recordrr),
+        then falls back to the same-document window global. Clears both."""
         try:
             return self.page.evaluate(
-                "() => { const n=window.__recordrr; if(!n||!n.cmd) return null;"
-                " const c=n.cmd; n.cmd=null; return c; }")
+                "() => { let c=null;"
+                " try { c=localStorage.getItem('recordrrCmd'); if(c) localStorage.removeItem('recordrrCmd'); } catch(e){}"
+                " const n=window.__recordrr; if(!c && n && n.cmd) c=n.cmd;"
+                " if(n) n.cmd=null;"
+                " return c || null; }")
         except Exception:
             return None
 
     def bar_status(self, state, ep="", secs=None, audio="ok"):
-        """Push status to the bar so it can show REC ● / elapsed / mute icon."""
+        """Push status to the bar so it can show REC ● / elapsed / mute icon. Writes
+        the durable localStorage channel (the bar reads it after a reload) AND the
+        window global (same-document fast path)."""
+        s = {"state": state, "ep": ep, "secs": secs, "audio": audio}
         try:
             self.page.evaluate(
                 "(s) => { window.__recordrr = window.__recordrr || {cmd:null};"
-                " window.__recordrr.status = s; }",
-                {"state": state, "ep": ep, "secs": secs, "audio": audio})
+                " window.__recordrr.status = s;"
+                " try { localStorage.setItem('recordrrStatus', JSON.stringify(s)); } catch(e){} }",
+                s)
         except Exception:
             pass
 

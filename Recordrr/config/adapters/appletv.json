@@ -1,0 +1,67 @@
+{
+  "service": "appletv",
+  "display": "Apple TV+",
+  "url": "https://tv.apple.com/",
+  "_untuned": true,
+  "_note": "BLIND STUB authored 2026-06-10 — never seen live DOM. Apple's web player (tv.apple.com) has no public testid convention; controls are aria-labelled and localized (es-ES account → expect 'Reproducir', 'Pausa', 'Saltar introducción', 'Pantalla completa'). Selectors are role/name + text guesses. Run the 20.5d playbook on first login. Untuned ad-guard active.",
+  "_drm_note": "FairPlay is Safari-only; on Chrome Apple falls back to Widevine — playback should work but expect a resolution cap similar to Netflix L3. Verify video_state climbs past 0 before tuning anything else.",
+  "timing": {
+    "play_settle": 8,
+    "ad_poll": 3,
+    "end_pad": 2,
+    "max_runtime_factor": 2.2
+  },
+  "controls": {
+    "play": [
+      {
+        "role": "button",
+        "name": "(?i)^(reproducir|pausar?|play|pause)$"
+      },
+      {
+        "css": "[aria-label*='eproduc' i], [aria-label*='play' i]"
+      }
+    ],
+    "skip_intro": [
+      {
+        "text": "(?i)saltar (introducci|intro|resumen)|omitir (intro|introducci|resumen)|skip (intro|recap)"
+      },
+      {
+        "role": "button",
+        "name": "(?i)saltar|omitir|skip"
+      }
+    ],
+    "next_episode": [
+      {
+        "text": "(?i)siguiente episodio|pr[óo]ximo episodio|next episode|up next"
+      },
+      {
+        "role": "button",
+        "name": "(?i)siguiente episodio|next episode"
+      }
+    ],
+    "ad_marker": [
+      {
+        "text": "(?i)anuncio \\d+ de \\d+|ad \\d+ of \\d+|pausa publicitaria|ad break"
+      }
+    ],
+    "fullscreen": [
+      {
+        "role": "button",
+        "name": "(?i)pantalla completa|full ?screen"
+      },
+      {
+        "css": "[aria-label*='pantalla completa' i], [aria-label*='fullscreen' i]"
+      }
+    ],
+    "unmute": [
+      {
+        "role": "button",
+        "name": "(?i)volumen|activar sonido|silenciar|un-?mute|^mute|volume"
+      },
+      {
+        "css": "[aria-label*='volumen' i], [aria-label*='mute' i]"
+      }
+    ]
+  },
+  "mute_key": "m"
+}

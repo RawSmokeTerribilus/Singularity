@@ -2,82 +2,84 @@
   "service": "disney",
   "display": "Disney+",
   "url": "https://www.disneyplus.com/",
-  "_untuned": true,
-  "_note": "STUB — selectors cloned from pluto, NOT tuned for Disney+. Run drift (Proveedores -> drift) against the live DOM and edit. Anchor on role/aria/text, not layout classes.",
+  "_note": "TUNED from live DOM 2026-06-10 (real episode playing in container Chrome+Widevine — Disney PLAYS; the 2026-06-09 Error 83 was an unregistered device, fixed by relaunching playback once). Player is WEB COMPONENTS (Lit): semantic custom-element tags (toggle-play-pause, play-next, toggle-mute-button, toggle-fullscreen, skip-overlay, ad-badge-overlay, up-next-lite-v1). Playwright CSS pierces open shadow roots, so tag-based selectors are the primary strategy — stable AND locale-immune (aria labels are localized: 'Pausar', 'Silenciar', 'VER EL SIGUIENTE'). Real clickables are div[role=button] INSIDE the shadow root, not <button> elements.",
+  "_overlay_note": "Lit renders overlay shadow content ONLY while active — inactive ad-badge-overlay/skip-overlay shadow is an empty comment node. So '<tag> div'/'<tag> [role=button]' matches ONLY while the overlay is live: visibility-aware presence without :visible hacks. Bare tags are ALWAYS mounted (ad-badge-overlay spans 1920x1080 permanently) — never anchor a presence check on the bare tag (the stub's [data-testid*='ad'] equivalent trap).",
+  "_next_note": "next_episode CONFIRMED LIVE 2026-06-10: 'play-next [role=button]' hits a div[role=button][aria-label='VER EL SIGUIENTE'] inside play-next's shadow. CAVEAT: play-next is a PERSISTENT control-bar button during playback (always mounted while controls are up), toggling aria-disabled='true' (no successor / movie) vs 'false' (next available) — so present()/click() always resolves; the engine should treat it as a fast-forward, not a presence-gate. Disney AUTOPLAYS the next ep ~5s after content end into a new playback blade (operator: 'gets 5 seconds in a new blade') without any click — boundary_src + surviving page cover it, same model as RTVE/HBO. up-next-lite-v1 stayed empty this session (play-next is the live surface). Two distinct controls: play-next = control-bar button; up-next-lite-v1 = end-card overlay (kept as fallback).",
+  "_video_note": "Disney <video>.duration is NaN/Infinity (MSE buffer) → video_state reports dur=None → near_end NEVER fires. Episode end = boundary_src (blob src swap on autoplay) / ended / runaway guard, all inherited from the shared engine. Page also carries a dummy second <video> (no src) — _VIDEO_STATE_JS already prefers the playing one. Audio: element-level (video.muted=false, vol=1 observed live with sound); mute control aria is Spanish ('Silenciar') so adapter.mute_state() returns None and the 'm'-press net stays idle — element unmute covers it, same shape as Prime.",
+  "_ad_note": "AD BREAK LIVE-OBSERVED 2026-06-10 (Standard-with-ads tier, 35s skippable preroll): ad-badge-overlay shadow stayed EMPTY through the whole playing ad — it is NOT the marker for promo-type breaks. The real signal: 'promo-overlay' shadow POPULATES during the break (hosts a skip-button whose label is 'OMITIR') and empties at content — now the PRIMARY ad_marker strategy. ad-badge-overlay div kept as fallback for hard (unskippable) ad-tier breaks, which this account serves too rarely to reproduce on demand (operator: 'not more than hulu trailers', start/end mostly) — confirm badge behaviour via flight log when one lands. 'ad-markers' (progress bar) shadow carries div.marker-point children (#INT-0 at left:0%) = break-position map, present even during content, NOT a state marker. Ad plays via src swap in the same <video> with a FIXED short dur (35.1), while content dur GROWS as MSE appends (25→68s+ observed) — growing dur is the content tell, but DOM stays the gate.",
+  "_skip_ad_note": "Skippable promos: 'promo-overlay skip-button button' (both shadow hops pierced by Playwright CSS) clicks OMITIR. Added as a skip_intro fallback strategy so any periodic skip_intro attempt also skips promos; harmless when absent.",
+  "_skip_intro_note": "skip-overlay (intro/recap skip) NOT reproducible 2026-06-10 — operator: Disney has stripped intro-skip even on shows with iconic openings (Family Guy). Surface rarely/never mounts on this catalog. skip-overlay selector kept as harmless best-guess; non-critical (worst case the intro records inline, trimmed downstream).",
   "timing": {
     "play_settle": 8,
-    "ad_poll": 3,
+    "ad_poll": 1,
     "end_pad": 2,
     "max_runtime_factor": 2.2
   },
   "controls": {
     "play": [
       {
+        "css": "toggle-play-pause [role=button]"
+      },
+      {
+        "css": "button[data-testid='play-button'], a[data-testid='play-button']"
+      },
+      {
         "role": "button",
-        "name": "(?i)^play"
-      },
-      {
-        "css": "button[aria-label*='Play' i]"
-      },
-      {
-        "css": "[data-testid*='play' i], .video-player__play"
+        "name": "(?i)^(reproducir|play|reanudar|resume|pausar|pause)"
       }
     ],
     "skip_intro": [
       {
-        "role": "button",
-        "name": "(?i)skip intro|skip recap"
+        "css": "skip-overlay [role=button], skip-overlay button"
       },
       {
-        "text": "(?i)skip intro"
+        "css": "promo-overlay skip-button button"
       },
       {
-        "css": "button[class*='skip' i], [class*='skip-intro' i] button"
+        "text": "(?i)^omitir$|omitir (intro|introducci|resumen|cr[eé]ditos|anuncio)|skip (intro|recap|credits|ad)"
       }
     ],
     "next_episode": [
       {
+        "css": "play-next [role=button]"
+      },
+      {
+        "css": "up-next-lite-v1:not([hidden]) [role=button]"
+      },
+      {
         "role": "button",
-        "name": "(?i)next episode|up next|play next"
-      },
-      {
-        "text": "(?i)next episode|up next"
-      },
-      {
-        "css": "[data-testid*='next' i], [class*='next-episode' i]"
+        "name": "(?i)ver el siguiente|siguiente episodio|next episode|up next"
       }
     ],
     "ad_marker": [
       {
-        "text": "(?i)advertisement|commercial|ad break"
+        "css": "promo-overlay div"
       },
       {
-        "css": "[class*='ad-countdown' i], [data-testid*='ad' i], [class*='advertisement' i]"
+        "css": "ad-badge-overlay div"
+      },
+      {
+        "text": "(?i)pausa publicitaria|ad break"
       }
     ],
     "fullscreen": [
       {
-        "role": "button",
-        "name": "(?i)full ?screen"
+        "css": "toggle-fullscreen [role=button]"
       },
       {
-        "css": "button[aria-label*='full' i]"
+        "role": "button",
+        "name": "(?i)pantalla completa|full ?screen"
       }
     ],
     "unmute": [
       {
+        "css": "toggle-mute-button [role=button]"
+      },
+      {
         "role": "button",
-        "name": "(?i)unmute|^mute"
-      },
-      {
-        "css": "button[aria-label*='unmute' i]"
-      },
-      {
-        "css": "button[aria-label*='mute' i]"
-      },
-      {
-        "css": "[data-testid*='mute' i], [class*='mute' i] button"
+        "name": "(?i)activar sonido|silenciar|un-?mute|^mute"
       }
     ]
-  }
+  },
+  "mute_key": "m"
 }

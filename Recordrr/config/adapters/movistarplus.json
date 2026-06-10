@@ -1,0 +1,59 @@
+{
+  "service": "movistarplus",
+  "display": "Movistar Plus+",
+  "url": "https://ver.movistarplus.es/",
+  "_untuned": true,
+  "_note": "BLIND STUB authored 2026-06-10 — never seen live DOM. Movistar Plus+ web player (ver.movistarplus.es) is fully Spanish-first; no public selector convention known, so everything below is role/text guesswork in Spanish with English fallbacks. Movistar also has live linear channels — if archiving those, expect a guide.py-style store hunt like Pluto (window state unverified). Run the 20.5d playbook on first login. Untuned ad-guard active.",
+  "_drm_note": "Movistar historically gates some content on DRM level / device type; like Rakuten it may block or cap on Linux. First check: does video_state climb past 0 and at what resolution. If it walls out, park it like rakuten.json.",
+  "timing": {
+    "play_settle": 8,
+    "ad_poll": 3,
+    "end_pad": 2,
+    "max_runtime_factor": 2.2
+  },
+  "controls": {
+    "play": [
+      {
+        "role": "button",
+        "name": "(?i)^(reproducir|pausar?|play|pause|reanudar|ver ahora)"
+      },
+      {
+        "css": "[class*='play' i][role='button'], button[title*='eproduc' i]"
+      }
+    ],
+    "skip_intro": [
+      {
+        "text": "(?i)omitir (intro|introducci|resumen|cabecera)|saltar (intro|cabecera)|skip intro"
+      }
+    ],
+    "next_episode": [
+      {
+        "text": "(?i)siguiente episodio|pr[óo]ximo episodio|siguiente cap[íi]tulo|next episode"
+      }
+    ],
+    "ad_marker": [
+      {
+        "text": "(?i)anuncio \\d+ de \\d+|publicidad|pausa publicitaria|ad break"
+      }
+    ],
+    "fullscreen": [
+      {
+        "role": "button",
+        "name": "(?i)pantalla completa|full ?screen"
+      },
+      {
+        "css": "button[title*='pantalla completa' i]"
+      }
+    ],
+    "unmute": [
+      {
+        "role": "button",
+        "name": "(?i)volumen|activar sonido|silenciar|un-?mute|^mute|volume"
+      },
+      {
+        "css": "button[title*='silenciar' i], button[title*='volumen' i]"
+      }
+    ]
+  },
+  "mute_key": "m"
+}

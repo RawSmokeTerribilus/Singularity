@@ -3,7 +3,8 @@
   "display": "Rakuten TV",
   "url": "https://www.rakuten.tv/",
   "_untuned": true,
-  "_note": "STUB — selectors cloned from pluto, NOT tuned for Rakuten TV. Run drift (Proveedores -> drift) against the live DOM and edit. Anchor on role/aria/text, not layout classes.",
+  "_note": "PARKED 2026-06-10 — recon verdict: BAD archive source on Linux. Rakuten blocks MOVIES outright on GNU/Linux ('you cannot watch movies on GNU/Linux' dialog — Widevine L1/hardware-DRM gate) and caps the rest at potato-res (live channel observed 576x432). Operator decision: not worth archiving; titles live elsewhere at real quality. Adapter kept as last-mile stock fallback only. _untuned stays TRUE on purpose: the VOD episode player was never seen, so ad_marker/skip/next are unverified guesses and the orchestrator's untuned guard (log-don't-pause) must stay active.",
+  "_recon_note": "Partial live recon 2026-06-10 (live linear channel, FilmRise — dur=Infinity, 576x432): React + styled-components (hashed classes, ignore), stable data-testids on the player shell: 'mute-unmute', 'fullscreen-button', 'playback-back-button', 'epg_guide_button' (live view). aria-labels absent on player buttons — testid is the only anchor. OneTrust consent stack present (same as Disney). play/skip_intro/next_episode/ad_marker below are UNVERIFIED (live channel has none of them).",
   "timing": {
     "play_settle": 8,
     "ad_poll": 3,
@@ -14,70 +15,45 @@
     "play": [
       {
         "role": "button",
-        "name": "(?i)^play"
+        "name": "(?i)^(reproducir|play|reanudar|resume)"
       },
       {
-        "css": "button[aria-label*='Play' i]"
-      },
-      {
-        "css": "[data-testid*='play' i], .video-player__play"
+        "css": "[data-testid*='play' i]"
       }
     ],
     "skip_intro": [
       {
-        "role": "button",
-        "name": "(?i)skip intro|skip recap"
-      },
-      {
-        "text": "(?i)skip intro"
-      },
-      {
-        "css": "button[class*='skip' i], [class*='skip-intro' i] button"
+        "text": "(?i)omitir (intro|introducci|resumen)|skip (intro|recap)"
       }
     ],
     "next_episode": [
       {
-        "role": "button",
-        "name": "(?i)next episode|up next|play next"
-      },
-      {
-        "text": "(?i)next episode|up next"
-      },
-      {
-        "css": "[data-testid*='next' i], [class*='next-episode' i]"
+        "text": "(?i)siguiente episodio|pr[óo]ximo episodio|next episode|up next"
       }
     ],
     "ad_marker": [
       {
-        "text": "(?i)advertisement|commercial|ad break"
-      },
-      {
-        "css": "[class*='ad-countdown' i], [data-testid*='ad' i], [class*='advertisement' i]"
+        "text": "(?i)anuncio \\d+ de \\d+|ad \\d+ of \\d+|pausa publicitaria|ad break"
       }
     ],
     "fullscreen": [
       {
-        "role": "button",
-        "name": "(?i)full ?screen"
+        "css": "[data-testid='fullscreen-button']"
       },
       {
-        "css": "button[aria-label*='full' i]"
+        "role": "button",
+        "name": "(?i)pantalla completa|full ?screen"
       }
     ],
     "unmute": [
       {
+        "css": "[data-testid='mute-unmute']"
+      },
+      {
         "role": "button",
-        "name": "(?i)unmute|^mute"
-      },
-      {
-        "css": "button[aria-label*='unmute' i]"
-      },
-      {
-        "css": "button[aria-label*='mute' i]"
-      },
-      {
-        "css": "[data-testid*='mute' i], [class*='mute' i] button"
+        "name": "(?i)activar sonido|silenciar|un-?mute|^mute"
       }
     ]
-  }
+  },
+  "mute_key": "m"
 }
