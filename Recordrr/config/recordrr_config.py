@@ -59,6 +59,18 @@ CHROME_ARGS = [
     "--kiosk",
     "--window-position=0,0",
     f"--window-size={SCREEN_W},{SCREEN_H}",
+    # Composite the video into the X framebuffer that ffmpeg x11grab reads.
+    # Prime's video PLAYS (currentTime advances, audio + ads fire) but its surface
+    # composites to a HARDWARE OVERLAY plane OUTSIDE the Xvfb framebuffer → x11grab
+    # records grey. A manual double-click forced a repaint INTO the framebuffer
+    # (image returned WHILE STILL FULLSCREEN — it is NOT a fullscreen-vs-windowed
+    # thing). asbuilt §20.5m, The Boys rec2 sample: frame@30s grey, frame@2:22 real
+    # after the click. This forces SW compositing so the video paints to the
+    # framebuffer without needing a gesture. UNVERIFIED — if Prime still greys,
+    # escalate: add "--disable-features=VaapiVideoDecoder" (SW decode), then
+    # "--disable-gpu" (nuclear; CPU-only, last resort). Benign for the providers
+    # that already captured fine (only changes the final composite path, not EME).
+    "--disable-gpu-compositing",
 ]
 
 # Opt-in remote debugging. Set RECORDRR_DEBUG_PORT=9222 to expose the DevTools

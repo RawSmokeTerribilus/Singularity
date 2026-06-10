@@ -189,6 +189,11 @@ class Orchestrator:
         blind mute press). Trusted gesture only — 'f' (most HTML5 players, Pluto
         included), then the adapter's own fullscreen button as a fallback. F11 is
         left entirely to the operator; this just means they never NEED it."""
+        # Adapter opt-out (Prime): requesting player-fullscreen reloads its surface
+        # and the per-poll re-assert thrashes it (cover/loading flash every ad_poll).
+        # --kiosk already fills the capture display, so skip player-fullscreen here.
+        if not self.adapter.player_fullscreen:
+            return
         if self.browser.is_fitted():
             return
         self._blur_active()                  # so 'f' reaches the player, not our bar
@@ -327,12 +332,17 @@ class Orchestrator:
                         # frame-fit durability net: fullscreen drops on nav/ad/seek and
                         # the toolbar reappears in the capture. Re-assert (guarded — only
                         # acts when not fitted, so it never exits an already-clean frame).
-                        fitted = self.browser.is_fitted()
-                        if not fitted:
-                            _log(f"{ep.code} — frame sin fullscreen (barra del navegador visible); reajustando")
-                            fr.event("fullscreen_reassert", secs=secs)
-                            self._ensure_fitted()
+                        # Skipped entirely for adapters that opt out of player-fullscreen
+                        # (Prime: the re-assert thrashes its surface — §20.5n); kiosk fills.
+                        if not self.adapter.player_fullscreen:
+                            fitted = True
+                        else:
                             fitted = self.browser.is_fitted()
+                            if not fitted:
+                                _log(f"{ep.code} — frame sin fullscreen (barra del navegador visible); reajustando")
+                                fr.event("fullscreen_reassert", secs=secs)
+                                self._ensure_fitted()
+                                fitted = self.browser.is_fitted()
                         self.browser.bar_status("rec", ep.code, secs, "ok" if audible else "mute")
                     # snapshot the full signal vector once per poll, before the
                     # break checks, so the flight log captures the deciding sample too.
@@ -529,10 +539,13 @@ class Orchestrator:
                         if not audible:
                             fr.event("audio_reassert", secs=secs)
                             self._ensure_audible(); audible = self.browser.is_audible()
-                        fitted = self.browser.is_fitted()
-                        if not fitted:
-                            fr.event("fullscreen_reassert", secs=secs)
-                            self._ensure_fitted(); fitted = self.browser.is_fitted()
+                        if not self.adapter.player_fullscreen:
+                            fitted = True            # §20.5n: kiosk fills; skip the thrash
+                        else:
+                            fitted = self.browser.is_fitted()
+                            if not fitted:
+                                fr.event("fullscreen_reassert", secs=secs)
+                                self._ensure_fitted(); fitted = self.browser.is_fitted()
                         self.browser.bar_status("rec", code, secs, "ok" if audible else "mute")
 
                     vs = self.browser.video_state()

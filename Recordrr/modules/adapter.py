@@ -51,6 +51,14 @@ class Adapter:
         self.untuned = bool(spec.get("_untuned", False))
         # player keybind to toggle mute (trusted gesture). Most HTML5 players = 'm'.
         self.mute_key = spec.get("mute_key", "m")
+        # Whether to drive the player into element-fullscreen ('f'/requestFullscreen)
+        # AND re-assert it every poll. Default True (Pluto/RTVE/etc need it to hide
+        # the URL bar). Prime sets it FALSE: requesting fullscreen on its <video>
+        # makes the player reload its surface (cover/loading flash) and fullscreen
+        # drops, so the per-poll re-assert THRASHES it every ad_poll seconds. With
+        # --kiosk the window already fills the capture display, so player-fullscreen
+        # is redundant there anyway. (asbuilt §20.5n)
+        self.player_fullscreen = bool(spec.get("player_fullscreen", True))
 
     # ---- loading -------------------------------------------------------
     @classmethod
