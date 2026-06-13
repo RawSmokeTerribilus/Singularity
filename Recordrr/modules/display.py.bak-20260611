@@ -58,56 +58,16 @@ def _alive(name: str) -> bool:
         return False
 
 
-def _kill(name: str, grace: float = 5.0):
-    """SIGTERM the pidfile'd process and VERIFY it died; escalate to SIGKILL.
-
-    The old fire-and-forget (one SIGTERM + immediate pidfile unlink) orphaned
-    x11vnc on 2026-06-12: with a VNC viewer attached it printed 'caught signal:
-    15' but never exited, kept -forever's listener on 5900, and — pidfile gone —
-    every later up() spawned an x11vnc that died with 'could not obtain
-    listening port' (the post-Disney "display no funciona" that blocked the
-    test checklist). Unlink only after the process is confirmed gone."""
+def _kill(name: str):
     pf = _pidfile(name)
     if not pf.exists():
         return
     try:
-        pid = int(pf.read_text().strip())
-    except ValueError:
-        pf.unlink(missing_ok=True)
-        return
-    try:
-        os.kill(pid, signal.SIGTERM)
-        for _ in range(max(1, int(grace / 0.2))):   # graceful-exit window
-            time.sleep(0.2)
-            if _gone(pid):
-                break
-        else:
-            os.kill(pid, signal.SIGKILL)   # wedged (blocked client socket) — force
-    except OSError:
+        os.kill(int(pf.read_text().strip()), signal.SIGTERM)
+    except (OSError, ValueError):
         pass
     finally:
         pf.unlink(missing_ok=True)
-
-
-def _gone(pid: int) -> bool:
-    """True once the pid no longer holds its resources. A SIGTERM'd Popen child
-    turns ZOMBIE until reaped — os.kill(pid, 0) still succeeds on it, which made
-    the verify loop burn the FULL grace on openbox/Xvfb (~10s per teardown) even
-    though they died instantly. Reap if it's ours, and count Z-state as gone
-    (ports/display are already released)."""
-    try:
-        os.waitpid(pid, os.WNOHANG)        # reap our own child; no-op if alive
-    except (ChildProcessError, OSError):
-        pass                               # not our child — /proc check decides
-    try:
-        os.kill(pid, 0)
-    except OSError:
-        return True
-    try:
-        with open(f"/proc/{pid}/stat") as f:
-            return f.read().rsplit(")", 1)[1].split()[0] == "Z"
-    except OSError:
-        return True
 
 
 def _make_xauth() -> str:
@@ -175,26 +135,6 @@ def start_xvfb() -> str:
     return cfg.DISPLAY
 
 
-def start_wm():
-    """Minimal window manager on the virtual display (openbox).
-
-    Without a WM, Chrome --kiosk degrades to a normal window WITH a toolbar
-    (the url bar bakes into the capture) and F11 browser-fullscreen has no way
-    back — the operator had to F11 by hand before every record and the layered
-    fullscreen states fought each other. With a WM, --kiosk genuinely fills the
-    screen chromeless and F11 toggles both ways. Graceful no-op when the binary
-    isn't in the image (pre-openbox containers keep working unchanged)."""
-    if shutil.which("openbox") is None:
-        return False
-    if _alive("openbox"):
-        return True
-    env = os.environ.copy()
-    env["DISPLAY"] = cfg.DISPLAY
-    env["XAUTHORITY"] = cfg.XAUTHORITY
-    _spawn("openbox", ["openbox"], env=env)
-    return True
-
-
 def start_pulse() -> str:
     """Start a user PulseAudio daemon + null sink; return the monitor source name."""
     monitor = f"{cfg.PULSE_SINK}.monitor"
@@ -238,31 +178,16 @@ def start_vnc():
 def up(with_vnc: bool = False) -> dict:
     cfg.ensure_dirs()
     disp = start_xvfb()
-    wm = start_wm()
     monitor = start_pulse()
-    info = {"display": disp, "wm": "openbox" if wm else "none", "audio_monitor": monitor}
+    info = {"display": disp, "audio_monitor": monitor}
     if with_vnc:
         info["vnc_port"] = start_vnc()
     return info
 
 
 def down():
-    # x11vnc gets a token grace: with a viewer attached it ALWAYS ignores
-    # SIGTERM (the 2026-06-12 orphan bug), so a long window just stalls every
-    # teardown 5s on a process that mirrors the framebuffer and has no state
-    # worth a graceful exit. Verify-kill semantics stay intact.
-    _kill("x11vnc", grace=0.6)
-    for name in ("openbox", "xvfb"):
+    for name in ("x11vnc", "xvfb"):
         _kill(name)
-    # Belt: sweep by NAME for untracked survivors (a pidfile lost to the old
-    # fire-and-forget _kill, or a crashed launcher). Inside the container every
-    # process by these names is ours, so a blanket pkill is safe — this is what
-    # heals an already-orphaned x11vnc holding the VNC port.
-    for proc in ("x11vnc", "openbox", "Xvfb"):
-        subprocess.run(["pkill", "-x", proc], capture_output=True)
-    time.sleep(0.3)
-    for proc in ("x11vnc", "openbox", "Xvfb"):
-        subprocess.run(["pkill", "-9", "-x", proc], capture_output=True)
     # Leave PulseAudio running; unloading the sink is cheap and avoids races.
     subprocess.run(["pactl", "unload-module", "module-null-sink"],
                    capture_output=True, text=True)

@@ -136,8 +136,6 @@ RUN if [ -f /etc/apt/sources.list.d/debian.sources ]; then \
 # google-chrome-stable trae el CDM de Widevine (el Chromium de Playwright NO).
 # Xvfb = display virtual headless; x11vnc = ver el navegador una vez para el
 # login manual; pulseaudio = sink nulo cuyo monitor graba ffmpeg.
-# openbox = WM mínimo en el display virtual: sin WM, Chrome --kiosk degrada a
-# ventana normal CON toolbar (la barra de URL se graba) y F11 no tiene vuelta.
 RUN apt-get update && apt-get install -y --no-install-recommends gnupg ca-certificates && \
     curl -fsSL https://dl.google.com/linux/linux_signing_key.pub \
         | gpg --dearmor -o /usr/share/keyrings/google-chrome.gpg && \
@@ -145,7 +143,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends gnupg ca-certif
         > /etc/apt/sources.list.d/google-chrome.list && \
     apt-get update && apt-get install -y --no-install-recommends \
     google-chrome-stable \
-    xvfb x11-utils x11vnc xauth openbox \
+    xvfb x11-utils x11vnc xauth \
     pulseaudio pulseaudio-utils \
     fonts-liberation && \
     rm -rf /var/lib/apt/lists/*

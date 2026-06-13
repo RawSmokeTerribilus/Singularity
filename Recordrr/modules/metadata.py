@@ -10,6 +10,7 @@ Reuses Singularity's existing Sonarr config (SONARR_URL / SONARR_API_KEY).
 """
 import re
 import sys
+import unicodedata
 from datetime import datetime
 from pathlib import Path
 
@@ -68,6 +69,51 @@ def _sanitize(name: str) -> str:
     bad = '/\\:*?"<>|'
     out = "".join(c for c in (name or "") if c not in bad).strip()
     return out.rstrip(". ")
+
+
+_ARTICLES = ("the ", "a ", "an ", "el ", "la ", "los ", "las ", "un ", "una ")
+
+
+def _norm_title(s: str) -> str:
+    """Matching-normalized title: casefold, accents stripped, punctuation out,
+    whitespace collapsed. 'Dinosaurs: The True Story' == 'dinosaurs the true story'."""
+    s = unicodedata.normalize("NFKD", s or "")
+    s = "".join(c for c in s if not unicodedata.combining(c)).casefold()
+    s = re.sub(r"[:;,.!?'\"()\[\]&\-_]", " ", s)
+    return re.sub(r"\s+", " ", s).strip()
+
+
+def _strip_article(s: str) -> str:
+    for a in _ARTICLES:
+        if s.startswith(a):
+            return s[len(a):]
+    return s
+
+
+def _parse_year(query: str):
+    """Split an optional year out of a query ('Conan 2011', 'From (2022)').
+    Returns (title_part, year_or_None)."""
+    q = (query or "").strip()
+    ym = re.search(r"\b(?:19|20)\d{2}\b", q)
+    year = int(ym.group()) if ym else None
+    qt = (q.replace(ym.group(), "") if ym else q).strip(" ()[]-.").strip()
+    return qt, year
+
+
+def _match_tier(nq: str, ntitle: str) -> int:
+    """Rank how well a normalized query matches a normalized title.
+    0 exact / 1 exact-sans-article / 2 prefix / 3 whole-word / 4 substring / -1 miss."""
+    if nq == ntitle:
+        return 0
+    if _strip_article(nq) == _strip_article(ntitle):
+        return 1
+    if ntitle.startswith(nq):
+        return 2
+    if re.search(rf"\b{re.escape(nq)}\b", ntitle):
+        return 3
+    if nq in ntitle:
+        return 4
+    return -1
 
 
 class Movie:
@@ -239,41 +285,38 @@ class RadarrClient:
         r.raise_for_status()
         return r.json()
 
-    def find_movie(self, query: str):
-        """Best-matching LIBRARY Movie for a title query, or None. Reads the local
+    def search_movies(self, query: str):
+        """Ranked LIBRARY Movie candidates for a title query. Reads the local
         Radarr DB (/api/v3/movie) — works with NO internet / metadata server down;
         only ADDING a movie needs the external lookup.
 
-        Understands a year in the query ('Conan 2011', 'Conan (2011)') to
-        disambiguate same-name films: the year is matched against Radarr's, the
-        rest against the title. When a year is given it WON'T fall back to a
-        wrong-year match — better to return None and let the operator retry than
-        silently record the wrong film. Priority: exact title (no year asked) →
-        title+year → plain substring."""
-        q = query.strip().lower()
-        ym = re.search(r"\b(?:19|20)\d{2}\b", q)
-        year = int(ym.group()) if ym else None
-        qt = (q.replace(ym.group(), "") if ym else q).strip(" ()[]-.").strip()
-        year_hit = exact = sub_hit = None
+        Matching is normalized (case/accents/punctuation/articles) and tiered —
+        see _match_tier. Understands a year in the query ('Conan 2011',
+        'Conan (2011)') to disambiguate same-name films; when a year is given it
+        WON'T fall back to a wrong-year match — better to return nothing and let
+        the operator retry than silently record the wrong film.
+
+        Returns [(tier, Movie), ...] sorted best-first."""
+        qt, year = _parse_year(query)
+        nq = _norm_title(qt)
+        if not nq:
+            return []
+        hits = []
         for m in self._get("movie"):
-            title = m.get("title", "").lower()
-            if qt and qt not in title:
+            tier = _match_tier(nq, _norm_title(m.get("title", "")))
+            if tier < 0:
                 continue
-            myear = m.get("year")
-            if year is not None:
-                if myear == year:
-                    if title == qt:
-                        return _movie_obj(m)            # title+year exact → done
-                    if year_hit is None:
-                        year_hit = _movie_obj(m)
+            if year is not None and m.get("year") != year:
                 continue                                # year given: ignore other years
-            if title == qt:
-                exact = _movie_obj(m)
-            if sub_hit is None:
-                sub_hit = _movie_obj(m)
-        if year is not None:
-            return year_hit                             # None = not found at that year
-        return exact or sub_hit
+            hits.append((tier, m))
+        hits.sort(key=lambda t: (t[0], abs(len(_norm_title(t[1].get("title", ""))) - len(nq)),
+                                 t[1].get("title", "")))
+        return [(tier, _movie_obj(m)) for tier, m in hits]
+
+    def find_movie(self, query: str):
+        """Best-matching LIBRARY Movie for a title query, or None."""
+        hits = self.search_movies(query)
+        return hits[0][1] if hits else None
 
 
 def _movie_obj(m):
@@ -302,20 +345,33 @@ class SonarrClient:
         r.raise_for_status()
         return r.json()
 
-    def find_series(self, query: str):
-        """Return (series_id, title, year, tvdb_id, tmdb_id) best-matching query, or None."""
-        q = query.strip().lower()
-        best = None
+    def search_series(self, query: str):
+        """Ranked library candidates for a series query. Normalized + tiered
+        matching (see _match_tier) with optional year disambiguation
+        ('From 2022') — year given but absent in the library ranks nothing,
+        same no-silent-wrong-year policy as Radarr.
+
+        Returns [{... _series_tuple keys ..., 'tier': N}, ...] best-first."""
+        qt, year = _parse_year(query)
+        nq = _norm_title(qt)
+        if not nq:
+            return []
+        hits = []
         for s in self._get("series"):
-            title = s.get("title", "")
-            if q in title.lower():
-                # prefer exact, else first substring hit
-                exact = title.lower() == q
-                if exact:
-                    return _series_tuple(s)
-                if best is None:
-                    best = _series_tuple(s)
-        return best
+            tier = _match_tier(nq, _norm_title(s.get("title", "")))
+            if tier < 0:
+                continue
+            if year is not None and s.get("year") != year:
+                continue
+            hits.append((tier, s))
+        hits.sort(key=lambda t: (t[0], abs(len(_norm_title(t[1].get("title", ""))) - len(nq)),
+                                 t[1].get("title", "")))
+        return [dict(_series_tuple(s), tier=tier) for tier, s in hits]
+
+    def find_series(self, query: str):
+        """Best-matching {id, title, year, tvdb_id, tmdb_id} for query, or None."""
+        hits = self.search_series(query)
+        return hits[0] if hits else None
 
     def get_episodes(self, series_id, season=None):
         """All episodes for a series (optionally one season), sorted, as Episode objs."""

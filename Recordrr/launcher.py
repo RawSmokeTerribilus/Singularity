@@ -500,7 +500,7 @@ def _banner():
         f"display=[{'[green]ON[/green]' if _display_up() else '[dim]off[/dim]'}]\n"
         f"  Provs    : {_providers_inline()}\n\n"
         "  [bold green][1][/bold green]  Grabar Serie           [dim](proveedor → serie)[/dim]\n"
-        "  [bold green][2][/bold green]  Grabar Película        [dim](proveedor → película)[/dim] [yellow][WIP][/yellow]\n"
+        "  [bold green][2][/bold green]  Grabar Película        [dim](proveedor → película)[/dim]\n"
         "  [bold green][3][/bold green]  Grabar TV              [dim](canal en vivo → modo → nombrado)[/dim]\n"
         "  [bold yellow][4][/bold yellow]  Ajustes                [dim](configuración / proveedores)[/dim]\n"
         "  [bold cyan][5][/bold cyan]  Diagnóstico            [dim](display / captura manual)[/dim]\n"

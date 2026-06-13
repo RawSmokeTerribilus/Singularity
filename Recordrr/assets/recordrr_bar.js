@@ -23,6 +23,10 @@
  * appending to BUTTONS below — render + command plumbing are generic.
  */
 (() => {
+  // Top frame only: add_init_script runs in EVERY frame, and the guard below is
+  // per-document — provider iframes (RTVE consent/player) each grew their own
+  // bar ("2 record boxes"). The orchestrator only talks to the top document.
+  try { if (window !== window.top) return; } catch (e) { return; }
   if (window.__recordrrBarInit) return;            // idempotent per document
   window.__recordrrBarInit = true;
   const NS = window.__recordrr = window.__recordrr || { cmd: null, status: { state: 'idle' } };
@@ -134,7 +138,24 @@
   }
 
   let lastMove = Date.now();
-  const seen = () => { lastMove = Date.now(); const b = document.getElementById('rr-bar'); if (b) b.style.opacity = '1'; };
+  // Reveal on mouse movement ONLY while idle. During a recording the bar must
+  // paint NOTHING — x11grab records every visible pixel (a hover-reveal plus
+  // its native tooltip ended up baked into a capture). opacity:0 keeps the
+  // buttons clickable; the VNC cursor (excluded from capture by -draw_mouse 0)
+  // turning into a pointer is the operator's cue that they're over STOP.
+  let lastMoveLS = 0;
+  const seen = () => {
+    lastMove = Date.now();
+    // Mirror real pointer activity to the orchestrator (throttled): it re-parks
+    // the synthetic pointer after movement+idle so a native tooltip left under
+    // the cursor on the VNC-viewer-close exit path can't freeze into the capture.
+    if (lastMove - lastMoveLS > 1000) {
+      lastMoveLS = lastMove;
+      try { localStorage.setItem('recordrrLastMove', String(lastMove)); } catch (e) {}
+    }
+    const b = document.getElementById('rr-bar');
+    if (b && b._state !== 'rec') b.style.opacity = '1';
+  };
 
   // Place the bar so it is ALWAYS clickable. The popover top layer paints above
   // the page but NOT above a fullscreen element (a fullscreen <video>/player wins
@@ -172,10 +193,11 @@
     const bar = buildBar();
     placeBar(bar);
     const s = readStatus();
-    // While recording, fade the bar out when idle so it stays OUT of the capture
-    // (x11grab records the framebuffer). Move the mouse to bring it back.
+    bar._state = s.state;
+    // While recording the bar is ALWAYS invisible (still clickable): anything
+    // painted lands in the file. No idle-fade grace, no mousemove reveal.
     bar.style.transition = 'opacity .35s';
-    bar.style.opacity = (s.state === 'rec' && (Date.now() - lastMove > 2500)) ? '0' : '1';
+    bar.style.opacity = (s.state === 'rec') ? '0' : '1';
     if (s.state === 'rec') {
       bar._stat.textContent = '● ' + (s.ep || '') + ' ' + (s.secs != null ? fmt(s.secs) : '') + ' ' + (s.audio === 'mute' ? '🔇' : '🔊');
       bar._stat.style.color = s.audio === 'mute' ? '#ff5555' : '#ff3b6b';
@@ -197,7 +219,9 @@
       const body = bar._body; body.innerHTML = '';
       for (const b of show) {
         const el = document.createElement('button');
-        el.textContent = b.label; el.title = b.title || '';
+        // No title while recording: native tooltips fire on hover even over an
+        // opacity:0 element, and the tooltip itself gets recorded.
+        el.textContent = b.label; el.title = (s.state === 'rec') ? '' : (b.title || '');
         Object.assign(el.style, {
           flex: '1 1 auto', padding: '9px 10px', cursor: 'pointer', border: 'none',
           borderRadius: '6px', fontWeight: '700', fontSize: '13px', color: '#fff',

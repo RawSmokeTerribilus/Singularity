@@ -1,0 +1,52 @@
+{
+  "service": "tivify",
+  "display": "Tivify",
+  "url": "https://www.tivify.tv/",
+  "_untuned": true,
+  "_note": "BLIND STUB authored 2026-06-13 — never seen live DOM. Free tier (account needed) = Spanish linear TDT channels + some AVOD; LINEAR-FIRST service, so expect mostly --live style use: guide client falls back to the Pluto store shape (will likely miss) → operator tunes the channel in VNC and the generic record-what-plays path takes over. Ads on free tier are channel-side (broadcast), not player-overlay — ad_marker guesses are weak by nature. Untuned ad-guard active.",
+  "timing": {
+    "play_settle": 8,
+    "ad_poll": 2,
+    "end_pad": 2,
+    "max_runtime_factor": 2.5
+  },
+  "live": {
+    "url": "https://www.tivify.tv/"
+  },
+  "controls": {
+    "play": [
+      {
+        "role": "button",
+        "name": "(?i)^(reproducir|pausar?|play|pause|reanudar)"
+      }
+    ],
+    "skip_intro": [
+      {
+        "text": "(?i)omitir (intro|introducci|resumen|cabecera)|saltar (intro|cabecera)"
+      }
+    ],
+    "next_episode": [
+      {
+        "text": "(?i)siguiente episodio|pr[óo]ximo episodio|siguiente cap[íi]tulo|next episode"
+      }
+    ],
+    "ad_marker": [
+      {
+        "text": "(?i)anuncio \\d+ de \\d+|publicidad \\d|pausa publicitaria"
+      }
+    ],
+    "fullscreen": [
+      {
+        "role": "button",
+        "name": "(?i)pantalla completa|full ?screen"
+      }
+    ],
+    "unmute": [
+      {
+        "role": "button",
+        "name": "(?i)volumen|activar sonido|silenciar|un-?mute|^mute|volume"
+      }
+    ]
+  },
+  "mute_key": "m"
+}

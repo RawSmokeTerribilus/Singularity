@@ -18,6 +18,7 @@ services:
       - PUID=${PUID:-1000}
       - PGID=${PGID:-1000}
       - LIBVA_DRIVER_NAME=radeonsi # Fuerza el driver de AMD
+      - RECORDRR_QP=18 # VAAPI CQP; era 22 (default). 18 ≈ doble bitrate, paridad con OBS host
     devices:
       - /dev/dri:/dev/dri # Mapeo explícito del hardware gráfico
       - /dev/fb0:/dev/fb0 # Framebuffer (opcional pero ayuda en probes)

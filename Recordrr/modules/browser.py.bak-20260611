@@ -14,11 +14,8 @@ Run standalone (POC): open a URL and leave Chrome up for manual login/playback:
     DISPLAY=:77 python3 -m Recordrr.modules.browser https://www.pluto.tv/ poc
 """
 import os
-import shutil
-import subprocess
 import sys
 import time
-import urllib.request
 from pathlib import Path
 
 try:
@@ -61,8 +58,6 @@ class RecordrrBrowser:
         self.profile_dir = cfg.PROFILES_DIR / profile
         self.profile_dir.mkdir(parents=True, exist_ok=True)
         self._pw = None
-        self._browser = None
-        self._chrome = None
         self.ctx = None
         self.page = None
 
@@ -88,41 +83,15 @@ class RecordrrBrowser:
     def open(self, url: str = None):
         from playwright.sync_api import sync_playwright
         self._clear_stale_singleton()
-        # Launch Chrome OURSELVES and attach Playwright over a CDP *port*.
-        # Playwright's launch_persistent_context talks --remote-debugging-pipe,
-        # and pipe-mode silently degrades --kiosk to a normal toolbar'd window
-        # (1919x1079 WITH the url bar baked into every capture — that's why the
-        # operator had to F11 before each record). Bisected: no ignorable
-        # default arg is responsible; --kiosk survives into the cmdline and is
-        # still ignored. A plain launch with --remote-debugging-port keeps the
-        # true 1920x1080 chromeless kiosk window, and connect_over_cdp drives
-        # it with the same Playwright API (add_init_script proven working).
-        port = cfg.DEBUG_PORT or 9222
-        args = list(cfg.CHROME_ARGS)
-        if not any(a.startswith("--remote-debugging-port") for a in args):
-            args.append(f"--remote-debugging-port={port}")
-        else:                          # RECORDRR_DEBUG_PORT env owns the port
-            port = cfg.DEBUG_PORT
-        binary = shutil.which("google-chrome") or "google-chrome"
-        cmd = [binary, "--no-first-run", "--no-default-browser-check",
-               f"--user-data-dir={self.profile_dir}", *args,
-               url or "about:blank"]
-        self._chrome = subprocess.Popen(
-            cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        endpoint = f"http://127.0.0.1:{port}"
-        for _ in range(100):           # wait for the CDP endpoint (~20s cap)
-            try:
-                urllib.request.urlopen(f"{endpoint}/json/version", timeout=1)
-                break
-            except Exception:
-                if self._chrome.poll() is not None:
-                    raise RuntimeError(
-                        f"Chrome exited rc={self._chrome.returncode} before "
-                        f"CDP came up — check DISPLAY/profile lock")
-                time.sleep(0.2)
         self._pw = sync_playwright().start()
-        self._browser = self._pw.chromium.connect_over_cdp(endpoint)
-        self.ctx = self._browser.contexts[0]
+        self.ctx = self._pw.chromium.launch_persistent_context(
+            user_data_dir=str(self.profile_dir),
+            channel=cfg.CHROME_CHANNEL,
+            headless=False,
+            args=cfg.CHROME_ARGS,
+            viewport={"width": cfg.SCREEN_W, "height": cfg.SCREEN_H},
+            ignore_default_args=["--enable-automation"],  # less detectable
+        )
         self.page = self.ctx.pages[0] if self.ctx.pages else self.ctx.new_page()
         if url:
             self.page.goto(url, wait_until="domcontentloaded")
@@ -160,75 +129,13 @@ class RecordrrBrowser:
         except Exception:
             pass
         try:
-            # Fullscreen the player CONTAINER, never the bare <video>: when the
-            # <video> itself is the fullscreenElement, the in-page bar gets
-            # appended INSIDE it (placeBar fullscreen mode) and video elements
-            # never render children — bar invisible/unclickable (Disney bug).
-            # The parent container hides the toolbar just the same and can host
-            # the bar.
             return bool(self.page.evaluate(
                 "() => { const v=document.querySelector('video');"
-                " if(v&&!document.fullscreenElement){ const t=v.parentElement||v;"
-                " (t.requestFullscreen||t.webkitRequestFullscreen||(()=>{})).call(t); }"
-                " return true; }"
+                " if(v&&!document.fullscreenElement){ (v.requestFullscreen||"
+                "v.webkitRequestFullscreen||(()=>{})).call(v); } return true; }"
             ))
         except Exception:
             return False
-
-    def park_mouse(self):
-        """Synthetic pointer to the mid-left edge. Chrome's hover/tooltip state
-        follows the LAST input event, so this dismisses a native title-attr
-        tooltip left under the operator's parked VNC cursor (RTVE's 'Reproducir
-        vídeo' baked into a full record) and un-hovers provider chrome. Mid-left,
-        not a bottom corner: bottom edges host control bars that pin visible
-        under hover. Call before the settle so triggered chrome fades pre-capture."""
-        try:
-            self.page.mouse.move(2, cfg.SCREEN_H // 2)
-            self._parked_ms = time.time() * 1000
-        except Exception:
-            pass
-
-    def last_mouse_move(self):
-        """Epoch ms of the last REAL pointer movement the bar saw (localStorage
-        mirror, survives navigation), or None."""
-        try:
-            v = self.page.evaluate(
-                "() => { try { return localStorage.getItem('recordrrLastMove'); }"
-                " catch(e) { return null; } }")
-            return int(v) if v else None
-        except Exception:
-            return None
-
-    def strip_titles(self):
-        """Remove title attributes page-wide (Recordrr bar excluded — it manages
-        its own). Native tooltips are OS-drawn and x11grab captures them; the
-        owner can be ANY hit-testable layer (player chrome, a hidden ad slot
-        behind the video, RTVE's mini-player) — no attribute, no tooltip,
-        regardless of which layer theory is right. Per-poll call: SPAs re-add
-        attributes on every re-render."""
-        try:
-            self.page.evaluate(
-                "() => { for (const el of document.querySelectorAll('[title]'))"
-                " if (!el.closest('#rr-bar')) el.removeAttribute('title'); }")
-        except Exception:
-            pass
-
-    def maybe_repark(self) -> bool:
-        """Re-park after the operator moved the pointer and went idle. The VNC
-        viewer's close button sits past the player's top-right chrome, so the
-        exit path ALWAYS re-hovers a titled control as the session's final input
-        — the record-start park can't cover it. park_mouse() itself fires a
-        synthetic mousemove the bar records, so only movement NEWER than the
-        last park (+slack) counts; 3s idle keeps hover chrome from flapping
-        while the operator is actively driving. Returns True when it parked."""
-        lm = self.last_mouse_move()
-        if not lm:
-            return False
-        now = time.time() * 1000
-        if lm > getattr(self, "_parked_ms", 0) + 1500 and (now - lm) > 3000:
-            self.park_mouse()
-            return True
-        return False
 
     def is_fitted(self) -> bool:
         """True when the player is in the browser Fullscreen state — the ONLY clean
@@ -267,8 +174,7 @@ class RecordrrBrowser:
         try:
             self.page.evaluate(
                 "() => { try { localStorage.removeItem('recordrrCmd');"
-                " localStorage.removeItem('recordrrStatus');"
-                " localStorage.removeItem('recordrrLastMove'); } catch(e){} }")
+                " localStorage.removeItem('recordrrStatus'); } catch(e){} }")
         except Exception:
             pass
 
@@ -358,19 +264,12 @@ class RecordrrBrowser:
 
     def close(self):
         try:
-            if self._browser:
-                self._browser.close()      # disconnect CDP, Chrome stays ours
+            if self.ctx:
+                self.ctx.close()
         finally:
             if self._pw:
                 self._pw.stop()
-            if self._chrome:
-                self._chrome.terminate()   # we launched it, we kill it
-                try:
-                    self._chrome.wait(timeout=10)
-                except Exception:
-                    self._chrome.kill()
             self.ctx = self.page = self._pw = None
-            self._browser = self._chrome = None
 
 
 if __name__ == "__main__":

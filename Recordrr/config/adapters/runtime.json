@@ -1,0 +1,49 @@
+{
+  "service": "runtime",
+  "display": "Runtime",
+  "url": "https://www.runtime.tv/",
+  "_untuned": true,
+  "_note": "BLIND STUB authored 2026-06-13 — never seen live DOM. Runtime (rlaxx successor lineage) free AVOD, available in Spain, genre-channel + on-demand movies/series, no account needed for most playback. Small catalog but occasionally has out-of-print titles — the 'worth it' filter applies. Player tech unknown; generic Spanish/English guesses only. Untuned ad-guard active.",
+  "timing": {
+    "play_settle": 8,
+    "ad_poll": 2,
+    "end_pad": 2,
+    "max_runtime_factor": 2.5
+  },
+  "controls": {
+    "play": [
+      {
+        "role": "button",
+        "name": "(?i)^(reproducir|pausar?|play|pause|resume|reanudar)"
+      }
+    ],
+    "skip_intro": [
+      {
+        "text": "(?i)skip intro|omitir (intro|introducci)|saltar intro"
+      }
+    ],
+    "next_episode": [
+      {
+        "text": "(?i)next episode|siguiente episodio|pr[óo]ximo episodio"
+      }
+    ],
+    "ad_marker": [
+      {
+        "text": "(?i)ad \\d+ of \\d+|anuncio \\d+ de \\d+|advertisement|publicidad"
+      }
+    ],
+    "fullscreen": [
+      {
+        "role": "button",
+        "name": "(?i)pantalla completa|full ?screen"
+      }
+    ],
+    "unmute": [
+      {
+        "role": "button",
+        "name": "(?i)volumen|activar sonido|silenciar|un-?mute|^mute|volume"
+      }
+    ]
+  },
+  "mute_key": "m"
+}

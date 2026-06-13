@@ -1,0 +1,52 @@
+{
+  "service": "samsungtvplus",
+  "display": "Samsung TV Plus",
+  "url": "https://www.samsungtvplus.com/",
+  "_untuned": true,
+  "_note": "BLIND STUB authored 2026-06-13 — never seen live DOM. Samsung's free linear service has a web player available in Spain (no account, no Samsung device needed); LINEAR-ONLY, so this is a --live workflow: generic guide fallback will miss → tune the channel in VNC, record-what-plays. Broadcast-side ads, so ad_marker is best-effort. Untuned ad-guard active.",
+  "timing": {
+    "play_settle": 8,
+    "ad_poll": 2,
+    "end_pad": 2,
+    "max_runtime_factor": 2.5
+  },
+  "live": {
+    "url": "https://www.samsungtvplus.com/"
+  },
+  "controls": {
+    "play": [
+      {
+        "role": "button",
+        "name": "(?i)^(reproducir|pausar?|play|pause|resume|reanudar)"
+      }
+    ],
+    "skip_intro": [
+      {
+        "text": "(?i)skip intro|omitir intro|saltar intro"
+      }
+    ],
+    "next_episode": [
+      {
+        "text": "(?i)next episode|siguiente episodio"
+      }
+    ],
+    "ad_marker": [
+      {
+        "text": "(?i)ad \\d+ of \\d+|anuncio \\d+ de \\d+|advertisement|publicidad"
+      }
+    ],
+    "fullscreen": [
+      {
+        "role": "button",
+        "name": "(?i)pantalla completa|full ?screen"
+      }
+    ],
+    "unmute": [
+      {
+        "role": "button",
+        "name": "(?i)volumen|activar sonido|silenciar|un-?mute|^mute|volume"
+      }
+    ]
+  },
+  "mute_key": "m"
+}

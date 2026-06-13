@@ -251,6 +251,7 @@ class Orchestrator:
         self._ensure_audible()
         self._ensure_fitted()
         self.adapter.skip_intro(page)
+        self.browser.park_mouse()      # clear stuck tooltips/hover before capture
         time.sleep(self.play_settle)
 
         # guard rail: expected runtime, else a generous default
@@ -344,6 +345,11 @@ class Orchestrator:
                                 self._ensure_fitted()
                                 fitted = self.browser.is_fitted()
                         self.browser.bar_status("rec", ep.code, secs, "ok" if audible else "mute")
+                    # tooltip net: no title attr = no native tooltip (whatever layer
+                    # owns it), and re-park clears one already showing + hover chrome.
+                    self.browser.strip_titles()
+                    if self.browser.maybe_repark():
+                        fr.event("mouse_repark", secs=secs)
                     # snapshot the full signal vector once per poll, before the
                     # break checks, so the flight log captures the deciding sample too.
                     vs = self.browser.video_state()
@@ -490,6 +496,7 @@ class Orchestrator:
         self.browser.bar_status("rec", code, 0, "ok")
         self._ensure_audible()
         self._ensure_fitted()
+        self.browser.park_mouse()      # clear stuck tooltips/hover before capture
         time.sleep(self.play_settle)
 
         # Runaway guard: EPG program length × factor, else a generous default. This
@@ -548,6 +555,9 @@ class Orchestrator:
                                 self._ensure_fitted(); fitted = self.browser.is_fitted()
                         self.browser.bar_status("rec", code, secs, "ok" if audible else "mute")
 
+                    self.browser.strip_titles()
+                    if self.browser.maybe_repark():
+                        fr.event("mouse_repark", secs=secs)
                     vs = self.browser.video_state()
                     fr.sample(ct=(vs["currentTime"] if vs else None),
                               dur=(vs["duration"] if vs else None),
@@ -671,12 +681,44 @@ def _mb(path):
         return 0
 
 
+def _pick_candidate(query, cands, label):
+    """Resolve match ambiguity. cands = [(tier, display, obj), ...] best-first.
+    Single sharp hit (tier <= 1, no same-tier rival) → silent. Fuzzy + tty →
+    numbered pick. Fuzzy + batch → top hit with a warning. None = cancelled."""
+    if not cands:
+        return None
+    if cands[0][0] <= 1 and (len(cands) == 1 or cands[1][0] > 1):
+        return cands[0][2]
+    if not sys.stdin.isatty():
+        _log(f"AVISO: match difuso '{query}' → '{cands[0][1]}' (tier {cands[0][0]})")
+        return cands[0][2]
+    _log(f"'{query}' no es exacto en {label} — candidatos:")
+    show_n = min(len(cands), 5)
+    for i, (tier, disp, _) in enumerate(cands[:show_n], 1):
+        print(f"  [{i}] {disp}", flush=True)
+    try:
+        raw = input(f"¿Cuál? [1-{show_n}, 0=cancelar] (1): ").strip()
+    except EOFError:
+        raw = ""
+    if raw == "0":
+        _log("cancelado por el operador")
+        return None
+    idx = int(raw) - 1 if raw.isdigit() and 1 <= int(raw) <= show_n else 0
+    return cands[idx][2]
+
+
 def _resolve_episodes(show, season, start, count):
     sc = SonarrClient()
-    s = sc.find_series(show)
+    cands = []
+    for c in sc.search_series(show):
+        year = " ({})".format(c["year"]) if c.get("year") else ""
+        cands.append((c["tier"], "{}{} [tvdb-{}]".format(c["title"], year, c["tvdb_id"]), c))
+    s = _pick_candidate(show, cands, "Sonarr")
     if not s:
         _log(f"'{show}' not found in Sonarr — check the name / SONARR_API_KEY")
         return None, None
+    year = " ({})".format(s["year"]) if s.get("year") else ""
+    _log(f"serie: {s['title']}{year} [tvdb-{s['tvdb_id']}]")
     eps = sc.get_episodes(s["id"], season=season)   # sorted by (season, number)
     if start and start > 0 and eps:
         # start = episode NUMBER. Anchor it to the chosen season, or — if none was
@@ -695,11 +737,16 @@ def _resolve_movie(query):
     so the 'season' is a one-item list the run loop walks once (no autoplay-next,
     no _advance)."""
     rc = RadarrClient()
-    m = rc.find_movie(query)
+    cands = []
+    for tier, m in rc.search_movies(query):
+        year = " ({})".format(m.year) if m.year else ""
+        cands.append((tier, f"{m.title}{year}", m))
+    m = _pick_candidate(query, cands, "Radarr")
     if not m:
         _log(f"'{query}' not found in Radarr — check the name / RADARR_API_KEY")
         return None, None
     disp = f"{m.title}{f' ({m.year})' if m.year else ''}"
+    _log(f"película: {disp}" + (f" [tmdb-{m.tmdb_id}]" if m.tmdb_id else ""))
     return disp, [m]
 
 

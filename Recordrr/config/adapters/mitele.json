@@ -1,0 +1,49 @@
+{
+  "service": "mitele",
+  "display": "Mitele",
+  "url": "https://www.mitele.es/",
+  "_untuned": true,
+  "_note": "BLIND STUB authored 2026-06-13 — never seen live DOM. Mediaset España free AVOD (Telecinco/Cuatro catalogs); free tier needs an account and is heavily ad-funded (mitele PLUS is the paid tier — do NOT assume it). Player is Mediaset's own; selector guesses are Spanish role/text first with generic video fallbacks. Run the 20.5d playbook on first login. Untuned ad-guard active.",
+  "timing": {
+    "play_settle": 8,
+    "ad_poll": 2,
+    "end_pad": 2,
+    "max_runtime_factor": 2.5
+  },
+  "controls": {
+    "play": [
+      {
+        "role": "button",
+        "name": "(?i)^(reproducir|pausar?|play|pause|reanudar)"
+      }
+    ],
+    "skip_intro": [
+      {
+        "text": "(?i)omitir (intro|introducci|resumen|cabecera)|saltar (intro|cabecera)"
+      }
+    ],
+    "next_episode": [
+      {
+        "text": "(?i)siguiente episodio|pr[óo]ximo episodio|siguiente cap[íi]tulo|next episode"
+      }
+    ],
+    "ad_marker": [
+      {
+        "text": "(?i)anuncio \\d+ de \\d+|publicidad|pausa publicitaria|tu contenido continuar[áa]|podr[áa]s saltar"
+      }
+    ],
+    "fullscreen": [
+      {
+        "role": "button",
+        "name": "(?i)pantalla completa|full ?screen"
+      }
+    ],
+    "unmute": [
+      {
+        "role": "button",
+        "name": "(?i)volumen|activar sonido|silenciar|un-?mute|^mute|volume"
+      }
+    ]
+  },
+  "mute_key": "m"
+}

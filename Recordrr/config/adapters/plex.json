@@ -1,0 +1,72 @@
+{
+  "service": "plex",
+  "display": "Plex",
+  "url": "https://app.plex.tv/",
+  "_untuned": false,
+  "_note": "TUNED from LIVE DOM 2026-06-13 (free-tier live TV + Farscape on-demand, operator logged in): player buttons have STABLE data-testids (PlayerIconButton family: closeButton, windowedButton, videoSettingsButton, volumeButton) — testid selectors OBSERVED, not guessed. Aria ENGLISH even with Spanish catalog. Live = true 1920x1080 (free tier!), duration = rolling buffer like RTVE live; live program rotation cuts via boundary_src (proven, 32min Farscape block). app.plex.tv covers free AVOD + friend servers (DRM-free, untested).",
+  "_ad_note": "Plex free ads are CSAI: a SECOND <video> element playing a plain https .mp4 (content <video> keeps its blob: src, PAUSES in place, stays mounted). Observed live 2026-06-13: 3 creatives/break (30s+30s+15s), ad element UNMOUNTS at break end, content resumes at same ct — so `video[src*='.mp4']` is an exact presence marker (resolve() count>0 semantics safe). WITHOUT the marker the ad's src swap false-trips boundary_src and KILLS the record mid-ad (happened live: E03 cut at 369s). End detection is suppressed while ad_active — marker firing fully protects. EPISODE-END INTERSTITIAL: Plex swaps the player to a 'PLAYING NEXT' countdown page at content end (no audible stream → unmute-reassert spam; got baked into a file tail 2026-06-13) → '(?i)playing next' is an ad_marker ON PURPOSE: pause hides the interstitial, next ep's content unmatches it, resume → boundary_src cuts with a clean tail. CAUTION: do NOT use 'up next' — that string lives permanently in the LIVE-TV player metadata (PlayerControlsMetadata 'Up Next: …') = would fake-ad every live record.",
+  "_live_note": "Player chrome exposes full live metadata in PlayerControlsMetadata-* components: 'Farscape', 'S1·E15—Durka Returns', 'Up Next: Farscape', channel name. A plex guide-client could name Programs straight from the DOM (Pluto-store style) — build when live recording here becomes regular.",
+  "timing": {
+    "play_settle": 8,
+    "ad_poll": 2,
+    "end_pad": 2,
+    "max_runtime_factor": 2.5
+  },
+  "live": {
+    "url": "https://app.plex.tv/desktop/#!/live-tv"
+  },
+  "controls": {
+    "play": [
+      {
+        "css": "[data-testid=playButton], [data-testid=pauseButton], [data-testid=resumeButton]"
+      },
+      {
+        "role": "button",
+        "name": "(?i)^(play|pause|resume|reproducir|pausar?|reanudar)"
+      }
+    ],
+    "skip_intro": [
+      {
+        "text": "(?i)skip (intro|credits|recap)|omitir (intro|introducci|resumen)"
+      }
+    ],
+    "next_episode": [
+      {
+        "css": "[data-testid*=upNext], [data-testid*=playNext]"
+      },
+      {
+        "text": "(?i)play next|next episode|up next|siguiente episodio"
+      }
+    ],
+    "ad_marker": [
+      {
+        "css": "video[src*='.mp4']"
+      },
+      {
+        "text": "(?i)playing next"
+      },
+      {
+        "text": "(?i)ad \\d+ of \\d+|anuncio \\d+ de \\d+|your (show|video) will resume|advertisement|publicidad"
+      }
+    ],
+    "fullscreen": [
+      {
+        "css": "[data-testid=fullscreenButton], [data-testid=windowedButton]"
+      },
+      {
+        "role": "button",
+        "name": "(?i)enter fullscreen|exit fullscreen|pantalla completa|full ?screen"
+      }
+    ],
+    "unmute": [
+      {
+        "css": "[data-testid=volumeButton]"
+      },
+      {
+        "role": "button",
+        "name": "(?i)(un)?mute volume|volumen|activar sonido|silenciar"
+      }
+    ]
+  },
+  "mute_key": "m"
+}
