@@ -710,10 +710,24 @@ config = {'AUTO': {'delay': 0, 'description_folder': None, 'dupe_similarity': 80
                      'signature': '\n'
                                   '[center][b]PLEASE SEED YU-SCENE FAMILY[/b][/center]\n'
                                   '[center][url=https://codeberg.org/RawSmoke/Singularity][img=400]https://i.ibb.co/2NVWb0c/uploadrr.webp[/img][/url][/center]'}},
+ # Este es el bloque que lee la Aduana (RawLoadrr/rawncher.py:113), NO el 'qbit'
+ # de dentro de TORRENT_CLIENTS.
+ #
+ # 'qbit_user' TIENE que ser el literal 'YOUR_USERNAME': el asistente decide si
+ # preguntarte la configuración comparando contra esa cadena exacta. Con
+ # cualquier otro valor el asistente NO se lanza en una instalación nueva, y el
+ # handshake se ejecuta directamente contra las credenciales de plantilla
+ # ('USERNAME'/'PASSWORD') y muere con "Connection refused". Verificado
+ # ejecutando rawncher.py con las dos plantillas sobre la misma imagen.
+ #
+ # (El puerto repetido en 'qbit_url' y 'qbit_port' hace que el log escriba
+ #  http://127.0.0.1:8888:8888. Es solo cosmético — qbittorrent-api usa el
+ #  puerto de la URL e ignora el redundante — y así lleva años en producción,
+ #  así que se deja como está.)
  'qbit': {'enable_search': True,
           'qbit_pass': 'PASSWORD',
           'qbit_port': '8888',
           'qbit_url': 'http://127.0.0.1:8888',
-          'qbit_user': 'USERNAME',
+          'qbit_user': 'YOUR_USERNAME',
           'torrent_storage_dir': '/app/RawLoadrr/qbit_backup'},
  'version': '1.0.7'}

@@ -4,7 +4,7 @@ services:
     image: rawsmoke/singularity-suite:latest
     container_name: singularity_core
     restart: unless-stopped
-    privileged: true
+    # Sin privileged: `devices:` + `group_add` bastan para /dev/dri.
     user: "${PUID:-1000}:${PGID:-1000}"
     group_add:
       - "997"         # Acceso directo al grupo 'render' (AMD/Intel)

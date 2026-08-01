@@ -4,7 +4,10 @@ services:
     image: rawsmoke/singularity-suite:latest
     container_name: singularity_core
     restart: unless-stopped
-    privileged: true
+    # Sin privileged. El acceso a la GPU lo dan `devices:` (/dev/dri) +
+    # `group_add` (render/video) más abajo; privileged era un resto de la fase
+    # de pruebas de v1.0 (commit 1573588, 2026-03-02) y nunca se revirtió.
+    # La variante de Windows ya corría sin él.
     # Recordrr: Chrome se cae con el /dev/shm por defecto (64MB).
     shm_size: "2gb"
     user: "${PUID:-1000}:${PGID:-1000}"
