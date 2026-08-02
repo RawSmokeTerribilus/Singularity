@@ -231,11 +231,12 @@ class RecordrrBrowser:
         return False
 
     def is_fitted(self) -> bool:
-        """True when the player is in the browser Fullscreen state — the ONLY clean
-        capture frame on this WM-less display. With no window manager, Chrome
-        --kiosk degrades to a normal window WITH a toolbar (the url bar bakes into
-        the file); the Fullscreen API hides Chrome's chrome WM-independently, which
-        is exactly what a manual F11 does.
+        """True when the player is in the browser Fullscreen state. The display now
+        runs the openbox WM (display.py start_wm, baked d143e70), so --kiosk genuinely
+        fills the screen WITHOUT a toolbar — but the Fullscreen API is still the
+        signal we trust: it hides Chrome's chrome regardless, exactly like a manual
+        F11, and the same check guards the safe 'f' toggle below. (History: pre-WM,
+        kiosk degraded to a toolbar'd window and the url bar baked into the file.)
 
         Signal = `document.fullscreenElement != null`, nothing more. This is also
         the SAFE toggle guard: 'f' enters fullscreen only when there's none, so we
@@ -269,6 +270,80 @@ class RecordrrBrowser:
                 "() => { try { localStorage.removeItem('recordrrCmd');"
                 " localStorage.removeItem('recordrrStatus');"
                 " localStorage.removeItem('recordrrLastMove'); } catch(e){} }")
+        except Exception:
+            pass
+
+    def seek_to_start(self, land: float = 3.0) -> bool:
+        """PAUSE the playback <video> and rewind it to t≈0 — leaving it paused on
+        frame 0 so the caller can cap.start() and only THEN resume_play(): capture
+        rolls before a single frame of content advances = zero loss. (The earlier
+        version seeked-then-waited-for-resume, which let 0→~2s play during the wait
+        and got recorded as 'started 2s in' — §20.5v.) The prep/settle window + the
+        autoplay transition gap are why episodes opened mid-action otherwise.
+        VOD-only by construction: bails when non-seekable or duration non-finite (a
+        live/linear <video> — RTVE/Pluto live — has a rolling buffer, no real 0), so
+        it's a no-op even if mistakenly enabled there. Polls until the seek lands
+        (currentTime≈0); SAFE to poll because the element is paused — nothing plays
+        while we wait. Returns True only when it paused+seeked."""
+        try:
+            ok = self.page.evaluate(
+                "() => { const vs=[...document.querySelectorAll('video')];"
+                " const v=vs.find(x=>!x.paused && x.currentTime>0)||vs[0];"
+                " if(!v||!isFinite(v.duration)||!v.seekable||v.seekable.length===0) return false;"
+                " try{ v.pause(); v.currentTime=0; }catch(e){ return false; }"
+                " return true; }")
+        except Exception:
+            return False
+        if not ok:
+            return False
+        end = time.time() + land
+        while time.time() < end:
+            st = self.video_state()
+            if st and (st.get("currentTime") or 0) < 0.5:
+                break
+            time.sleep(0.2)
+        return True
+
+    def resume_play(self) -> bool:
+        """Resume the playback <video> after a seek_to_start() pause. Used so capture
+        starts on a paused frame 0 and content only moves once ffmpeg is already
+        rolling (zero-loss start). play() is allowed: Chrome runs
+        --autoplay-policy=no-user-gesture-required and the operator already started
+        playback once (the gesture is spent)."""
+        try:
+            return bool(self.page.evaluate(
+                "() => { const vs=[...document.querySelectorAll('video')];"
+                " const v=vs.find(x=>x.currentTime<2)||vs[0];"
+                " if(!v) return false; try{ const p=v.play(); if(p) p.catch(()=>{}); }"
+                " catch(e){ return false; } return true; }"))
+        except Exception:
+            return False
+
+    def apply_hide_css(self, selectors):
+        """Hide adapter-named overlay elements from the CAPTURE by killing their
+        paint — Chrome never composites `display:none`, so x11grab can't bake them.
+        A persistent <style id=rr-hide> rule (NOT per-poll JS) auto-covers the
+        element however many times the SPA remounts it; that's why Plex's loading
+        Spinner — orphaned on the autoplay episode transition (§20.5u) — stays gone
+        for the rest of the run after one call. add_init_script re-applies the rule
+        after a navigation; evaluate() covers the page already open. Stall/boundary
+        logic reads <video> state, never the spinner, so hiding it blinds nothing.
+        No-op when the adapter sets no selectors. Call ONCE per session: repeated
+        add_init_script calls STACK (like install_bar)."""
+        sels = [s for s in (selectors or []) if s]
+        if not sels:
+            return
+        rule = ",".join(sels) + "{display:none!important}"
+        js = ("() => { let s=document.getElementById('rr-hide');"
+              " if(!s){ s=document.createElement('style'); s.id='rr-hide';"
+              " (document.head||document.documentElement).appendChild(s); }"
+              " s.textContent=" + repr(rule) + "; }")
+        try:
+            self.ctx.add_init_script(script="(" + js + ")()")
+        except Exception:
+            pass
+        try:
+            self.page.evaluate(js)
         except Exception:
             pass
 

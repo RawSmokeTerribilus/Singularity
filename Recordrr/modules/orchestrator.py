@@ -253,12 +253,20 @@ class Orchestrator:
         self.adapter.skip_intro(page)
         self.browser.park_mouse()      # clear stuck tooltips/hover before capture
         time.sleep(self.play_settle)
+        # rewind to t≈0 so we don't lose the cold open to the prep/settle window
+        # (every episode was opening mid-action — §20.5v). PAUSE@0 → cap.start →
+        # resume_play: capture rolls before any content advances = zero loss.
+        # No-op on live/non-seekable <video>; gated per adapter.
+        seeked = self.adapter.seek_start and self.browser.seek_to_start()
 
         # guard rail: expected runtime, else a generous default
         expected = ep.runtime or 3600
         deadline = time.time() + expected * self.max_factor
 
         self.cap.start(outfile)
+        if seeked:
+            self.browser.resume_play()    # content moves now, ffmpeg already rolling
+            _log(f"{ep.code} — captura desde t≈0 (rebobinado + reanudado)")
         self._verify_audio()    # console warning if the capture is silent
         start_t = time.time()
         ad_seen = 0
@@ -759,6 +767,7 @@ def _run_live(args):
     browser = RecordrrBrowser(args.profile)
     browser.open(live_url)
     browser.install_bar()
+    browser.apply_hide_css(adapter.hide_css)   # kill stuck capture overlays (§20.5u)
     guide = get_guide_client(adapter.name, browser)
 
     # Channel select is BEST-EFFORT: Pluto's channel `list` only hydrates on the
@@ -854,6 +863,7 @@ def main():
     browser = RecordrrBrowser(args.profile)
     browser.open(adapter.url)
     browser.install_bar()   # in-page control bar (REC/STOP) — no console needed
+    browser.apply_hide_css(adapter.hide_css)   # kill stuck capture overlays (§20.5u)
 
     if not args.no_wait:
         _log("VNC in (127.0.0.1:5900): loguéate si hace falta, navega al episodio,")

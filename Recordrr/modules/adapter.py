@@ -59,6 +59,19 @@ class Adapter:
         # --kiosk the window already fills the capture display, so player-fullscreen
         # is redundant there anyway. (asbuilt §20.5n)
         self.player_fullscreen = bool(spec.get("player_fullscreen", True))
+        # CSS selectors for overlay elements to hide from the CAPTURE (display:none
+        # → Chrome never paints them → x11grab can't bake them). For stuck/orphaned
+        # overlays a healthy player should have dismissed (Plex leaves its loading
+        # Spinner mounted after an autoplay episode transition — asbuilt §20.5u).
+        # Empty by default → no-op for every adapter that doesn't set it.
+        self.hide_css = [s for s in (spec.get("hide_css") or []) if s]
+        # Rewind the content <video> to t≈0 right before capture starts. The
+        # prep+settle window (and, on autoplay, the transition gap) lets several
+        # seconds play before cap.start, so every episode opened mid-action (E13
+        # began on the kiss, not the roses — 2026-06-13). Default OFF (untested
+        # adapters keep current behaviour); the seek itself no-ops on a non-
+        # seekable/live <video>. Enable per adapter once proven. (asbuilt §20.5v)
+        self.seek_start = bool(spec.get("seek_start", False))
 
     # ---- loading -------------------------------------------------------
     @classmethod
