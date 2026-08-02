@@ -3,7 +3,7 @@
   "display": "Atresplayer",
   "url": "https://www.atresplayer.com/",
   "_untuned": true,
-  "_note": "BLIND STUB authored 2026-06-10 — never seen live DOM (named in asbuilt future-adapters list). Atresmedia's player has historically been video.js-based, so vjs-* class fallbacks are included after the role/text guesses. Free tier is HEAVILY ad-funded — ad_marker matters here more than anywhere; expect real telemetry fast. Spanish-only UI. Run the 20.5d playbook on first login. Untuned ad-guard active.",
+  "_note": "PARTIAL RECON 2026-08-02 (live session, /directos/neox + Los Borbones VOD). OBSERVED: player is BITMOVIN, not video.js — container classes 'playerContainer playtres-container video bitmovinplayer-container aspect-16x9' inside 'a3mod_player player-video modVideo atresplayer'. The old .vjs-* fallbacks were a blind guess and are DEAD; left out. Player lives in the MAIN document, no iframe (not a crunchyroll case). Source ceiling 1280x720. AD SHAPE = a fourth kind, neither Plex-CSAI nor Prime-SSAI: during a break there is NO second <video> and no video in any of the 18 iframes; the content <video> keeps playing (paused=false, currentTime advancing) and the player merely mounts a DOM top bar over it — 'El contenido se encuentra en publicidad' in P.style__StyledMessage inside DIV.style__StyledAdvertismentTopBar (their typo: Advertisment, no 'e'). So boundary_src cannot false-trip on an ad here. Styled-components hash suffixes (jKRdqf/aRmsW) are build-volatile — anchor on the displayName prefix only. ad_marker MUST NOT match bare 'publicidad': the consent banner carries 'publicidad personalizada' and would fake-ad every run. LIVE PATH: /directos/<channel>/ gives duration=Infinity and currentTime as a UNIX EPOCH (EXT-X-PROGRAM-DATE-TIME), so live ct IS wall-clock — better than Pluto, no DVR-buffer correction needed — but VOD end-detection is dead there and there is no guide client yet, so live recording degrades to clock naming. TRAP: display/banner ads open a NEW TAB on click and steal the kiosk screen; fullscreen keeps them out of the x11grab, hence player_fullscreen stays true. STILL UNSEEN: the Bitmovin control DOM (play/unmute/fullscreen/skip/next — player was fullscreen with controls hidden) and VOD in-stream ad behaviour; the originals carry display ads only, so tune the ad path on U7D catch-up (lasexta/programas/*). Engine side already proven on this provider: capture/concat/remux/arr-naming all finalized clean. Untuned ad-guard still active.",
   "timing": {
     "play_settle": 8,
     "ad_poll": 2,
@@ -15,9 +15,6 @@
       {
         "role": "button",
         "name": "(?i)^(reproducir|pausar?|play|pause|reanudar)"
-      },
-      {
-        "css": ".vjs-play-control, .vjs-big-play-button"
       }
     ],
     "skip_intro": [
@@ -32,28 +29,22 @@
     ],
     "ad_marker": [
       {
-        "text": "(?i)anuncio \\d+ de \\d+|publicidad \\d|pausa publicitaria|la publicidad terminar[áa]"
+        "text": "(?i)se encuentra en publicidad"
       },
       {
-        "css": ".vjs-ad-playing"
+        "css": "[class*='StyledAdvertismentTopBar']"
       }
     ],
     "fullscreen": [
       {
         "role": "button",
         "name": "(?i)pantalla completa|full ?screen"
-      },
-      {
-        "css": ".vjs-fullscreen-control"
       }
     ],
     "unmute": [
       {
         "role": "button",
         "name": "(?i)volumen|activar sonido|silenciar|un-?mute|^mute|volume"
-      },
-      {
-        "css": ".vjs-mute-control"
       }
     ]
   },
