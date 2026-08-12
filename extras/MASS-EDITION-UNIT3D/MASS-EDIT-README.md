@@ -167,6 +167,27 @@ descargó. Si borraste el fichero, ese torrent no se puede regenerar desde aquí
 nadie más puede arreglarlo por ti, porque nadie más tiene tu copia. Por el mismo
 motivo, cada uploader afectado tiene que pasar esto en su propia máquina.
 
+### Modo de ejecución: usa los flags
+
+`--real` / `--dry-run` **mandan sobre cualquier `.env`**. El modo viajaba sólo en
+`ME_REGEN_DRY_RUN`, y un valor viejo en el fichero podía imponerse sobre lo que acababas de
+responder: hubo quien confirmó *"sí, edita el tracker"* y se pasó la tirada entera en simulacro
+sin escribir nada. Un argumento no lo pisa ningún fichero.
+
+```bash
+python3 05_image_regenerator.py --real  --todos   # edita de verdad
+python3 05_image_regenerator.py --dry-run --todos # sólo enseña el cambio
+```
+
+Si te quedas atascado en simulacro, mira la cabecera — siempre dice en cuál estás:
+
+```
+⚙️  Modo    : REAL — se editará el tracker
+⚙️  Modo    : SIMULACRO (no se escribe nada)
+```
+
+Arreglo directo: lanza con `--real`, o quita `ME_REGEN_DRY_RUN` de tu `.env`.
+
 ### Uso
 
 Desde el menú: **Singularity → 3 (UNIT3D Editor) → 3 (Regenerar imágenes desde el
