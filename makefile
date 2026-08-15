@@ -1,21 +1,27 @@
 SCRIPTS_SRC := RawLoadrr/src/trackers
 WORK_TRACKERS := work_data/trackers
 
-.PHONY: pull build up down restart logs attach shell install prep
+.PHONY: pull build up down restart logs attach shell install prep sync-defaults
 
 # --- 1. Comandos de Orquestación ---
 pull:
 	docker compose pull
 
 build:
-	docker build -t rawsmoke/singularity-suite:v3.0.2 .
-	docker tag rawsmoke/singularity-suite:v3.0.2 rawsmoke/singularity-suite:latest
+	docker build -t rawsmoke/singularity-suite:v3.0.9 .
+	docker tag rawsmoke/singularity-suite:v3.0.9 rawsmoke/singularity-suite:latest
 
 up: prep
 	docker compose up -d
 
 down:
 	docker compose down
+
+# Las plantillas de config van embebidas en final-user-install.sh; son copias.
+# Tras tocar cualquier config/*.example hay que volcarlas o las instalaciones
+# nuevas seguirán naciendo con la versión vieja.
+sync-defaults:
+	python3 sync-embedded-defaults.py
 
 restart:
 	docker compose restart
