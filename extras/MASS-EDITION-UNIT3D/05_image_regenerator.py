@@ -1,5 +1,11 @@
 """05_image_regenerator — regenera las capturas desde el medio original.
 
+Con --desde-cola toma la descripción ORIGINAL de la cola que dejó
+06_intruso al barrer, en vez de la página viva. Sirve cuando la limpieza
+de Intruso ya ha pasado: el spam se quita YA (no cuesta cuota de imágenes)
+y las galerías se regeneran después desde el medio local, que es el camino
+barato — sin descargar nada.
+
 Diferencia clave con 04_image_resurrector: 04 es un RE-SUBIDOR (lee PNGs que ya
 existen en la carpeta local de tmp y muere con "No hay imágenes locales" si la
 carpeta está vacía). Este módulo GENERA las capturas de cero a partir del
@@ -467,6 +473,27 @@ def _elegir_img_host(rl_config):
             continue
         return host
     return "imgbb"
+
+
+def _cargar_cola_intruso():
+    """La cola que dejó Intruso al barrer, con las descripciones ORIGINALES.
+
+    Sirve para el caso en que la limpieza de Intruso ya haya pasado: la página
+    viva no tiene enlaces muertos, así que el criterio normal de 05 no encuentra
+    nada, pero el sitio donde iba la galería sigue guardado aquí. Permite limpiar
+    el spam YA (que no cuesta cuota) y regenerar después desde el medio local,
+    sin perder el camino barato.
+    """
+    ruta = os.path.join(REGEN_STATE_DIR, f"intruso_cola_{_SUF}.json")
+    datos = _cargar_json(ruta)
+    entradas = datos.get("entradas") or []
+    if not entradas:
+        return {}, ruta
+    return {str(e["id"]): e.get("descripcion_original", "") for e in entradas}, ruta
+
+
+DESDE_COLA = bool(_ARGS & {"--desde-cola", "--from-queue"})
+COLA_INTRUSO = {}
 
 
 def _es_url_muerta(url):
@@ -1170,8 +1197,26 @@ def procesar(tid, media_root, session, site_base, rl_config, screens, img_host):
     if err:
         return False, err
 
+    base = desc_actual
+    origen = "la página"
+
     if not any(dead in desc_actual.lower() for dead in DEAD_HOSTS):
-        return True, "ya está limpio"
+        if not (DESDE_COLA and str(tid) in COLA_INTRUSO):
+            return True, "ya está limpio"
+
+        # La página ya la limpió Intruso: se reconstruye sobre el original
+        # guardado, que sí conserva dónde iba la galería.
+        base = COLA_INTRUSO[str(tid)]
+        origen = "la cola de Intruso"
+
+        if not any(dead in base.lower() for dead in DEAD_HOSTS):
+            return True, "ya está limpio (tampoco había nada en la cola)"
+
+        # Que nadie haya editado la página por medio: el texto que queda al
+        # quitar las imágenes tiene que ser el mismo en las dos versiones.
+        if _texto_sin_imagenes(base) != _texto_sin_imagenes(desc_actual):
+            return False, ("la página cambió desde el barrido de Intruso; "
+                           "no se reconstruye sobre el original")
 
     media_path = elegir_fichero(media_root)
     if not media_path:
@@ -1191,7 +1236,7 @@ def procesar(tid, media_root, session, site_base, rl_config, screens, img_host):
     # Tantas capturas como imágenes muertas haya: así la sustitución es 1 a 1 y
     # el documento no cambia en nada más. Aquí manda la descripción, no el
     # `screens` de RawLoadrr (que es el valor por defecto para subidas nuevas).
-    objetivo = contar_muertas(desc_actual) or 1
+    objetivo = contar_muertas(base) or 1
 
     image_list, err = regenerar_imagenes(
         media_path, uuid, objetivo, img_host, rl_config, reanudar
@@ -1199,7 +1244,7 @@ def procesar(tid, media_root, session, site_base, rl_config, screens, img_host):
     if err:
         return False, err
 
-    desc_nueva, n, err = sustituir_imagenes(desc_actual, image_list)
+    desc_nueva, n, err = sustituir_imagenes(base, image_list)
     if err:
         return False, err
 
@@ -1209,7 +1254,7 @@ def procesar(tid, media_root, session, site_base, rl_config, screens, img_host):
     # envía nada.
     if not desc_nueva.strip():
         return False, "la descripción resultante está vacía — abortado"
-    if _texto_sin_imagenes(desc_nueva) != _texto_sin_imagenes(desc_actual):
+    if _texto_sin_imagenes(desc_nueva) != _texto_sin_imagenes(base):
         return False, "el texto de fuera de las imágenes cambió — abortado"
 
     aviso = "" if len(image_list) == n else f"  ⚠️  {n} muertas pero sólo {len(image_list)} nuevas"
@@ -1255,7 +1300,8 @@ def procesar(tid, media_root, session, site_base, rl_config, screens, img_host):
             except OSError:
                 pass
 
-    return True, f"{n} etiqueta(s) → {len(image_list)} imagen(es) publicadas{aviso}"
+    return True, (f"{n} etiqueta(s) → {len(image_list)} imagen(es) publicadas"
+                  f"{'' if origen == 'la página' else ' [desde ' + origen + ']'}{aviso}")
 
 
 # ==========================================
@@ -1279,6 +1325,18 @@ def main():
     print(f"🖼️  Host    : {img_host}   (capturas: las que haga falta reponer en cada torrent)")
     print(f"⚙️  Modo    : {'SIMULACRO (no se escribe nada)' if DRY_RUN else 'REAL — se editará el tracker'}")
     print(f"☠️  Muertos : {', '.join(DEAD_HOSTS)}")
+
+    if DESDE_COLA:
+        global COLA_INTRUSO
+        COLA_INTRUSO, ruta_cola = _cargar_cola_intruso()
+        if not COLA_INTRUSO:
+            print(f"❌ --desde-cola pero no hay cola de Intruso en {ruta_cola}.")
+            print("   Lánzala antes con: 06_intruso.py --barrer")
+            return 1
+        print(f"📋 Cola de Intruso: {len(COLA_INTRUSO)} descripciones originales "
+              f"({os.path.basename(ruta_cola)})")
+        print("   Las páginas que Intruso ya limpió se reconstruyen sobre su original.")
+
     _auditar_cascada(rl_config)
 
     update_status("UNIT3D", "Regeneración de Imágenes", "PROCESSING",
