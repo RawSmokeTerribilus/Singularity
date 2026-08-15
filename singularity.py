@@ -605,12 +605,21 @@ def _me_intruso() -> None:
                 "ya no hay nada que buscar) y para cada torrent con seeds baja por\n"
                 "[bold]libtorrent[/bold] sólo unas ventanas del fichero, saca capturas y las\n"
                 "devuelve al sitio que ocupaba la galería. Borra los datos al terminar.\n\n"
-                "[dim]~26 MiB por torrent, no el fichero entero. Primero los que más seeds\n"
-                "tienen. Los que no tengan ninguno van a la lista de revisión manual.[/dim]",
+                "[dim]Baja sólo unas ventanas, no el fichero entero — cuánto depende del\n"
+                "tamaño de pieza: un BDREMUX de temporada se fue a 240 MiB con 4 capturas.\n"
+                "Tope de 3 GB por torrent (ME_INTRUSO_TOPE_GB). Primero los que más seeds\n"
+                "tienen; los que no tengan ninguno se saltan.[/dim]",
                 title="[bold cyan]REPONER GALERÍAS[/bold cyan]", border_style="cyan",
             ))
+        # OJO: en reposición el "seco" NO es gratis. Genera las capturas y las
+        # SUBE (hace falta el image_list para construir la descripción); lo único
+        # que se salta es el PATCH al tracker. Decir "sin escribir" a secas hacía
+        # creer que tampoco gastaba cuota de los hosts de imágenes.
+        _aviso_seco = ("enseña el cambio sin tocar el tracker"
+                       if accion == "2" else
+                       "no toca el tracker, pero SÍ genera y sube las capturas")
         seco = Prompt.ask(
-            "¿Ensayo en seco primero?  [dim](enseña qué se quitaría, sin escribir)[/dim]",
+            f"¿Ensayo en seco primero?  [dim]({_aviso_seco})[/dim]",
             choices=["s", "n"], default="s",
         )
         flags.append("--dry-run" if seco == "s" else "--real")

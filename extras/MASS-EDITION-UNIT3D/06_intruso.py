@@ -617,7 +617,14 @@ class _ServidorPiezas:
         # es lo que hace RawLoadrr al generar capturas, y así la galería
         # repuesta es coherente con las que ya existen en el tracker. Además
         # evita bajar trozos de varios ficheros.
-        fs = self.ti.files()
+        # `files()` y `file_at()` están deprecados en libtorrent 2.x, pero las
+        # bindings de Python no exponen file_path/file_size/file_offset en
+        # ningún otro sitio: el file_storage que devuelve `files()` es la única
+        # vía. Se silencia el aviso a propósito, no se ignora por pereza.
+        import warnings
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", DeprecationWarning)
+            fs = self.ti.files()
         mejor = None
         for i in sorted(range(fs.num_files()), key=lambda i: fs.file_path(i)):
             if fs.file_path(i).lower().endswith(R.VIDEO_EXT):
