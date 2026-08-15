@@ -585,8 +585,8 @@ def _me_intruso() -> None:
 
     accion = Prompt.ask(
         "\n¿Qué hacemos?"
-        "  [dim][1] barrer y construir la cola  ·  [2] barrer y limpiar[/dim]",
-        choices=["1", "2"], default="1",
+        "  [dim][1] barrer  ·  [2] limpiar enlaces muertos  ·  [3] reponer galerías[/dim]",
+        choices=["1", "2", "3"], default="1",
     )
 
     flags = []
@@ -597,6 +597,18 @@ def _me_intruso() -> None:
         flags.append("--barrer")
         console.print("[dim]Sólo se construirá la cola. No se toca el tracker.[/dim]")
     else:
+        if accion == "3":
+            flags.append("--reponer")
+            console.print()
+            console.print(Panel(
+                "Lee la cola guardada (no barre: la fase 1 ya quitó los enlaces, así que\n"
+                "ya no hay nada que buscar) y para cada torrent con seeds baja por\n"
+                "[bold]libtorrent[/bold] sólo unas ventanas del fichero, saca capturas y las\n"
+                "devuelve al sitio que ocupaba la galería. Borra los datos al terminar.\n\n"
+                "[dim]~26 MiB por torrent, no el fichero entero. Primero los que más seeds\n"
+                "tienen. Los que no tengan ninguno van a la lista de revisión manual.[/dim]",
+                title="[bold cyan]REPONER GALERÍAS[/bold cyan]", border_style="cyan",
+            ))
         seco = Prompt.ask(
             "¿Ensayo en seco primero?  [dim](enseña qué se quitaría, sin escribir)[/dim]",
             choices=["s", "n"], default="s",
