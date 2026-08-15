@@ -165,9 +165,31 @@ if ensure_env_keys(_ENV_PATH):
     except ImportError:
         pass
 
-DEAD_HOSTS = [h.strip().lower()
-              for h in os.getenv("ME_DEAD_HOSTS", "imgbox.com,pixhost.to").split(",")
-              if h.strip()]
+def _hosts_muertos():
+    """Qué hosts se consideran muertos EN ESTA TIRADA.
+
+    `--muertos a.com,b.net` manda sobre ME_DEAD_HOSTS. Tiene que ser bandera y
+    no variable de entorno por lo mismo que `--tracker`: config.py hace
+    load_dotenv(override=True), así que un `-e ME_DEAD_HOSTS=…` por delante del
+    comando se pierde. Y siendo global, dos tiradas simultáneas sobre trackers
+    distintos compartían valor: si cada tracker tiene su host caído, no había
+    forma de expresarlo.
+    """
+    args = sys.argv[1:]
+    crudo = None
+    for i, a in enumerate(args):
+        if a in ("--muertos", "--dead-hosts") and i + 1 < len(args):
+            crudo = args[i + 1]
+            break
+        if a.startswith(("--muertos=", "--dead-hosts=")):
+            crudo = a.split("=", 1)[1]
+            break
+    if crudo is None:
+        crudo = os.getenv("ME_DEAD_HOSTS", "imgbox.com,pixhost.to")
+    return [h.strip().lower() for h in crudo.split(",") if h.strip()]
+
+
+DEAD_HOSTS = _hosts_muertos()
 REGEN_IMG_HOST  = os.getenv("ME_REGEN_IMG_HOST", "").strip().lower()
 REGEN_SCREENS   = os.getenv("ME_REGEN_SCREENS", "").strip()
 REGEN_IMG_SIZE  = os.getenv("ME_REGEN_IMG_SIZE", "350").strip()

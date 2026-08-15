@@ -583,6 +583,17 @@ def _me_intruso() -> None:
         default="",
     ).strip().upper()
 
+    # Qué hosts se consideran muertos ES POR TRACKER: cada uno puede tener el
+    # suyo caído. Como bandera y no por .env, porque config.py hace
+    # load_dotenv(override=True) y además dos tiradas simultáneas compartirían
+    # el valor global.
+    _muertos = os.getenv("ME_DEAD_HOSTS", "imgbox.com")
+    console.print(f"\n[dim]Hosts considerados muertos: {_muertos}[/dim]")
+    nuevos_muertos = Prompt.ask(
+        "Hosts muertos a limpiar  [dim](separados por comas; Enter para mantener)[/dim]",
+        default="",
+    ).strip()
+
     accion = Prompt.ask(
         "\n¿Qué hacemos?"
         "  [dim][1] barrer  ·  [2] limpiar enlaces muertos  ·  [3] reponer galerías[/dim]",
@@ -592,6 +603,8 @@ def _me_intruso() -> None:
     flags = []
     if abbrev:
         flags += ["--tracker", abbrev]
+    if nuevos_muertos:
+        flags += ["--muertos", nuevos_muertos]
 
     if accion == "1":
         flags.append("--barrer")
