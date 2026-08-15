@@ -549,7 +549,10 @@ TOPE_GB     = float(os.getenv("ME_INTRUSO_TOPE_GB", "3"))
 TOPE_MIB    = int(os.getenv("ME_INTRUSO_TOPE_MIB", str(int(TOPE_GB * 1024))))
 ESPERA_MAX  = int(os.getenv("ME_INTRUSO_ESPERA_MAX", "180"))
 PUERTO      = int(os.getenv("ME_INTRUSO_PUERTO", "0"))  # 0 = puerto libre
-IFACE       = os.getenv("ME_INTRUSO_IFACE", "0.0.0.0:6881")
+# Puerto de escucha efímero (:0). Con uno fijo, dos torrentes seguidos pueden
+# solaparse mientras el anterior suelta el socket, y la sesión nueva se queda
+# sin escuchar — menos peers y ventanas que no llegan.
+IFACE       = os.getenv("ME_INTRUSO_IFACE", "0.0.0.0:0")
 
 
 def _descargar_torrent(session, tid):
@@ -639,6 +642,10 @@ class _ServidorPiezas:
         self.nombre = os.path.basename(fs.file_path(mejor))
         self.ruta = os.path.join(destino, fs.file_path(mejor))
         self.srv = None
+        # El handler corre en otro hilo: si _asegurar() revienta (piezas que no
+        # llegan, tope superado), la excepción moría ahí y ffmpeg sólo recibía
+        # datos truncados. Se guarda para poder decir QUÉ pasó de verdad.
+        self.ultimo_error = None
 
         # Cabecera y cola DEL FICHERO elegido. Sin nada deseado libtorrent
         # anuncia numwant=0 y el tracker no devuelve ni un peer (bloqueo
@@ -725,8 +732,9 @@ class _ServidorPiezas:
                         pos += len(datos)
                 except (BrokenPipeError, ConnectionResetError):
                     pass          # ffmpeg ya tiene lo que quería: es NORMAL
-                except Exception:
-                    pass
+                except Exception as exc:
+                    srv_self.ultimo_error = f"{type(exc).__name__}: {exc}"
+
 
         self.srv = http.server.ThreadingHTTPServer(("127.0.0.1", PUERTO), Handler)
         puerto = self.srv.server_address[1]
@@ -808,7 +816,8 @@ def capturar_desde_torrent(entrada, rl_config, img_host, session):
                 break
 
         if not pngs:
-            return None, "no se pudo extraer ninguna captura aprovechable"
+            motivo = srv.ultimo_error or "ffmpeg no devolvió ningún fotograma útil"
+            return None, f"sin capturas aprovechables ({motivo})"
 
         print(f"    📥 {srv.bajado_mib():.0f} MiB bajados · {len(pngs)} capturas", flush=True)
 
