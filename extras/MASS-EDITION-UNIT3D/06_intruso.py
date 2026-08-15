@@ -527,11 +527,19 @@ def main():
 # Es la cola guardada, que conserva la descripción original de cada página y por
 # tanto el sitio exacto donde iba la galería.
 REPUESTOS = os.path.join(ESTADO, f"intruso_repuestos_{_SUF}.txt")
+# Aplazados por CUOTA, no por avería. Se separan de la lista de revisión
+# humana porque no hay nada que revisar: cuando los hosts respiren, se
+# relanza y estos vuelven a intentarse tal cual.
+APLAZADOS = os.path.join(ESTADO, f"intruso_aplazados_{_SUF}.txt")
 DATOS_TMP = os.path.join(ESTADO, "intruso_torrents")
 
 VENTANAS   = [float(x) for x in
               (os.getenv("ME_INTRUSO_VENTANAS", "30,50,70").split(","))]
-POR_VENTANA = int(os.getenv("ME_INTRUSO_CAPS_POR_VENTANA", "3"))
+POR_VENTANA = int(os.getenv("ME_INTRUSO_CAPS_POR_VENTANA", "2"))
+# Tope DURO de capturas por torrent. Con ~1400 torrents, cada captura de más
+# son ~1400 subidas más contra unos hosts que van justos de cuota. 4 llegan
+# para una galería decente y hacen la campaña terminable.
+MAX_CAPS    = int(os.getenv("ME_INTRUSO_MAX_CAPS", "4"))
 # Cortafuegos por torrent, en GB. Generoso a propósito: un BDREMUX de
 # temporada tiene piezas enormes y tres ventanas se comieron 384 MiB, con lo
 # que un tope de 400 MiB cortaba justo lo que hacía falta. Esto no es una
@@ -787,6 +795,10 @@ def capturar_desde_torrent(entrada, rl_config, img_host, session):
                                capture_output=True, text=True, timeout=600)
                 if os.path.exists(salida) and os.path.getsize(salida) > 20000:
                     pngs.append(os.path.basename(salida))
+                if len(pngs) >= MAX_CAPS:
+                    break
+            if len(pngs) >= MAX_CAPS:
+                break
 
         if not pngs:
             return None, "no se pudo extraer ninguna captura aprovechable"
@@ -839,6 +851,19 @@ def _descripcion_con_galeria(original, actual, image_list):
     if actual.strip() == PLACEHOLDER:
         return bloque, "sustituyendo el aviso"
     return actual.rstrip() + "\n\n" + bloque, "añadida al final (la página había cambiado)"
+
+
+_MOTIVOS_CUOTA = (
+    "hosts de imágenes han fallado",
+    "no devolvió ninguna URL",
+    "Rate limit",
+    "rate limit",
+)
+
+
+def _es_falta_de_cuota(mensaje):
+    """¿El fallo es 'ahora no hay cuota' en vez de 'este torrent está roto'?"""
+    return any(m in (mensaje or "") for m in _MOTIVOS_CUOTA)
 
 
 def reponer_uno(session, entrada, rl_config, img_host):
@@ -896,7 +921,7 @@ def fase_reponer(session, cola, rl_config):
           f"× {POR_VENTANA} capturas · tope {TOPE_MIB/1024:.1f} GB por torrent")
     print(f"   Modo: {'SIMULACRO (no se escribe nada)' if DRY_RUN else 'REAL'}\n")
 
-    ok_n = fail_n = seguidos = 0
+    ok_n = fail_n = seguidos = cuota_n = 0
     for i, e in enumerate(pend, 1):
         print(f"[{i}/{len(pend)}] ID {e['id']}  ({e['uploader']}, seeds={e['seeders']})  "
               f"{e['nombre'][:48]}", flush=True)
@@ -915,7 +940,12 @@ def fase_reponer(session, cola, rl_config):
             fail_n += 1
             seguidos += 1
             print(f"    ❌ {msg}", flush=True)
-            _anotar_manual(e, f"reposición: {msg}"[:120])
+            # Un fallo de cuota no es un torrent roto: es un "ahora no".
+            if _es_falta_de_cuota(msg):
+                cuota_n += 1
+                _marcar(APLAZADOS, e["id"], msg[:80])
+            else:
+                _anotar_manual(e, f"reposición: {msg}"[:120])
             if "sesión caducada" in msg:
                 print("\n🛑 Sesión caducada. Paro; al relanzar continúa por donde iba.")
                 break
@@ -926,10 +956,16 @@ def fase_reponer(session, cola, rl_config):
         if i < len(pend):
             time.sleep(random.uniform(DELAY_MIN, DELAY_MAX))
 
-    print(f"\n✅ Repuestos: {ok_n}   ❌ Fallos: {fail_n}")
+    print(f"\n✅ Repuestos: {ok_n}   ❌ Fallos: {fail_n}"
+          + (f"   ⏸️  Aplazados por cuota: {cuota_n}" if cuota_n else ""))
     if not DRY_RUN:
         print(f"   Reanudable          : {REPUESTOS}")
-    print(f"   Para revisar a mano : {MANUAL}")
+    if cuota_n:
+        print(f"   Aplazados por cuota : {APLAZADOS}")
+        print("   No están marcados como hechos: relanza cuando los hosts respiren "
+              "y se reintentan solos.")
+    if fail_n - cuota_n > 0:
+        print(f"   Para revisar a mano : {MANUAL}")
     return ok_n, fail_n
 
 if __name__ == "__main__":
