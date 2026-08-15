@@ -70,3 +70,11 @@ simpleobsws==1.4.3
 # against the R73 C library is a version mismatch. Bump both together or neither.
 vapoursynth==73
 awsmfunc==1.3.5
+
+# Intruso — recuperación de galerías en torrents de OTROS usuarios
+# Control por PIEZA (piece_priority / set_piece_deadline / read_piece) para bajar
+# sólo unas ventanas del fichero en vez del torrent entero. La API de qBittorrent
+# no llega: sólo tiene prioridad por FICHERO y modo secuencial.
+# Hay rueda manylinux para x86_64 Y aarch64 (cp39-cp313), así que la RPi de
+# Singularity_Lite no compila nada.
+libtorrent==2.1.1

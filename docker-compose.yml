@@ -49,6 +49,9 @@ services:
       - ./work_data/mass_editor/mapeo_maestro.json:/app/extras/MASS-EDITION-UNIT3D/mapeo_maestro.json:z
       - ./work_data/mass_editor/titulos_mapa.json:/app/extras/MASS-EDITION-UNIT3D/titulos_mapa.json:z
       - ./work_data/mass_editor/mapeo_por_titulo.json:/app/extras/MASS-EDITION-UNIT3D/mapeo_por_titulo.json:z
+      # Estado de 05/06 (colas, marcadores, mapas). /app es capa de IMAGEN:
+      # sin este montaje un --force-recreate se lleva la campaña por delante.
+      - ./work_data/mass_editor/estado:/app/estado
       - ./work_data/tmp:/app/RawLoadrr/tmp:z
       - ./work_data/logs:/app/logs:z
       - ./work_data/reports:/app/MKVerything/docs:z
