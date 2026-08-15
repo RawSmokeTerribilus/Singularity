@@ -532,7 +532,13 @@ DATOS_TMP = os.path.join(ESTADO, "intruso_torrents")
 VENTANAS   = [float(x) for x in
               (os.getenv("ME_INTRUSO_VENTANAS", "30,50,70").split(","))]
 POR_VENTANA = int(os.getenv("ME_INTRUSO_CAPS_POR_VENTANA", "3"))
-TOPE_MIB    = int(os.getenv("ME_INTRUSO_TOPE_MIB", "400"))
+# Cortafuegos por torrent, en GB. Generoso a propósito: un BDREMUX de
+# temporada tiene piezas enormes y tres ventanas se comieron 384 MiB, con lo
+# que un tope de 400 MiB cortaba justo lo que hacía falta. Esto no es una
+# cuota de ahorro, es una red por si algo se desboca; los datos se borran al
+# terminar cada torrent, así que el disco no acumula.
+TOPE_GB     = float(os.getenv("ME_INTRUSO_TOPE_GB", "3"))
+TOPE_MIB    = int(os.getenv("ME_INTRUSO_TOPE_MIB", str(int(TOPE_GB * 1024))))
 ESPERA_MAX  = int(os.getenv("ME_INTRUSO_ESPERA_MAX", "180"))
 PUERTO      = int(os.getenv("ME_INTRUSO_PUERTO", "0"))  # 0 = puerto libre
 IFACE       = os.getenv("ME_INTRUSO_IFACE", "0.0.0.0:6881")
@@ -887,7 +893,7 @@ def fase_reponer(session, cola, rl_config):
           f"(ya repuestos: {len(hechos)} · sin seeds, no reparables: {sin_seeds})")
     print(f"   Host de imágenes: {img_host}")
     print(f"   Ventanas: {', '.join(str(int(v)) + '%' for v in VENTANAS)} "
-          f"× {POR_VENTANA} capturas · tope {TOPE_MIB} MiB por torrent")
+          f"× {POR_VENTANA} capturas · tope {TOPE_MIB/1024:.1f} GB por torrent")
     print(f"   Modo: {'SIMULACRO (no se escribe nada)' if DRY_RUN else 'REAL'}\n")
 
     ok_n = fail_n = seguidos = 0
