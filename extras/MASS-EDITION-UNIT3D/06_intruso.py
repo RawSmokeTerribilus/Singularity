@@ -11,7 +11,7 @@ Intruso trabaja en dos pasadas, y son deliberadamente independientes:
       Barre el tracker entero, guarda la cola CON LA DESCRIPCIÓN ORIGINAL y
       quita los enlaces muertos de todas las páginas. El spam desaparece hoy.
 
-  FASE 2 · reparar   (horas, reanudable)   [pendiente]
+  FASE 2 · reponer   (horas, reanudable)   --reponer
       Trabaja la cola guardada: baja unas ventanas de piezas por libtorrent,
       saca capturas y las devuelve a su sitio.
 
@@ -24,14 +24,18 @@ Por qué la cola se guarda ANTES de limpiar:
 Uso:
     python3 06_intruso.py --limpiar [--real|--dry-run] [--tracker NOBS]
     python3 06_intruso.py --barrer                 # sólo construir la cola
+    python3 06_intruso.py --reponer [--real] [--limite N]
 """
 
 import json
 import os
 import random
 import re
+import shutil
+import subprocess
 import sys
 import time
+import urllib.parse
 import importlib.util
 from datetime import datetime
 
@@ -507,9 +511,420 @@ def main():
         print("\n(--barrer: sólo se ha construido la cola, no se ha tocado nada)")
         return 0
 
+    if _ARGS & {"--reponer", "--reparar"}:
+        fase_reponer(session, cola, rl)
+        return 0
+
     fase_limpiar(session, cola)
     return 0
 
+
+
+# ==========================================
+# 🔧 FASE 2 — REPONER GALERÍAS (libtorrent)
+# ==========================================
+# El selector NO son los enlaces muertos: ya no existen, los quitó la fase 1.
+# Es la cola guardada, que conserva la descripción original de cada página y por
+# tanto el sitio exacto donde iba la galería.
+REPUESTOS = os.path.join(ESTADO, f"intruso_repuestos_{_SUF}.txt")
+DATOS_TMP = os.path.join(ESTADO, "intruso_torrents")
+
+VENTANAS   = [float(x) for x in
+              (os.getenv("ME_INTRUSO_VENTANAS", "30,50,70").split(","))]
+POR_VENTANA = int(os.getenv("ME_INTRUSO_CAPS_POR_VENTANA", "3"))
+TOPE_MIB    = int(os.getenv("ME_INTRUSO_TOPE_MIB", "400"))
+ESPERA_MAX  = int(os.getenv("ME_INTRUSO_ESPERA_MAX", "180"))
+PUERTO      = int(os.getenv("ME_INTRUSO_PUERTO", "0"))  # 0 = puerto libre
+IFACE       = os.getenv("ME_INTRUSO_IFACE", "0.0.0.0:6881")
+
+
+def _descargar_torrent(session, tid):
+    """El .torrent desde la API. UNIT3D le inyecta TU passkey en el announce."""
+    r = session.get(f"{SITE_BASE}/api/torrents/{tid}",
+                    params={"api_token": R.TRACKER_API_KEY},
+                    headers={"Accept": "application/json",
+                             "User-Agent": R.CUSTOM_USER_AGENT}, timeout=30)
+    if r.status_code != 200:
+        return None, f"la API no devolvió el torrent (HTTP {r.status_code})"
+    datos = r.json()
+    attrs = datos.get("attributes") or datos.get("data", {}).get("attributes", {})
+    enlace = attrs.get("download_link")
+    if not enlace:
+        return None, "la API no trae download_link"
+    t = session.get(enlace, headers={"User-Agent": R.CUSTOM_USER_AGENT}, timeout=60)
+    if t.status_code != 200 or not t.content.startswith(b"d"):
+        return None, f"la descarga del .torrent falló (HTTP {t.status_code})"
+    os.makedirs(DATOS_TMP, exist_ok=True)
+    ruta = os.path.join(DATOS_TMP, f"{tid}.torrent")
+    with open(ruta, "wb") as f:
+        f.write(t.content)
+    return ruta, None
+
+
+class _ServidorPiezas:
+    """libtorrent + servidor HTTP que BLOQUEA hasta que llega la pieza.
+
+    Es como lo hacen Kodi/elementum: ffmpeg lee por HTTP con Range y nunca ve un
+    agujero, porque la lectura ESPERA en vez de devolver ceros. Así no hay que
+    llevar registro de qué rangos han llegado.
+    """
+
+    def __init__(self, ruta_torrent, destino):
+        import libtorrent as lt
+        self.lt = lt
+        self.ses = lt.session({
+            "listen_interfaces": IFACE,
+            "enable_dht": False, "enable_lsd": False,
+            "enable_upnp": False, "enable_natpmp": False,
+            "alert_mask": lt.alert.category_t.error_notification,
+        })
+        self.ti = lt.torrent_info(ruta_torrent)
+        par = lt.add_torrent_params()
+        par.ti = self.ti
+        par.save_path = destino
+        # auto_managed + 0 piezas deseadas => libtorrent PAUSA el torrent y no
+        # llama a nadie. Hay que quitar los dos flags a mano.
+        par.flags &= ~lt.torrent_flags.auto_managed
+        par.flags &= ~lt.torrent_flags.paused
+        self.h = self.ses.add_torrent(par)
+        self.n = self.ti.num_pieces()
+        self.pieza = self.ti.piece_length()
+        self.tam = self.ti.total_size()
+        self.h.prioritize_pieces([0] * self.n)
+        # Cabecera y cola YA: sin nada deseado libtorrent anuncia numwant=0 y el
+        # tracker no devuelve ni un peer (bloqueo circular). Además son las que
+        # ffmpeg pedirá sí o sí (EBML al principio, Cues al final).
+        self.h.resume()
+
+        # Un torrent puede ser multi-fichero (packs de temporada). Se elige el
+        # vídeo más grande y se trabaja con SU rango dentro del torrent: las
+        # piezas van por offset global, pero ffmpeg lee el fichero suelto.
+        # En un pack de temporada se coge el PRIMER vídeo, no el más grande:
+        # es lo que hace RawLoadrr al generar capturas, y así la galería
+        # repuesta es coherente con las que ya existen en el tracker. Además
+        # evita bajar trozos de varios ficheros.
+        fs = self.ti.files()
+        mejor = None
+        for i in sorted(range(fs.num_files()), key=lambda i: fs.file_path(i)):
+            if fs.file_path(i).lower().endswith(R.VIDEO_EXT):
+                mejor = i
+                break
+        if mejor is None:
+            raise RuntimeError("el torrent no contiene ningún fichero de vídeo")
+
+        self.idx = mejor
+        self.off = fs.file_offset(mejor)          # offset global de ESE fichero
+        self.tam = fs.file_size(mejor)            # y su tamaño (no el del torrent)
+        self.nombre = os.path.basename(fs.file_path(mejor))
+        self.ruta = os.path.join(destino, fs.file_path(mejor))
+        self.srv = None
+
+        # Cabecera y cola DEL FICHERO elegido. Sin nada deseado libtorrent
+        # anuncia numwant=0 y el tracker no devuelve ni un peer (bloqueo
+        # circular); y son justo las piezas que ffmpeg pedirá sí o sí (EBML al
+        # principio, Cues al final en MKV).
+        pc = self.pieza
+        for p in (list(range(self.off // pc, self.off // pc + 4))
+                  + list(range(max(0, (self.off + self.tam - 1) // pc - 3),
+                               (self.off + self.tam - 1) // pc + 1))):
+            if 0 <= p < self.n:
+                self.h.piece_priority(p, 7)
+                self.h.set_piece_deadline(p, 1000, 0)
+
+    def esperar_peers(self, seg=60):
+        t0 = time.time()
+        while time.time() - t0 < seg:
+            if self.h.status().num_peers > 0:
+                return self.h.status().num_peers
+            time.sleep(0.5)
+        return 0
+
+    def bajado_mib(self):
+        return self.h.status().total_done / 2 ** 20
+
+    def _asegurar(self, desde, hasta):
+        p0 = desde // self.pieza
+        p1 = min((hasta - 1) // self.pieza, self.n - 1)
+        faltan = [p for p in range(p0, p1 + 1) if not self.h.have_piece(p)]
+        for p in faltan:
+            self.h.piece_priority(p, 7)
+            self.h.set_piece_deadline(p, 1000, 0)
+        t0 = time.time()
+        while faltan:
+            if self.bajado_mib() > TOPE_MIB:
+                raise RuntimeError(f"tope de {TOPE_MIB} MiB superado")
+            if time.time() - t0 > ESPERA_MAX:
+                raise TimeoutError(f"las piezas {faltan[:3]} no llegaron en {ESPERA_MAX}s")
+            time.sleep(0.2)
+            faltan = [p for p in faltan if not self.h.have_piece(p)]
+
+    def arrancar(self):
+        import http.server, threading
+        srv_self = self
+
+        class Handler(http.server.BaseHTTPRequestHandler):
+            protocol_version = "HTTP/1.1"
+
+            def log_message(self, *a):
+                pass
+
+            def _rango(self):
+                r = self.headers.get("Range")
+                if not r or not r.startswith("bytes="):
+                    return 0, srv_self.tam - 1
+                a, _, b = r[6:].partition("-")
+                return (int(a) if a else 0), (min(int(b), srv_self.tam - 1) if b else srv_self.tam - 1)
+
+            def do_HEAD(self):
+                self.send_response(200)
+                self.send_header("Content-Length", str(srv_self.tam))
+                self.send_header("Accept-Ranges", "bytes")
+                self.end_headers()
+
+            def do_GET(self):
+                ini, fin = self._rango()
+                parcial = self.headers.get("Range") is not None
+                self.send_response(206 if parcial else 200)
+                if parcial:
+                    self.send_header("Content-Range", f"bytes {ini}-{fin}/{srv_self.tam}")
+                self.send_header("Content-Length", str(fin - ini + 1))
+                self.send_header("Accept-Ranges", "bytes")
+                self.end_headers()
+                pos, TROZO = ini, 1 << 20
+                try:
+                    while pos <= fin:
+                        hasta = min(pos + TROZO, fin + 1)
+                        srv_self._asegurar(srv_self.off + pos, srv_self.off + hasta)
+                        with open(srv_self.ruta, "rb") as f:
+                            f.seek(pos)
+                            datos = f.read(hasta - pos)
+                        if not datos:
+                            break
+                        self.wfile.write(datos)
+                        pos += len(datos)
+                except (BrokenPipeError, ConnectionResetError):
+                    pass          # ffmpeg ya tiene lo que quería: es NORMAL
+                except Exception:
+                    pass
+
+        self.srv = http.server.ThreadingHTTPServer(("127.0.0.1", PUERTO), Handler)
+        puerto = self.srv.server_address[1]
+        threading.Thread(target=self.srv.serve_forever, daemon=True).start()
+        return f"http://127.0.0.1:{puerto}/{urllib.parse.quote(self.nombre)}"
+
+    def cerrar(self):
+        # ORDEN IMPORTANTE: parar el servidor del todo ANTES de soltar el
+        # handle, o un hilo vivo toca un handle muerto -> "invalid torrent
+        # handle [libtorrent:20]". Con 1400 torrents eso deja hilos colgando.
+        if self.srv:
+            try:
+                self.srv.shutdown()
+                self.srv.server_close()
+            except Exception:
+                pass
+        try:
+            # event=stopped OBLIGATORIO: sin él el peer sigue vivo en la memoria
+            # del announce durante ACTIVE_PEER_TTL, y con
+            # MAX_PEERS_PER_TORRENT_PER_USER=3 tres tiradas agotan el cupo del
+            # torrent ("You already have 3 peers on this torrent").
+            self.h.pause()
+            time.sleep(5)
+            self.ses.remove_torrent(self.h, self.lt.session.delete_files)
+            time.sleep(2)
+        except Exception:
+            pass
+
+
+def capturar_desde_torrent(entrada, rl_config, img_host, session):
+    """Baja unas ventanas del fichero, saca capturas y las sube.
+
+    Devuelve (image_list, None) o (None, motivo). No deja datos en disco.
+    """
+    tid = entrada["id"]
+    ruta_torrent, err = _descargar_torrent(session, tid)
+    if err:
+        return None, err
+
+    destino = os.path.join(DATOS_TMP, f"d{tid}")
+    os.makedirs(destino, exist_ok=True)
+    carpeta = os.path.join(R.RAWLOADRR_DIR, "tmp", f"intruso_{tid}__{_SUF}")
+    os.makedirs(carpeta, exist_ok=True)
+    srv = None
+    try:
+        srv = _ServidorPiezas(ruta_torrent, destino)
+        peers = srv.esperar_peers()
+        if not peers:
+            return None, "ningún peer respondió (¿sin seeds ahora mismo?)"
+
+        url = srv.arrancar()
+
+        pr = subprocess.run(["ffprobe", "-v", "error", "-seekable", "1",
+                             "-show_entries", "format=duration", "-of", "csv=p=0", url],
+                            capture_output=True, text=True, timeout=300)
+        dur = float((pr.stdout or "0").strip() or 0)
+        if dur <= 0:
+            return None, "ffprobe no pudo leer la duración"
+
+        pngs = []
+        for v in VENTANAS:
+            base = dur * v / 100.0
+            for k in range(POR_VENTANA):
+                # Capturas juntas dentro de la MISMA ventana: así se aprovecha
+                # lo ya descargado en vez de abrir otra ventana por captura.
+                ts = base + k * 12
+                if ts >= dur:
+                    continue
+                salida = os.path.join(carpeta, f"intruso-{int(v)}-{k}.png")
+                subprocess.run(["ffmpeg", "-y", "-v", "error", "-seekable", "1",
+                                "-ss", str(int(ts)), "-i", url,
+                                "-frames:v", "1", "-q:v", "2", salida],
+                               capture_output=True, text=True, timeout=600)
+                if os.path.exists(salida) and os.path.getsize(salida) > 20000:
+                    pngs.append(os.path.basename(salida))
+
+        if not pngs:
+            return None, "no se pudo extraer ninguna captura aprovechable"
+
+        print(f"    📥 {srv.bajado_mib():.0f} MiB bajados · {len(pngs)} capturas", flush=True)
+
+        from src.prep import Prep
+        prep = Prep(screens=len(pngs), img_host=img_host, config=rl_config)
+        meta = {"base_dir": R.RAWLOADRR_DIR, "uuid": os.path.basename(carpeta),
+                "path": srv.ruta, "filename": "intruso", "image_list": [],
+                "imghost": img_host, "ffdebug": False, "vapoursynth": False}
+        cwd = os.getcwd()
+        try:
+            image_list, _ = prep.upload_screens(meta, len(pngs), 1, 0, len(pngs), pngs, {})
+        except KeyError as e:
+            if re.fullmatch(r"img_host_\d+", str(e).strip("'\"")):
+                return None, "todos los hosts de imágenes han fallado (cascada agotada)"
+            raise
+        finally:
+            os.chdir(cwd)
+
+        if not image_list:
+            return None, "el host de imágenes no devolvió ninguna URL"
+        return image_list, None
+    finally:
+        if srv:
+            srv.cerrar()
+        for d in (destino, carpeta):
+            shutil.rmtree(d, ignore_errors=True)
+        try:
+            os.remove(ruta_torrent)
+        except OSError:
+            pass
+
+
+def _descripcion_con_galeria(original, actual, image_list):
+    """Devuelve la descripción a publicar, con la galería en su sitio.
+
+    `original` (de la cola) marca DÓNDE iba: se reconstruye sobre ella
+    sustituyendo el bloque de imágenes muertas. Antes se comprueba que nadie
+    haya editado la página por medio comparando el texto visible; si difiere, se
+    respeta lo que hay ahora y la galería va al final.
+    """
+    # sustituir_imagenes devuelve TRES valores: (texto, n, motivo_si_falla)
+    nueva_orig, n, _motivo = R.sustituir_imagenes(original, image_list)
+    if n and nueva_orig and _texto_visible(original) == _texto_visible(actual):
+        return nueva_orig, "en su sitio original"
+
+    bloque = "[center]" + R._bbcode(image_list, R._size_attr()) + "[/center]"
+    if actual.strip() == PLACEHOLDER:
+        return bloque, "sustituyendo el aviso"
+    return actual.rstrip() + "\n\n" + bloque, "añadida al final (la página había cambiado)"
+
+
+def reponer_uno(session, entrada, rl_config, img_host):
+    tid = entrada["id"]
+    if not int(entrada.get("seeders") or 0):
+        return False, "sin seeds: no hay de dónde sacar las capturas"
+
+    form, soup, edit_url, err = R.leer_formulario(session, SITE_BASE, tid)
+    if err:
+        return False, err
+    actual, err = R.leer_descripcion(session, SITE_BASE, tid, soup)
+    if err:
+        return False, err
+
+    image_list, err = capturar_desde_torrent(entrada, rl_config, img_host, session)
+    if err:
+        return False, err
+
+    nueva, donde = _descripcion_con_galeria(
+        entrada["descripcion_original"], actual, image_list)
+
+    if quedan_muertos(nueva):
+        return False, "la reconstrucción reintroduciría enlaces muertos — abortado"
+
+    if DRY_RUN:
+        return True, f"SIMULACRO: {len(image_list)} imagen(es) {donde}"
+
+    payload = R.construir_payload(form, nueva)
+    ok, msg = R.enviar(session, form, payload, SITE_BASE, edit_url)
+    if not ok:
+        return False, msg
+
+    ok, msg = R.verificar(session, SITE_BASE, tid, image_list)
+    if not ok:
+        return False, msg
+    return True, f"{len(image_list)} imagen(es) publicadas, {donde}"
+
+
+def fase_reponer(session, cola, rl_config):
+    img_host = R._elegir_img_host(rl_config)
+    hechos = _leer_marcador(REPUESTOS)
+    # El selector es la COLA, no los enlaces: la fase 1 ya los quitó. Primero
+    # los que más seeds tienen, que son los que menos van a hacer esperar.
+    pend = [e for e in cola
+            if e["id"] not in hechos and int(e.get("seeders") or 0) > 0]
+    pend.sort(key=lambda e: -int(e.get("seeders") or 0))
+    if LIMITE:
+        pend = pend[:LIMITE]
+
+    sin_seeds = sum(1 for e in cola if not int(e.get("seeders") or 0))
+    print(f"\n🔧 Fase 2 · reponer galerías — {len(pend)} por hacer "
+          f"(ya repuestos: {len(hechos)} · sin seeds, no reparables: {sin_seeds})")
+    print(f"   Host de imágenes: {img_host}")
+    print(f"   Ventanas: {', '.join(str(int(v)) + '%' for v in VENTANAS)} "
+          f"× {POR_VENTANA} capturas · tope {TOPE_MIB} MiB por torrent")
+    print(f"   Modo: {'SIMULACRO (no se escribe nada)' if DRY_RUN else 'REAL'}\n")
+
+    ok_n = fail_n = seguidos = 0
+    for i, e in enumerate(pend, 1):
+        print(f"[{i}/{len(pend)}] ID {e['id']}  ({e['uploader']}, seeds={e['seeders']})  "
+              f"{e['nombre'][:48]}", flush=True)
+        try:
+            ok, msg = reponer_uno(session, e, rl_config, img_host)
+        except Exception as ex:
+            ok, msg = False, f"excepción: {ex}"
+
+        if ok:
+            ok_n += 1
+            seguidos = 0
+            print(f"    ✨ {msg}", flush=True)
+            if not DRY_RUN:
+                _marcar(REPUESTOS, e["id"])
+        else:
+            fail_n += 1
+            seguidos += 1
+            print(f"    ❌ {msg}", flush=True)
+            _anotar_manual(e, f"reposición: {msg}"[:120])
+            if "sesión caducada" in msg:
+                print("\n🛑 Sesión caducada. Paro; al relanzar continúa por donde iba.")
+                break
+            if seguidos >= 8:
+                print("\n🛑 8 fallos seguidos. Paro para que le eches un ojo.")
+                break
+
+        if i < len(pend):
+            time.sleep(random.uniform(DELAY_MIN, DELAY_MAX))
+
+    print(f"\n✅ Repuestos: {ok_n}   ❌ Fallos: {fail_n}")
+    if not DRY_RUN:
+        print(f"   Reanudable          : {REPUESTOS}")
+    print(f"   Para revisar a mano : {MANUAL}")
+    return ok_n, fail_n
 
 if __name__ == "__main__":
     sys.exit(main())
