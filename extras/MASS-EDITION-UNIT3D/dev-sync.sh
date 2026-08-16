@@ -24,6 +24,7 @@ CODE=(
   03_mass_updater.py
   04_image_resurrector.py
   05_image_regenerator.py
+  06_intruso.py
   MASS-EDIT-README.md
 )
 for f in "${CODE[@]}"; do

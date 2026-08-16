@@ -71,6 +71,18 @@ ESTADO       = R.REGEN_STATE_DIR
 DELAY_MIN    = R.DELAY_MIN
 DELAY_MAX    = R.DELAY_MAX
 
+# Las capturas se escriben ya en JPG en vez de PNG: aquí las genera ffmpeg
+# directamente, así que no hace falta el paso de recodificado de 05.a_jpg().
+# El motivo es el mismo (ver a_jpg): un PNG de 1-12 MiB revienta a los cuatro
+# hosts de la cascada a la vez. El `-q:v` que ya se pasaba era papel mojado —
+# el codificador PNG lo ignora.
+_EXT_CAP = "jpg" if R.REGEN_JPG else "png"
+_Q_CAP   = str(R.REGEN_JPG_Q) if R.REGEN_JPG else "2"
+# Umbral de "captura aprovechable" (descarta fotogramas negros o rotos). Un JPG
+# pesa ~7% de lo que pesaba el PNG, así que el listón de 20 KB dejaría fuera
+# capturas buenas de material SD.
+_MIN_CAP = 6000 if R.REGEN_JPG else 20000
+
 COLA      = os.path.join(ESTADO, f"intruso_cola_{_SUF}.json")
 LIMPIADOS = os.path.join(ESTADO, f"intruso_limpiados_{_SUF}.txt")
 MANUAL    = os.path.join(ESTADO, f"intruso_manual_{_SUF}.txt")
@@ -794,6 +806,14 @@ def capturar_desde_torrent(entrada, rl_config, img_host, session):
         if dur <= 0:
             return None, "ffprobe no pudo leer la duración"
 
+        # Aquí el tonemap va EN ORIGEN, no al recodificar: estas capturas las
+        # genera nuestro propio ffmpeg, así que se convierte desde el vídeo de
+        # 10 bits en vez de desde un PNG de 8 con la curva ya horneada.
+        # (En 05 no se puede: las captura prep.screenshots(), que es de upstream.)
+        vf = ["-vf", R._filtro_tonemap()] if R.necesita_tonemap(url) else []
+        if vf:
+            print(f"    🌈 HDR detectado: tonemap {R.REGEN_TONEMAP_OP} → SDR", flush=True)
+
         pngs = []
         for v in VENTANAS:
             base = dur * v / 100.0
@@ -803,12 +823,12 @@ def capturar_desde_torrent(entrada, rl_config, img_host, session):
                 ts = base + k * 12
                 if ts >= dur:
                     continue
-                salida = os.path.join(carpeta, f"intruso-{int(v)}-{k}.png")
+                salida = os.path.join(carpeta, f"intruso-{int(v)}-{k}.{_EXT_CAP}")
                 subprocess.run(["ffmpeg", "-y", "-v", "error", "-seekable", "1",
                                 "-ss", str(int(ts)), "-i", url,
-                                "-frames:v", "1", "-q:v", "2", salida],
+                                "-frames:v", "1", *vf, "-q:v", _Q_CAP, salida],
                                capture_output=True, text=True, timeout=600)
-                if os.path.exists(salida) and os.path.getsize(salida) > 20000:
+                if os.path.exists(salida) and os.path.getsize(salida) > _MIN_CAP:
                     pngs.append(os.path.basename(salida))
                 if len(pngs) >= MAX_CAPS:
                     break
