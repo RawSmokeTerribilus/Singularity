@@ -902,6 +902,60 @@ def _es_falta_de_cuota(mensaje):
     return any(m in (mensaje or "") for m in _MOTIVOS_CUOTA)
 
 
+# Errores de PASARELA: el tracker no está, pero el torrent está perfecto. Los
+# 5xx de nginx salen durante el backup de la base de datos (06:00) y duran
+# minutos. 502 es el que se ve en la práctica; 503/504 van por completitud.
+_MOTIVOS_TRACKER = ("HTTP 502", "HTTP 503", "HTTP 504",
+                    "Bad Gateway", "Service Unavailable", "Gateway Time-out")
+
+
+def _es_tracker_caido(mensaje):
+    """¿El fallo es del tracker y no del torrent?
+
+    Importa distinguirlo porque antes un 502 hacía tres cosas mal a la vez:
+    contaba para el tope de "8 fallos seguidos", ensuciaba la lista de revisión
+    manual con torrents sanos, y abortaba la tirada. Resultado medido: el backup
+    de las 06:00 mataba la tirada y no se reanudaba hasta que el operador lo veía
+    por la tarde — horas de nada.
+    """
+    return any(m in (mensaje or "") for m in _MOTIVOS_TRACKER)
+
+
+def _tracker_responde(session):
+    """Sonda barata: ¿contesta el tracker algo que no sea un 5xx?"""
+    try:
+        r = session.get(SITE_BASE, timeout=20, allow_redirects=True)
+        return r.status_code < 500
+    except Exception:
+        return False
+
+
+# El backup de la base de datos ronda los 30 min y CRECE cada día, así que el
+# tope va con margen de sobra (90 min). No cuesta nada tenerlo alto: se sondea
+# cada 2 min y se sale en cuanto el tracker contesta; el tope sólo se agota en
+# un corte de verdad.
+ESPERA_TRACKER_S   = int(os.getenv("ME_INTRUSO_ESPERA_TRACKER", "120") or 120)
+ESPERA_TRACKER_MAX = int(os.getenv("ME_INTRUSO_ESPERA_TRACKER_MAX", "5400") or 5400)
+
+
+def _esperar_tracker(session):
+    """Espera a que el tracker vuelva. True si volvió, False si se rindió.
+
+    Sondea cada ESPERA_TRACKER_S hasta ESPERA_TRACKER_MAX en total. Esperar una
+    hora es infinitamente más barato que perder la mañana entera parado.
+    """
+    esperado = 0
+    while esperado < ESPERA_TRACKER_MAX:
+        time.sleep(ESPERA_TRACKER_S)
+        esperado += ESPERA_TRACKER_S
+        if _tracker_responde(session):
+            print(f"    ✅ el tracker responde otra vez (tras {esperado//60} min). Sigo.",
+                  flush=True)
+            return True
+        print(f"    ⏳ sigue sin responder ({esperado//60} min esperando)…", flush=True)
+    return False
+
+
 def reponer_uno(session, entrada, rl_config, img_host):
     tid = entrada["id"]
     if not int(entrada.get("seeders") or 0):
@@ -958,13 +1012,32 @@ def fase_reponer(session, cola, rl_config):
     print(f"   Modo: {'SIMULACRO (no se escribe nada)' if DRY_RUN else 'REAL'}\n")
 
     ok_n = fail_n = seguidos = cuota_n = 0
+    rescate_usado = False        # la espera larga del tope de fallos, una vez por tirada
     for i, e in enumerate(pend, 1):
         print(f"[{i}/{len(pend)}] ID {e['id']}  ({e['uploader']}, seeds={e['seeders']})  "
               f"{e['nombre'][:48]}", flush=True)
-        try:
-            ok, msg = reponer_uno(session, e, rl_config, img_host)
-        except Exception as ex:
-            ok, msg = False, f"excepción: {ex}"
+        # Si el tracker se cae (backup de las 06:00), se espera y se reintenta
+        # ESTE MISMO torrent: el fallo no era suyo. reponer_uno() lee el
+        # formulario ANTES de descargar nada, así que un corte se paga barato.
+        tracker_ko = False
+        for _intento in range(3):
+            try:
+                ok, msg = reponer_uno(session, e, rl_config, img_host)
+            except Exception as ex:
+                ok, msg = False, f"excepción: {ex}"
+            if ok or not _es_tracker_caido(msg):
+                break
+            print(f"    ⏸️  {msg} — es el tracker, no el torrent. Espero a que vuelva.",
+                  flush=True)
+            if not _esperar_tracker(session):
+                tracker_ko = True
+                break
+
+        if tracker_ko:
+            print(f"\n🛑 El tracker lleva {ESPERA_TRACKER_MAX//60} min sin responder. "
+                  f"Paro; al relanzar continúa por donde iba.")
+            _marcar(APLAZADOS, e["id"], "tracker caído")
+            break
 
         if ok:
             ok_n += 1
@@ -984,6 +1057,19 @@ def fase_reponer(session, cola, rl_config):
                 _anotar_manual(e, f"reposición: {msg}"[:120])
             if "sesión caducada" in msg:
                 print("\n🛑 Sesión caducada. Paro; al relanzar continúa por donde iba.")
+                break
+            if seguidos >= 7 and not rescate_usado:
+                # Red de seguridad para cortes que NO se anuncian como 5xx
+                # (conexión reseteada, timeouts, la pasarela devolviendo HTML…).
+                # Antes de rendirse, una espera larga: si la racha la causaba el
+                # backup, al volver se recoge sola en vez de perder la mañana.
+                rescate_usado = True
+                print(f"\n⏸️  {seguidos} fallos seguidos. Antes de rendirme espero "
+                      f"a ver si es el tracker.", flush=True)
+                if _esperar_tracker(session):
+                    seguidos = 0
+                    continue
+                print("\n🛑 Y el tracker sigue sin responder. Paro.")
                 break
             if seguidos >= 8:
                 print("\n🛑 8 fallos seguidos. Paro para que le eches un ojo.")

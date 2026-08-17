@@ -94,6 +94,10 @@ ENV_DEFAULTS = [
     ("ME_REGEN_JPG_Q",       "3",  "Calidad del JPG para ffmpeg -q:v (2 mejor … 31 peor). 3 ≈ 7% del peso del PNG"),
     ("ME_REGEN_TONEMAP",     "1",  "1 = convierte HDR/PQ a SDR en las capturas. Sin esto salen lavadas y sepia"),
     ("ME_REGEN_TONEMAP_OP",  "mobius", "Operador de tonemap de ffmpeg: mobius (recomendado), reinhard, hable, clip"),
+    ("ME_INTRUSO_ESPERA_TRACKER",     "120",
+     "Segundos entre sondas cuando el tracker devuelve 5xx (backup de la BD)"),
+    ("ME_INTRUSO_ESPERA_TRACKER_MAX", "5400",
+     "Tope total de espera al tracker. El backup ronda 30 min y crece; 90 min da margen"),
 ]
 
 _CIERTO = {"1", "true", "yes", "y", "on", "si", "sí", "s", "t"}
