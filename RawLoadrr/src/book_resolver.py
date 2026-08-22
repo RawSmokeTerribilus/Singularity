@@ -201,6 +201,67 @@ def _score_book(cand, title, author, year):
     return max(0.0, min(1.0, score))
 
 
+
+# ─── cascada de títulos ──────────────────────────────────────────────────────
+_PARENTESIS_FINAL = re.compile(r'\s*[\(\[][^\)\]]*[\)\]]\s*$')
+_SEQ_FINAL = re.compile(r'\b\d{1,2}\s*$')
+
+
+def query_variants(title, author=None):
+    """
+    Del candidato más fiel al más laxo. Se para en el primero que dé algo.
+
+    Nace de un caso real: el `.m4a` de *El arte de la guerra* traía en las
+    etiquetas "Sun Tzu - El Arte de la Guerra (Audiolibro en Castellano)".
+    Audible no conoce ningún libro que se llame así, y el nombre del formato
+    y del idioma pegados al título son la norma, no la excepción.
+
+    Misma regla dura que en juegos: **nunca se recorta un número final**. "Dune
+    2" y "Dune" son libros distintos, y quitar el número fabrica un acierto de
+    los que puntúan perfecto y están mal.
+    """
+    base = str(title or '').strip()
+    if not base:
+        return []
+
+    lleva_secuencia = bool(_SEQ_FINAL.search(base))
+    vistos = []
+
+    def add(texto):
+        texto = re.sub(r'\s+', ' ', (texto or '')).strip(' -_,:;.')
+        if len(texto) < 3:
+            return
+        if lleva_secuencia and not _SEQ_FINAL.search(texto):
+            return
+        if texto.lower() not in [v.lower() for v in vistos]:
+            vistos.append(texto)
+
+    add(base)
+
+    # Los paréntesis finales se van de uno en uno: "(Audiolibro) (192kbit_AAC)"
+    # son dos, y quitar sólo el último no arregla nada.
+    recortado = base
+    while _PARENTESIS_FINAL.search(recortado):
+        recortado = _PARENTESIS_FINAL.sub('', recortado)
+        add(recortado)
+
+    # "Autor - Título" es como nombra medio mundo sus ficheros. Sólo se quita
+    # cuando la parte de delante ES el autor que ya conocemos: cortar por el
+    # primer guion a ciegas destroza "Cien años - de soledad" y parecidos.
+    if author:
+        for texto in list(vistos):
+            for sep in (' - ', ' – ', ': '):
+                if sep in texto:
+                    izquierda, derecha = texto.split(sep, 1)
+                    if _title_score(author, izquierda) >= 0.80:
+                        add(derecha)
+
+    for texto in list(vistos):
+        add(re.sub(r'[_\.]+', ' ', texto))
+
+    return vistos
+
+
 def resolve_book(title, author=None, year=None, isbn_hint=None, config=None, log=None):
     """
     -> {'confidence': high|low|none, 'isbn13': str, 'score': float,
@@ -222,17 +283,28 @@ def resolve_book(title, author=None, year=None, isbn_hint=None, config=None, log
     if not key:
         return _verdict("none", 0.0, None, "no google books api key configured")
 
-    q = f"intitle:{title}"
-    if author:
-        q += f" inauthor:{author}"          # a literal space; a '+' is sent as %2B and 503s
-
     cands = []
-    for item in _google_get({"q": q, "maxResults": 10, "langRestrict": "es", "country": "ES"}, key, log):
-        cand = _google_candidate(item)
-        if cand:
-            cand["score"] = _score_book(cand, title, author, year)
-            if cand["score"] >= MIN_CANDIDATE_SCORE:
-                cands.append(cand)
+    for variante in query_variants(title, author):
+        q = f"intitle:{variante}"
+        if author:
+            q += f" inauthor:{author}"      # a literal space; a '+' is sent as %2B and 503s
+
+        for item in _google_get({"q": q, "maxResults": 10,
+                                 "langRestrict": "es", "country": "ES"}, key, log):
+            cand = _google_candidate(item)
+            if cand:
+                # Se puntúa contra la variante QUE SE CONSULTÓ, no contra el
+                # título original: si se limpió "(Audiolibro en Castellano)"
+                # es porque sobraba, y penalizar al candidato por no traerlo
+                # sería castigarle por acertar.
+                cand["score"] = _score_book(cand, variante, author, year)
+                if cand["score"] >= MIN_CANDIDATE_SCORE:
+                    cands.append(cand)
+
+        if cands:
+            if variante != title:
+                log(f"variante '{variante}' dio {len(cands)} candidatos")
+            break
 
     if not cands:
         log(f"no book candidate above threshold for '{title}'")
@@ -331,20 +403,32 @@ def resolve_audiobook(title, author=None, region="es", asin_hint=None, log=None)
 
         log(f"asin hint {hint} unknown to audnexus in region {region}")
 
-    products = _audible_search(title, author, region, log)
-    if not products:
-        return _verdict("none", 0.0, None, "no audible product matched")
-
+    # Misma cascada que en resolve_book, y por el mismo motivo: las etiquetas
+    # de un audiolibro traen el idioma y el bitrate pegados al título, y
+    # Audible no conoce ningún libro llamado "... (Audiolibro en Castellano)".
     scored = []
-    for p in products:
-        score = _title_score(title, p["title"])
-        if p["subtitle"]:
-            score = max(score, _title_score(title, f"{p['title']} {p['subtitle']}"))
-        if author and p["authors"] and max(_title_score(author, a) for a in p["authors"]) >= 0.85:
-            score += 0.05
-        score = max(0.0, min(1.0, score))
-        if score >= MIN_CANDIDATE_SCORE:
-            scored.append(dict(p, score=score))
+    consultado = title
+
+    for variante in query_variants(title, author):
+        products = _audible_search(variante, author, region, log)
+        if not products:
+            continue
+
+        for p in products:
+            score = _title_score(variante, p["title"])
+            if p["subtitle"]:
+                score = max(score, _title_score(variante, f"{p['title']} {p['subtitle']}"))
+            if author and p["authors"] and max(_title_score(author, a) for a in p["authors"]) >= 0.85:
+                score += 0.05
+            score = max(0.0, min(1.0, score))
+            if score >= MIN_CANDIDATE_SCORE:
+                scored.append(dict(p, score=score))
+
+        if scored:
+            consultado = variante
+            if variante != title:
+                log(f"variante '{variante}' dio {len(scored)} candidatos en audible")
+            break
 
     if not scored:
         log(f"no audiobook candidate above threshold for '{title}'")

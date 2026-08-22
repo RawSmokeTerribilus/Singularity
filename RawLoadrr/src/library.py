@@ -58,7 +58,7 @@ def classify(name, only=None):
     lower = str(name).lower()
     explicit_game = bool(only and 'game' in only)
 
-    if lower.endswith(bookinfo.AUDIOBOOK_EXTS):
+    if bookinfo.looks_like_audiobook(name, declared=bool(only and 'audiobook' in only)):
         return 'audiobook'
     if lower.endswith(VIDEO_EXTS):
         return 'video'
@@ -74,6 +74,12 @@ def classify(name, only=None):
 # no es estético: un `.m4b` es audio y es libro a la vez, y una carpeta de
 # películas con un `caratulas.zip` dentro es una carpeta de películas.
 _PRECEDENCIA = ('audiobook', 'book', 'video', 'game')
+
+# ...salvo entre ellos dos. Una carpeta con el audiolibro y el e-book de la
+# misma obra tiene DOS cosas que subir, no una: son ediciones distintas y cada
+# una es su propio torrent. Medido con "El arte de la guerra", donde el .m4a y
+# el .pdf viven juntos y sólo subía el pdf.
+_CONVIVEN = {'audiobook', 'book'}
 
 
 def scan(root, only=None):
@@ -107,7 +113,9 @@ def scan(root, only=None):
             continue
 
         gana = next(k for k in _PRECEDENCIA if k in por_tipo)
-        found[gana].extend(por_tipo[gana])
+
+        for kind in ({gana} | (_CONVIVEN & set(por_tipo)) if gana in _CONVIVEN else {gana}):
+            found[kind].extend(por_tipo[kind])
 
     return {k: v for k, v in found.items() if v}
 
@@ -124,12 +132,21 @@ def describe(found):
 
 def is_mixed(found):
     """
-    ¿Hay más de un tipo?
+    ¿Hay tipos que NO deberían ir en la misma tirada?
 
     Éste es el caso peligroso y el único que justifica parar: una biblioteca
     ordenada es homogénea y nunca lo ve. Una carpeta de descargas, sí.
+
+    Libro y audiolibro juntos NO cuentan como mezcla: es la forma normal de
+    guardar una obra de la que se tienen las dos ediciones, y ambas se suben.
+    Avisar ahí sería avisar siempre, que es como un aviso deja de leerse.
     """
-    return len(counts(found)) > 1
+    tipos = {k for k, _n in counts(found)}
+
+    if tipos <= _CONVIVEN:
+        return False
+
+    return len(tipos) > 1
 
 
 # ─── ¿esto es el nombre de una obra? ─────────────────────────────────────────

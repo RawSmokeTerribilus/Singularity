@@ -197,6 +197,9 @@ def build_recursive_queue(root_path, only=None):
     # cuando se ha declarado que se va a por juegos. Una sola fuente de verdad,
     # en gameinfo.
     from src import gameinfo as _gi
+    from src import bookinfo as _bi
+
+    quiere_audio = bool(only) and 'audiobook' in only
 
     # "all" no es un tipo, es la ausencia de filtro. El resolver ya lo traduce,
     # pero esta función es pública y la llaman de fuera: si no se defiende
@@ -256,14 +259,21 @@ def build_recursive_queue(root_path, only=None):
         # An audiobook is normally one folder of many .m4b chapters and has to
         # be queued as the folder, exactly like a season pack: queueing the
         # chapters individually would upload one torrent per chapter.
-        audiobook_files = ([f for f in filenames if f.lower().endswith(audiobook_extensions)]
+        # No basta la extensión: el primer audiolibro real que se probó era un
+        # .m4a, que es también música. Lo decide bookinfo mirando contenedor,
+        # nombre, etiquetas y duración.
+        audiobook_files = ([f for f in filenames
+                            if _bi.looks_like_audiobook(os.path.join(dirpath, f),
+                                                        declared=quiere_audio)]
                            if _quiere('audiobook') else [])
 
         if audiobook_files:
             queue.append(dirpath if len(audiobook_files) > 1 else os.path.join(dirpath, audiobook_files[0]))
             processed_paths.add(dirpath)
             dirnames.clear()
-            continue
+            # OJO: aquí NO se hace `continue`. Una carpeta puede tener el
+            # audiolibro y el e-book de la misma obra, y son dos torrents
+            # distintos: cortar aquí es lo que hacía que sólo subiera el pdf.
 
         # E-books are the opposite: several files in one folder are several
         # different books, not one book in parts, so each is its own upload.
@@ -274,6 +284,7 @@ def build_recursive_queue(root_path, only=None):
             for f in book_files:
                 queue.append(os.path.join(dirpath, f))
 
+        if audiobook_files or book_files:
             continue
 
         # If not a season/show folder, check for movies or loose files

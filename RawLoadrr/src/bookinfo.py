@@ -19,7 +19,22 @@ import zipfile
 import xml.etree.ElementTree as ET
 
 EBOOK_EXTS = ('.epub', '.mobi', '.azw3', '.azw', '.pdf', '.cbz', '.cbr', '.djvu', '.fb2')
-AUDIOBOOK_EXTS = ('.m4b',)
+
+# Formatos que sólo son audiolibro. `.m4b` es el contenedor con capítulos, y
+# `.aax`/`.aa` son los de Audible.
+AUDIOBOOK_EXTS_AUTO = ('.m4b', '.aax', '.aa')
+
+# Y los que también son música, que en la práctica son la MAYORÍA de los
+# audiolibros que circulan: medido en la caja, el primero que se probó era un
+# `.m4a` y no lo veía nadie. Aquí no vale la extensión sola.
+AUDIOBOOK_EXTS_AMBIGUOUS = ('.m4a', '.mp3', '.ogg', '.opus', '.flac', '.wma')
+
+AUDIOBOOK_EXTS = AUDIOBOOK_EXTS_AUTO + AUDIOBOOK_EXTS_AMBIGUOUS
+
+# Un audiolibro se anuncia en el nombre mucho más a menudo que un disco.
+_PISTA_AUDIOLIBRO = re.compile(
+    r'audiolibro|audio[\s._-]?book|narrado|unabridged|abridged|voz[\s._-]?humana',
+    re.IGNORECASE)
 
 # Dublin Core lives here inside every OPF package document.
 _DC = '{http://purl.org/dc/elements/1.1/}'
@@ -403,3 +418,51 @@ def _analyze_comic(path):
         'kib_por_pagina': round(sum(tam) / len(tam) / 1024),
         'formato_imagen': os.path.splitext(paginas[0].filename)[1].lstrip('.').upper(),
     }
+
+
+def looks_like_audiobook(path, declared=False):
+    """
+    ¿Este fichero de audio es un audiolibro y no música?
+
+    La extensión no lo dice: un `.m4a` de tres horas y una canción de tres
+    minutos son el mismo formato. Se mira, por orden de fiabilidad:
+
+      1. El contenedor, si es de los que sólo se usan para esto.
+      2. Que quien sube lo haya declarado.
+      3. El nombre o la carpeta -- "(Audiolibro en Castellano)" es lo que
+         traía el primero que se probó de verdad.
+      4. Un ASIN de Audible en las etiquetas, que es prueba directa.
+      5. La duración, y sólo como respaldo: 45 minutos en UN fichero no es
+         una canción. No basta sola -- una sesión de DJ también dura eso --
+         así que sólo cuenta si además hay un libro al lado.
+    """
+    lower = str(path).lower()
+
+    if lower.endswith(AUDIOBOOK_EXTS_AUTO):
+        return True
+
+    if not lower.endswith(AUDIOBOOK_EXTS_AMBIGUOUS):
+        return False
+
+    if declared:
+        return True
+
+    if _PISTA_AUDIOLIBRO.search(str(path)):
+        return True
+
+    tags = from_audiobook(path)
+
+    if tags.get('asin'):
+        return True
+
+    # El respaldo: largo Y con un libro de la misma obra al lado.
+    if (tags.get('runtime_min') or 0) >= 45:
+        try:
+            carpeta = os.path.dirname(str(path))
+            hermanos = os.listdir(carpeta)
+        except OSError:
+            return False
+
+        return any(h.lower().endswith(EBOOK_EXTS) for h in hermanos)
+
+    return False

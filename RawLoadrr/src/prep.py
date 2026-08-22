@@ -141,9 +141,13 @@ class Prep():
                 for file_name, full_path in all_files.items():
                     ext = os.path.splitext(file_name)[1].lower()
 
-                    if ext in bookinfo.AUDIOBOOK_EXTS:
-                        # Checked before the audio list below: an .m4b is an
-                        # audio file too, and whoever gets there first wins.
+                    if bookinfo.looks_like_audiobook(
+                            full_path,
+                            declared=str(meta.get('category') or '').upper() == 'AUDIOBOOK'):
+                        # Va antes que la lista de audio de abajo: un .m4b es
+                        # un fichero de audio también, y gana quien pregunta
+                        # primero. Y no basta la extensión -- el primer
+                        # audiolibro real que se probó era un .m4a.
                         meta['filelist'][file_name] = full_path
                         meta['is_audiobook'] = True
                     elif _is_game_category(meta) and gameinfo.is_game_file(file_name, explicit=True):
@@ -189,7 +193,9 @@ class Prep():
 
         else:  # Single file scenario
             file_extension = os.path.splitext(meta['path'])[1].lower()
-            if file_extension in bookinfo.AUDIOBOOK_EXTS:
+            if bookinfo.looks_like_audiobook(
+                    meta['path'],
+                    declared=str(meta.get('category') or '').upper() == 'AUDIOBOOK'):
                 meta['is_audiobook'] = True
             elif gameinfo.is_game_file(meta['path'], explicit=_is_game_category(meta)):
                 # Sin flag basta con que la extensión sea inequívoca: la cola
@@ -724,7 +730,11 @@ class Prep():
             'epub': 'EPUB', 'pdf': 'PDF', 'mobi': 'MOBI', 'azw': 'MOBI',
             'azw3': 'AZW3', 'cbz': 'CBZ/CBR', 'cbr': 'CBZ/CBR',
             'djvu': 'PDF', 'fb2': 'EPUB',
-            'm4b': 'M4B', 'mp3': 'MP3',
+            # El tracker sólo tiene dos tipos de audiolibro, M4B y MP3, así
+            # que la familia AAC/MP4 va a M4B y el resto a MP3. Sin esto un
+            # .m4a caía en 'AUDIOBOOK', que no es un tipo y viajaba como 0.
+            'm4b': 'M4B', 'm4a': 'M4B', 'aax': 'M4B', 'aa': 'M4B',
+            'mp3': 'MP3', 'ogg': 'MP3', 'opus': 'MP3', 'flac': 'MP3', 'wma': 'MP3',
         }
         if not meta.get('type'):
             meta['type'] = by_ext.get(
@@ -909,6 +919,10 @@ class Prep():
             if (record or {}).get(key) and not meta.get(key):
                 meta[key] = record[key]
 
+        # La de IGDB colaba porque no lleva query string, pero sigue siendo un
+        # enlace en caliente a un tercero. Mismo trato que la de libro.
+        self._rehost_cover(meta)
+
         # Las capturas de IGDB viajan por image_list para que las renderice el
         # mismo bucle que las de una peli. Se REHOSTEAN, no se enlazan en
         # caliente: enlazar al CDN de IGDB es dejar la descripción a merced de
@@ -933,7 +947,7 @@ class Prep():
 
         paths = []
         for n, url in enumerate(urls, 1):
-            dest = os.path.join(outdir, f"igdb-{n:02d}.jpg")
+            dest = os.path.join(outdir, f"img-{n:02d}.jpg")
             try:
                 r = _requests.get(url, timeout=20)
                 r.raise_for_status()
@@ -2369,6 +2383,43 @@ class Prep():
                     'volume_id', 'isbn13', 'subtitle'):
             if (record or {}).get(key) and not meta.get(key):
                 meta[key] = record[key]
+
+        self._rehost_cover(meta)
+
+    def _rehost_cover(self, meta):
+        """
+        La portada se sube a nuestro host de imágenes, no se enlaza.
+
+        Enlazarla en caliente falló por dos sitios a la vez, y merece la pena
+        anotar los dos porque el segundo no se ve venir:
+
+        1. El tracker sólo deja pasar los hosts de su lista blanca; el resto
+           los mete por un proxy de terceros.
+        2. Al hacerlo, la URL ya lleva los `&` convertidos en `&amp;`, así que
+           al proveedor le llegan parámetros llamados `amp;printsec` y
+           `amp;zoom`, y devuelve una imagen vacía.
+
+        Sólo pasaba con la portada de Google Books, porque es la única URL con
+        query string: la de IGDB no lleva parámetros y colaba. Rehosteada
+        queda un enlace limpio de un host que sí está en la lista, y de paso
+        deja de depender de que Google siga sirviendo el hotlink.
+        """
+        url = meta.get('cover_url') or ''
+
+        if not url or meta.get('cover_rehosted'):
+            return
+
+        local = self._download_images(meta, [url])
+
+        if not local:
+            return
+
+        subidas, _ = self.upload_screens(meta, 1, 1, 0, 1, local, {})
+
+        if subidas:
+            meta['cover_url'] = subidas[0]['raw_url']
+            meta['cover_rehosted'] = True
+            console.print(f"[green]Portada rehosteada:[/green] [dim]{meta['cover_url']}[/dim]")
 
     async def resolve_ids(self, meta, filename, aliases=None):
         """
