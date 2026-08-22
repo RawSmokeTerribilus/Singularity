@@ -500,17 +500,34 @@ class Rawncher:
     def _args_opcionales(self, debug: bool = False) -> list:
         """Muestra lista de flags opcionales para upload.py y devuelve los seleccionados"""
         flags = [
-            ("--anon",            "Subida anónima"),
-            ("--skip-dupe-check", "Saltar comprobación de duplicados"),
-            ("--stream",          "Stream Optimized Upload"),
-            ("--personalrelease", "Personal Release"),
-            ("--no-seed",         "No añadir torrent al cliente"),
-            ("--debug",           "Modo debug (sin subida real)"),
+            ("--anon",            "Subida anónima",                    "bool"),
+            ("--skip-dupe-check", "Saltar comprobación de duplicados",  "bool"),
+            ("--stream",          "Stream Optimized Upload",            "bool"),
+            ("--personalrelease", "Personal Release",                   "bool"),
+            ("--no-seed",         "No añadir torrent al cliente",       "bool"),
+            ("--debug",           "Modo debug (sin subida real)",       "bool"),
+            # Los ids a mano cortocircuitan el resolver, que es la salida honesta
+            # cuando la identificación automática se equivoca. Hasta ahora había
+            # que salirse del lanzador y tirar upload.py a pelo para dar uno.
+            ("--tmdb",            "Id de TMDB (peli o serie)",          "valor"),
+            ("--imdb",            "Id de IMDB (ttNNNNNNN)",             "valor"),
+            ("--tvdb",            "Id de TVDB (sólo se envía)",         "valor"),
+            ("--mal",             "Id de MyAnimeList (anime)",          "valor"),
+            ("--isbn",            "ISBN del e-book (10 ó 13 dígitos)",  "valor"),
+            ("--asin",            "ASIN de Audible (audiolibro)",       "valor"),
+            ("--igdb",            "Id de IGDB (juego)",                 "valor"),
         ]
 
         selected = set()
         if debug:
             selected.add("--debug")
+
+        def _valor_de(flag):
+            """El valor ya elegido para un flag de valor, o cadena vacía."""
+            for entry in selected:
+                if entry.split(" ", 1)[0] == flag and " " in entry:
+                    return entry.split(" ", 1)[1]
+            return ""
 
         while True:
             console.print()
@@ -525,9 +542,12 @@ class Rawncher:
             table.add_column("Descripción")
             table.add_column("Estado", justify="center")
 
-            for i, (flag, desc) in enumerate(flags, 1):
+            for i, (flag, desc, kind) in enumerate(flags, 1):
                 is_debug_flag = flag == "--debug"
-                if is_debug_flag and debug:
+                if kind == "valor":
+                    valor = _valor_de(flag)
+                    estado = f"[green]{valor}[/green]" if valor else "[dim]✗[/dim]"
+                elif is_debug_flag and debug:
                     estado = "[green]✓ (bloqueado)[/green]"
                 elif flag in selected:
                     estado = "[green]✓[/green]"
@@ -549,7 +569,7 @@ class Rawncher:
             elif raw == "c":
                 cat = Prompt.ask(
                     "Categoría",
-                    choices=["movie", "tv", "fanres"],
+                    choices=["movie", "tv", "fanres", "book", "audiobook", "game"],
                     default="tv",
                 )
                 selected_cats = {f for f in selected if f.startswith("--category")}
@@ -575,9 +595,20 @@ class Rawncher:
                     console.print("[bold red]❌ Número fuera de rango.[/bold red]")
                     continue
 
-                flag, _ = flags[idx - 1]
+                flag, _, kind = flags[idx - 1]
                 if flag == "--debug" and debug:
                     console.print("[bold yellow]⚠️  El flag --debug está bloqueado en modo debug.[/bold yellow]")
+                    continue
+
+                if kind == "valor":
+                    # Dejarlo en blanco lo quita, que es la única forma de
+                    # deshacer un id tecleado mal sin salirse del menú.
+                    valor = Prompt.ask(f"Valor para {flag}",
+                                       default=_valor_de(flag)).strip()
+                    selected -= {e for e in selected
+                                 if e.split(" ", 1)[0] == flag}
+                    if valor:
+                        selected.add(f"{flag} {valor}")
                     continue
 
                 if flag in selected:

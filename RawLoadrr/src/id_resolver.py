@@ -603,21 +603,32 @@ def resolve(title, year, category, config, aliases=None, mal_hint=False,
                        key=lambda k: -pool.get(k, {}).get("score", 0.0))
         for imdb in leads[:3]:
             voters = set(imdb_votes.get(imdb, set()))
+
+            # Confirmations used to be pooled with a hardcoded 0.0. Today that
+            # is inert -- every lead is already in the pool carrying the score
+            # of the search hit that made it a lead, and _pool() keeps the max
+            # -- but it stated the wrong thing: a by-id confirmation is the
+            # strongest evidence there is, not the weakest. Carrying the lead's
+            # own score says so, and stops a future caller that pools an
+            # unseen id from silently creating a zero-scored contender that
+            # the SCORE_MARGIN filter below would then have to catch.
+            lead_score = pool.get(imdb, {}).get("score", 0.0)
+
             if "omdb" not in voters:
                 rec = _omdb_by_id(omdb_key, imdb, log)
                 if rec:
                     imdb_votes.setdefault(imdb, set()).add("omdb")
-                    _pool(imdb, rec, 0.0)
+                    _pool(imdb, rec, lead_score)
             if "tmdb" not in voters:
                 rec = tmdb.verify_imdb(imdb)
                 if rec:
                     imdb_votes.setdefault(imdb, set()).add("tmdb")
-                    _pool(imdb, rec, 0.0)
+                    _pool(imdb, rec, lead_score)
             if "tvmaze" not in voters:
                 rec = _tvmaze_by_imdb(imdb, log)
                 if rec:
                     imdb_votes.setdefault(imdb, set()).add("tvmaze")
-                    _pool(imdb, rec, 0.0)
+                    _pool(imdb, rec, lead_score)
 
     imdb_n = 0
     if imdb_votes:

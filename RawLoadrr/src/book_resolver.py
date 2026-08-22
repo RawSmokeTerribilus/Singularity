@@ -31,6 +31,24 @@ LEAD_MARGIN = 0.05           # two editions of one book tie exactly; that is a q
 
 GOOGLE_BOOKS = "https://www.googleapis.com/books/v1/volumes"
 AUDNEXUS = "https://api.audnex.us"
+
+# The `imageLinks` block of the API only ever hands back a 128px thumbnail, which
+# looks miserable on a torrent page. The content endpoint takes an undocumented
+# `zoom`, and measured against the real API it goes up to 2177x2771 for the same
+# volume that `imageLinks` renders at 128x170.
+#
+# Always ask for 6 and never compute anything: the parameter self-limits to
+# whatever resolution the publisher actually uploaded, so asking for more than
+# exists simply returns the best available. And it is NOT a linear scale --
+# zoom=5 gives back the same 128px as zoom=1 -- so there is nothing to interpolate.
+GOOGLE_COVER = ("https://books.google.com/books/content"
+                "?id={vid}&printsec=frontcover&img=1&zoom=6")
+
+# Fallback only. Measured on the same book, OpenLibrary's large cover is
+# 128x164 / 6.4 KiB against Google's 2177x2771 / 539 KiB, so it never goes first.
+# `default=false` is not optional: without it OpenLibrary answers 200 with a
+# placeholder image instead of 404, and you end up caching filler.
+OPENLIBRARY_COVER = "https://covers.openlibrary.org/b/isbn/{isbn}-L.jpg?default=false"
 AUDIBLE_DOMAINS = {
     'es': 'api.audible.es', 'us': 'api.audible.com', 'uk': 'api.audible.co.uk',
     'fr': 'api.audible.fr', 'de': 'api.audible.de', 'it': 'api.audible.it',
@@ -105,10 +123,25 @@ def _google_get(params, key, log):
     return []
 
 
+def _best_image_link(v):
+    """The largest thumbnail Google admits to, as a fallback for the cover."""
+    links = v.get("imageLinks") or {}
+    for size in ("extraLarge", "large", "medium", "small",
+                 "thumbnail", "smallThumbnail"):
+        if links.get(size):
+            # These come back over plain http and with edge curl painted on.
+            return links[size].replace("http://", "https://").replace("&edge=curl", "")
+    return ""
+
+
 def _google_candidate(item):
     v = (item or {}).get("volumeInfo") or {}
     if not v.get("title"):
         return None
+
+    # The volume id is a sibling of volumeInfo in the response we already asked
+    # for to identify the book, so the cover costs no second request.
+    volume_id = (item or {}).get("id") or ""
 
     isbn13 = isbn10 = ""
     for ident in v.get("industryIdentifiers") or []:
@@ -128,12 +161,23 @@ def _google_candidate(item):
     if m:
         year = int(m.group(1))
 
+    cover = GOOGLE_COVER.format(vid=volume_id) if volume_id else ""
+
     return {
         "provider": "google", "title": v["title"], "subtitle": v.get("subtitle", ""),
         "authors": [str(a) for a in (v.get("authors") or [])],
         "year": year, "isbn13": isbn13, "isbn10": isbn10,
         "publisher": v.get("publisher", ""), "page_count": v.get("pageCount"),
         "language": v.get("language", ""), "score": 0.0,
+        "volume_id": volume_id,
+        "cover_url": cover,
+        "cover_fallbacks": [u for u in (_best_image_link(v),
+                                        OPENLIBRARY_COVER.format(isbn=isbn13)) if u],
+        # Google's own subject headings. Worth keeping: OpenLibrary's `subjects`
+        # were measured to return the same concept in five languages plus tags
+        # belonging to other works entirely.
+        "genres": [str(c) for c in (v.get("categories") or [])],
+        "description": v.get("description", "") or "",
     }
 
 

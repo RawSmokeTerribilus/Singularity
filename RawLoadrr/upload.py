@@ -194,7 +194,14 @@ def build_recursive_queue(root_path):
     book_extensions = ('.epub', '.mobi', '.azw3', '.azw', '.pdf', '.cbz', '.cbr', '.djvu', '.fb2')
     audiobook_extensions = ('.m4b',)
     upload_extensions = video_extensions + book_extensions + audiobook_extensions
-    season_patterns = [r'S[0-9]+', r'Season[\s-]*[0-9]+']
+    # Sonarr names in English, so our own catalogue (1164 Season-N dirs) never
+    # walked the failing branch. A Spanish "Temporada 1" did not match, so the
+    # folder was not a season pack and its 22 episodes were queued one by one --
+    # which is exactly how a member of a Spanish-speaking tracker found it.
+    season_patterns = [
+        r'S[0-9]+',
+        r'(?:Season|Temporada|Staffel|Saison|Stagione|Seizoen|Sezon)[\s._-]*[0-9]+',
+    ]
     
     processed_paths = set()
 

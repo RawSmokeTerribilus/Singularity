@@ -639,6 +639,14 @@ class Prep():
 
         local = bookinfo.gather(source)
 
+        # gather() answers "what work is this"; analyze() answers "what are you
+        # actually downloading" -- format, DRM, fixed vs reflowable layout,
+        # chapters, fonts, and the share of the file that is real text. It is
+        # the mediainfo of a book: an .epub at 5% text is an image dump with a
+        # nice extension, and only this number says so.
+        meta['bookinfo'] = bookinfo.analyze(source)
+        meta['book_file'] = source
+
         if local.get('title') and not meta.get('title'):
             meta['title'] = local['title']
 
@@ -660,7 +668,20 @@ class Prep():
         # These only ever get set on the video branch, and every tracker's
         # get_res_id() reads them unguarded.
         meta.setdefault('resolution', 'OTHER')
-        meta.setdefault('type', 'AUDIOBOOK' if meta.get('is_audiobook') else 'EBOOK')
+
+        # The tracker types a book by its container, not by "is it a book":
+        # EPUB, PDF, MOBI, AZW3 and CBZ/CBR are separate types, and so are M4B
+        # and MP3 for audio. So the extension of the file we actually have is
+        # the type, and 'EBOOK' is only the fallback for something unmapped.
+        ext = os.path.splitext(source)[1].lower().lstrip('.')
+        by_ext = {
+            'epub': 'EPUB', 'pdf': 'PDF', 'mobi': 'MOBI', 'azw': 'MOBI',
+            'azw3': 'AZW3', 'cbz': 'CBZ/CBR', 'cbr': 'CBZ/CBR',
+            'djvu': 'PDF', 'fb2': 'EPUB',
+            'm4b': 'M4B', 'mp3': 'MP3',
+        }
+        meta.setdefault('type', by_ext.get(
+            ext, 'AUDIOBOOK' if meta.get('is_audiobook') else 'EBOOK'))
 
         # A book has nothing to screenshot; the cover is the artwork.
         meta['screens'] = 0
@@ -2024,7 +2045,9 @@ class Prep():
     def _merge_book_record(self, meta, record):
         """Copy the provider's fields in without overwriting anything local."""
         for key in ('title', 'authors', 'narrators', 'publisher', 'series',
-                    'language', 'cover_url', 'description', 'runtime_min'):
+                    'language', 'cover_url', 'cover_fallbacks', 'description',
+                    'runtime_min', 'genres', 'page_count', 'year',
+                    'volume_id', 'isbn13', 'subtitle'):
             if (record or {}).get(key) and not meta.get(key):
                 meta[key] = record[key]
 
