@@ -119,7 +119,7 @@ class Rawncher:
             host = Prompt.ask("URL del Cliente", default=qbit_data.get('qbit_url', 'http://172.17.0.1'))
             port = Prompt.ask("Puerto", default=str(qbit_data.get('qbit_port', '8888')))
             user = Prompt.ask("Usuario qBit", default=qbit_data.get('qbit_user', '').replace('YOUR_USERNAME', ''))
-            pwd  = Prompt.ask("Password qBit", password=True)
+            pwd  = Prompt.ask("Contraseña qBit", password=True)
 
             if "qbit" not in self.config: self.config["qbit"] = {}
             self.config["qbit"].update({
@@ -283,7 +283,7 @@ class Rawncher:
             "            RawLoadrr Launcher  ·  Industrial Grade  ·  CvT\n"
         )
         console.print(f"[bold cyan]{ascii_art}[/]")
-        console.print(Rule("[bold magenta]◈  RAWNCHER SESSION INICIADA[/bold magenta]", style="magenta"))
+        console.print(Rule("[bold magenta]◈  RAWNCHER SESIÓN INICIADA[/bold magenta]", style="magenta"))
         while True:
             try:
                 choice = self._menu_principal()
@@ -480,7 +480,7 @@ class Rawncher:
                 "\n"
                 "  [bold cyan][1][/bold cyan]  Subir desde una ruta (archivo o carpeta)\n"
                 "  [bold cyan][2][/bold cyan]  Usar lista existente (.txt con rutas)\n"
-                "  [bold cyan][3][/bold cyan]  Triage primero (escanear directorio y elegir listas)\n",
+                "  [bold cyan][3][/bold cyan]  Triaje primero (escanear directorio y elegir listas)\n",
                 title=f"[bold green]◈  Tracker: {tracker}[/bold green]",
                 border_style="green",
             )
@@ -869,7 +869,7 @@ class Rawncher:
         tmp_list.parent.mkdir(parents=True, exist_ok=True)
         tmp_list.write_text("\n".join(resolved) + "\n", encoding="utf-8")
         console.print()
-        console.print(Rule(f"[bold yellow]▸  Re-subiendo {len(resolved)} "
+        console.print(Rule(f"[bold yellow]▸  Resubiendo {len(resolved)} "
                             f"release(s) resuelto(s)[/bold yellow]",
                             style="yellow"))
         cmd = ["python3", "auto-upload.py", "--list", str(tmp_list),
@@ -886,22 +886,22 @@ class Rawncher:
     def _flujo_triage(self, tracker: str) -> None:
         """Sub-flujo: ejecutar triage_mkv.py y luego subir las listas generadas"""
         while True:
-            ruta_raw = Prompt.ask("[bold]Directorio a analizar con triage[/bold]").strip()
+            ruta_raw = Prompt.ask("[bold]Directorio a analizar con el triaje[/bold]").strip()
             ruta = Path(ruta_raw)
             if ruta.is_dir():
                 break
             console.print(f"[bold red]❌ No es un directorio válido: {ruta_raw}[/bold red]")
 
         console.print()
-        console.print(Rule("[bold cyan]▸  RECON — Ejecutando Triage[/bold cyan]", style="cyan"))
-        console.print(f"\n[bold cyan]▶ Ejecutando triage en:[/bold cyan] {ruta}")
+        console.print(Rule("[bold cyan]▸  RECON — Ejecutando Triaje[/bold cyan]", style="cyan"))
+        console.print(f"\n[bold cyan]▶ Ejecutando el triaje en:[/bold cyan] {ruta}")
         self._ejecutar_comando(["python3", "../extras/Triaje-mkv/triage_mkv.py", str(ruta)])
 
         hevc_files = sorted(self.base_dir.glob("todo-hevc-*.txt"))
         h264_files = sorted(self.base_dir.glob("sigue-h264-*.txt"))
 
         if not hevc_files and not h264_files:
-            console.print("[bold yellow]⚠️  No se encontraron listas generadas por triage.[/bold yellow]")
+            console.print("[bold yellow]⚠️  No se encontraron listas generadas por el triaje.[/bold yellow]")
             return
 
         console.print()
@@ -1120,7 +1120,7 @@ class Rawncher:
                     f"[bold]API key para {tracker}[/bold] [dim](mín. 32 caracteres)[/dim]"
                 ).strip()
                 if len(nueva_key) < 32:
-                    console.print(f"[bold red]❌ Demasiado corta ({len(nueva_key)} chars). Mínimo 32.[/bold red]")
+                    console.print(f"[bold red]❌ Demasiado corta ({len(nueva_key)} caracteres). Mínimo 32.[/bold red]")
                     continue
                 if "API_KEY" in nueva_key:
                     console.print("[bold red]❌ El valor contiene 'API_KEY', introduce la clave real.[/bold red]")
@@ -1141,7 +1141,7 @@ class Rawncher:
                     console.print("[bold red]❌ Debe empezar por 'https://'.[/bold red]")
                     continue
                 if "Custom_Announce_URL" in nueva_url or "YOUR_PASSKEY" in nueva_url:
-                    console.print("[bold red]❌ El valor sigue siendo el placeholder, introduce la URL real.[/bold red]")
+                    console.print("[bold red]❌ El valor sigue siendo el de ejemplo, introduce la URL real.[/bold red]")
                     continue
                 break
             if self._escribir_config_tracker(tracker, "announce_url", nueva_url):
@@ -1192,8 +1192,8 @@ class Rawncher:
             curr_screens = default_cfg.get("screens", "4")
             curr_size = default_cfg.get("img_size", "500")
 
-            console.print(f"\n[cyan]Screens (Global):[/cyan] {curr_screens}")
-            console.print(f"[cyan]Img Size (Global):[/cyan] {curr_size}")
+            console.print(f"\n[cyan]Capturas (global):[/cyan] {curr_screens}")
+            console.print(f"[cyan]Tamaño de imagen (global):[/cyan] {curr_size}")
 
             if Confirm.ask("¿Editar valores?", default=False):
                 new_screens = Prompt.ask("Número de capturas", default=str(curr_screens))

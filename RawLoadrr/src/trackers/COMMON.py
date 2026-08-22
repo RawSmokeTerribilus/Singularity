@@ -264,36 +264,42 @@ class COMMON():
         await self._provider_badges(descfile, meta)
 
     async def _provider_badges(self, descfile, meta):
-        """Linked provider logos, same idea as the MusicBrainz/Discogs row."""
-        badges = []
+        """
+        Enlaces a la ficha del proveedor. TEXTO, no logos.
+
+        Los logos duraron una subida. Medido: el favicon de IGDB devuelve 403
+        (Cloudflare corta el enlazado en caliente, así que el proxy de imágenes
+        del tracker tampoco puede) y el SVG de Audible que había, 404. Google y
+        OpenLibrary aguantaban, con lo que quedaba una fila donde la mitad de
+        los iconos no pintaban nada -- peor que no tener fila.
+
+        Alojarlos nosotros no vale aquí: `COMMON.py` lo comparten los 52
+        trackers, y `public/img/meta/*.svg` sólo existe en uno. El texto no
+        depende de nadie.
+        """
+        enlaces = []
 
         volume_id = meta.get('volume_id')
         if volume_id:
-            badges.append((f"https://books.google.com/books?id={volume_id}",
-                           "https://www.gstatic.com/images/branding/googlelogo/svg/googlelogo_clr_74x24px.svg"))
+            enlaces.append(("Google Books", f"https://books.google.com/books?id={volume_id}"))
 
         isbn13 = meta.get('isbn13') or meta.get('isbn')
         if isbn13:
-            badges.append((f"https://openlibrary.org/isbn/{isbn13}",
-                           "https://openlibrary.org/static/images/openlibrary-logo-tighter.svg"))
+            enlaces.append(("OpenLibrary", f"https://openlibrary.org/isbn/{isbn13}"))
 
         asin = meta.get('asin')
         if asin:
-            badges.append((f"https://www.audible.es/pd/{asin}",
-                           "https://m.media-amazon.com/images/G/01/audibleweb/a2s/audible_logo_white.svg"))
+            enlaces.append(("Audible", f"https://www.audible.es/pd/{asin}"))
 
-        igdb = meta.get('igdb_slug')
-        if igdb:
-            badges.append((f"https://www.igdb.com/games/{igdb}",
-                           "https://www.igdb.com/favicon.ico"))
+        igdb_slug = meta.get('igdb_slug')
+        if igdb_slug:
+            enlaces.append(("IGDB", f"https://www.igdb.com/games/{igdb_slug}"))
 
-        if not badges:
+        if not enlaces:
             return
 
-        await descfile.write("[center]")
-        for url, img in badges:
-            await descfile.write(f"[url={url}][img=120]{img}[/img][/url] ")
-        await descfile.write("[/center]\n\n")
+        fila = " · ".join(f"[url={url}]{nombre}[/url]" for nombre, url in enlaces)
+        await descfile.write(f"[center][size=2]{fila}[/size][/center]\n\n")
 
     async def write_game_description(self, descfile, meta):
         """
