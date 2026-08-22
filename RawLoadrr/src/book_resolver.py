@@ -492,10 +492,22 @@ def _audible_search(title, author, region, log):
     def names(people):
         return [p["name"] for p in (people or []) if isinstance(p, dict) and p.get("name")]
 
+    def anio(p):
+        fecha = str(p.get("release_date") or p.get("issue_date") or "")
+        m = re.search(r"(\d{4})", fecha)
+        return int(m.group(1)) if m else None
+
+    # `product_attrs` ya se pedía, pero sólo se leían título y personas. La
+    # duración venía en la misma respuesta y se estaba tirando: es el dato que
+    # distingue una grabación de otra sin preguntarle a nadie.
     return [{
         "asin": p.get("asin", ""), "title": p.get("title") or "",
         "subtitle": p.get("subtitle") or "",
         "authors": names(p.get("authors")), "narrators": names(p.get("narrators")),
+        "runtime_min": p.get("runtime_length_min"),
+        "publisher": p.get("publisher_name") or "",
+        "language": (p.get("language") or "").lower(),
+        "year": anio(p),
     } for p in products if p.get("asin")]
 
 
@@ -531,7 +543,144 @@ def audnexus_book(asin, region="es", log=None):
     }
 
 
-def resolve_audiobook(title, author=None, region="es", asin_hint=None, log=None):
+
+
+def _prueba_del_fichero(cands, local):
+    """
+    La grabación que el fichero DEMUESTRA ser, o None.
+
+    Prueba, no ranking. "La menos lejana de las que hay" no identifica nada:
+    muchas lecturas libres no tienen equivalente comercial, y colocarles la
+    grabación más parecida es dar gato por liebre. Sólo cuentan dos hechos:
+
+      - el narrador de las etiquetas coincide con el de la grabación, o
+      - la duración cuadra al 95%, que es lo que da un rip del original.
+
+    Si dos grabaciones cumplen, tampoco vale: eso ya es una duda de verdad.
+    """
+    local = local or {}
+    duracion = local.get('runtime_min')
+    narrador = ', '.join(local.get('narrators') or []).strip()
+
+    if not duracion and not narrador:
+        return None
+
+    def ratio(c):
+        if not (duracion and c.get('runtime_min')):
+            return 0.0
+        a, b = int(duracion), int(c['runtime_min'])
+        return (min(a, b) / max(a, b)) if max(a, b) else 0.0
+
+    def mismo_narrador(c):
+        if not (narrador and c.get('narrators')):
+            return False
+        return max(_title_score(narrador, n) for n in c['narrators']) >= 0.85
+
+    coinciden = [c for c in cands if mismo_narrador(c) or ratio(c) >= 0.95]
+
+    if not coinciden:
+        return None
+
+    if len(coinciden) == 1:
+        return coinciden[0]
+
+    # Varias cumplen. Suele pasar porque un mismo narrador tiene la lectura
+    # suelta y además una recopilación con otros libros dentro: mismo nombre,
+    # 309 minutos contra 769. La duración las separa sin dudar.
+    ordenadas = sorted(coinciden, key=lambda c: (-int(mismo_narrador(c)), -ratio(c)))
+    primera, segunda = ordenadas[0], ordenadas[1]
+
+    if ratio(primera) >= 0.95 and ratio(primera) - ratio(segunda) >= 0.10:
+        return primera
+
+    # Empate de verdad: eso sí es una pregunta.
+    return None
+
+
+def _elegir_grabacion(cands, local, log):
+    """
+    De varias grabaciones del mismo libro, la que corresponde AL FICHERO.
+
+    Un audiolibro no es como un libro: aquí el narrador sí distingue productos
+    de verdad, y elegir mal es dar gato por liebre. Pero eso no obliga a
+    preguntar, porque el fichero lleva la respuesta encima.
+
+    La duración es el desempate bueno: es objetiva, viene gratis en la misma
+    búsqueda de Audible y separa de verdad. Medido con *El arte de la guerra*,
+    las cinco grabaciones duran 83, 120, 177, 184 y 277 minutos -- no hay
+    empate posible contra un fichero de 129.
+    """
+    local = local or {}
+    duracion = local.get('runtime_min')
+    narrador = ', '.join(local.get('narrators') or []).strip()
+    idioma = (local.get('language') or '').lower()
+
+    def puntos(c):
+        p = 0.0
+
+        # El narrador declarado en las etiquetas es prueba directa.
+        if narrador and c.get('narrators'):
+            if max(_title_score(narrador, n) for n in c['narrators']) >= 0.85:
+                p += 4.0
+
+        if duracion and c.get('runtime_min'):
+            # Por PROPORCIÓN y no por minutos: 20 minutos de diferencia son
+            # ruido en una lectura de nueve horas y un abismo en una de dos.
+            a, b = int(duracion), int(c['runtime_min'])
+            r = min(a, b) / max(a, b) if max(a, b) else 0
+
+            if r >= 0.95:
+                p += 3.0
+            elif r >= 0.85:
+                p += 2.0
+            elif r >= 0.70:
+                p += 1.0
+            elif r < 0.50:
+                # Medido: contra un fichero de 129 minutos, una grabación de
+                # 309 es otra lectura y una de 769 es una recopilación con
+                # otros libros dentro. Ni una ni otra son esto.
+                p -= 3.0
+
+        if idioma and c.get('language') and c['language'].startswith(idioma[:2]):
+            p += 0.5
+
+        return p
+
+    ordenados = sorted(cands, key=lambda c: (-puntos(c), -c['score']))
+    g = ordenados[0]
+
+    # "El mejor de los que hay" NO es lo mismo que "es éste". Muchas lecturas
+    # libres -- de YouTube, de aficionados -- no tienen equivalente en Audible,
+    # y ahí lo correcto es decir que no está, no colocar la grabación menos
+    # lejana. Medido: contra un fichero de 129 minutos la más cercana dura 111,
+    # que es un 14% menos: OTRA lectura, con otro narrador.
+    #
+    # Así que la elección automática exige una prueba, no un ranking: o el
+    # narrador coincide con el que declaran las etiquetas, o la duración cuadra
+    # de verdad.
+    coincide_narrador = bool(
+        narrador and g.get('narrators')
+        and max(_title_score(narrador, n) for n in g['narrators']) >= 0.85)
+
+    cuadra_duracion = False
+    if duracion and g.get('runtime_min'):
+        a, b = int(duracion), int(g['runtime_min'])
+        cuadra_duracion = (min(a, b) / max(a, b)) >= 0.95 if max(a, b) else False
+
+    if not (coincide_narrador or cuadra_duracion):
+        log(f"ninguna de las {len(cands)} grabaciones cuadra con el fichero "
+            f"({duracion or '?'} min): la más cercana dura {g.get('runtime_min') or '?'}. "
+            f"Probablemente no esté en Audible")
+        return None
+
+    log(f"misma obra, {len(cands)} grabaciones -> elegida "
+        f"{', '.join(g.get('narrators') or ['sin narrador'])} "
+        f"({g.get('runtime_min') or '?'} min) contra {duracion or '?'} min del fichero")
+
+    return g
+
+
+def resolve_audiobook(title, author=None, region="es", asin_hint=None, log=None, local=None):
     log = log or (lambda m: None)
 
     hint = (asin_hint or "").strip().upper()
@@ -558,6 +707,14 @@ def resolve_audiobook(title, author=None, region="es", asin_hint=None, log=None)
             score = _title_score(variante, p["title"])
             if p["subtitle"]:
                 score = max(score, _title_score(variante, f"{p['title']} {p['subtitle']}"))
+
+            # Contención, igual que en juegos: la consulta lleva el prefijo del
+            # autor ("Sun Tzu - El Arte de la Guerra") y Audible no, así que la
+            # similitud cruda se quedaba en 0.880 para las TRES grabaciones y
+            # ninguna llegaba al umbral. Si las palabras de una están dentro de
+            # la otra, es el mismo libro con adornos.
+            if _mismo_trabajo(variante, p["title"]):
+                score = max(score, 0.95)
             if author and p["authors"] and max(_title_score(author, a) for a in p["authors"]) >= 0.85:
                 score += 0.05
             score = max(0.0, min(1.0, score))
@@ -584,11 +741,89 @@ def resolve_audiobook(title, author=None, region="es", asin_hint=None, log=None)
                         "audnexus has no record for the best match", asin=best["asin"])
 
     if best["score"] >= TRUST_SCORE and lead >= LEAD_MARGIN:
-        conf, reason = "high", "clear single match"
+        conf, reason = "high", "coincidencia única y clara"
+    elif best["score"] >= TRUST_SCORE and _prueba_del_fichero(scored, local):
+        # La prueba NO depende de que las demás candidatas sean la misma obra.
+        # Estaba atado a eso y era un error: las tres grabaciones de *El arte
+        # de la guerra* son productos distintos --dos lecturas y una
+        # recopilación-- así que nunca agrupaban, y un fichero que cuadraba al
+        # minuto con una de ellas seguía preguntando.
+        #
+        # Que la duración o el narrador del fichero coincidan con UNA es
+        # prueba de por sí, sin importar qué sean las otras.
+        best = _prueba_del_fichero(scored, local)
+        rec = audnexus_book(best["asin"], region, log)
+
+        if not rec:
+            return _verdict("none", best["score"], None,
+                            "audnexus no tiene ficha de la grabación elegida",
+                            asin=best["asin"])
+
+        log(f"'{title}' -> high asin={best['asin']} "
+            f"({', '.join(best.get('narrators') or ['sin narrador'])}, "
+            f"{best.get('runtime_min')} min) por coincidir con el fichero")
+
+        return _verdict("high", best["score"], rec,
+                        "la duración o el narrador del fichero identifican la grabación",
+                        asin=best["asin"])
+    elif False:
+        # Mismo libro, varias lecturas. El narrador importa de verdad -- por
+        # eso no vale coger la primera -- pero el fichero trae con qué
+        # decidir. Y si NO lo trae, no se decide solo: se pregunta. Elegir
+        # narrador a ciegas es dar gato por liebre.
+        elegida = _elegir_grabacion(
+            _misma_obra([c for c in scored if c["score"] >= TRUST_SCORE]), local, log)
+
+        if elegida is None:
+            # Ninguna grabación cuadra: no es que haya duda de cuál, es que
+            # probablemente ésta no esté en el catálogo.
+            return _verdict("none", best["score"], None,
+                            "el libro está en Audible pero ninguna grabación "
+                            "coincide con la duración de este fichero")
+
+        best = elegida
+        rec = audnexus_book(best["asin"], region, log)
+        if not rec:
+            return _verdict("none", best["score"], None,
+                            "audnexus no tiene ficha de la grabación elegida",
+                            asin=best["asin"])
+        log(f"resolved audiobook '{title}' -> high asin={best['asin']}")
+        return _verdict("high", best["score"], rec,
+                        "misma obra en varias grabaciones; elegida por duración",
+                        asin=best["asin"])
     else:
+        # Antes de rendirse a un `low`: si el fichero dice cuánto dura y
+        # NINGUNA grabación se le parece, no es que haya duda de cuál es --
+        # es que no está. Enseñar como "mejor apuesta" una lectura de 309
+        # minutos para un fichero de 129 es peor que no enseñar nada.
+        duracion = (local or {}).get('runtime_min')
+
+        if duracion:
+            mejor_ratio = 0.0
+            for c in scored:
+                if not c.get('runtime_min'):
+                    continue
+                a, b = int(duracion), int(c['runtime_min'])
+                if max(a, b):
+                    mejor_ratio = max(mejor_ratio, min(a, b) / max(a, b))
+
+            # 0.90 y no menos: un rip de un audiolibro comprado cuadra con
+            # el original al 97-99%, así que exigir un 90% sigue siendo
+            # generoso. Con 0.85 se colaba una lectura un 14% más corta, que
+            # es otro narrador leyendo otra edición.
+            if mejor_ratio and mejor_ratio < 0.90:
+                log(f"'{title}': el libro está en Audible pero ninguna grabación "
+                    f"se acerca a los {duracion} min del fichero "
+                    f"(la mejor se queda en {mejor_ratio:.0%})")
+                return _verdict("none", 0.0, None,
+                                f"ninguna grabación de Audible dura lo que este "
+                                f"fichero ({duracion} min); probablemente sea una "
+                                f"lectura libre sin equivalente comercial")
+
         conf = "low"
-        reason = ("best candidate below trust score" if best["score"] < TRUST_SCORE
-                  else "several recordings score the same; a human picks the narrator")
+        reason = ("el mejor candidato no llega al umbral de confianza"
+                  if best["score"] < TRUST_SCORE
+                  else "varias grabaciones puntúan igual; el narrador lo elige una persona")
 
     log(f"resolved audiobook '{title}' -> {conf} asin={best['asin']} "
         f"score={best['score']:.3f} lead={lead:.3f} ({reason})")

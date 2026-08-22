@@ -2272,11 +2272,19 @@ class Prep():
 
         try:
             if is_audio:
+                # La duración y el narrador que traen las etiquetas son lo
+                # que distingue una grabación de otra sin preguntar.
+                local = dict(meta.get('bookinfo') or {})
+                for k in ('runtime_min', 'narrators', 'language', 'year', 'publisher'):
+                    if meta.get(k):
+                        local.setdefault(k, meta[k])
+
                 res = _resolve_audiobook(
                     title, author,
                     region=(self.config['DEFAULT'].get('audible_region') or 'es'),
                     asin_hint=meta.get('asin'),
-                    log=lambda m: log.info(f"[book_resolver] {m}"))
+                    log=lambda m: log.info(f"[book_resolver] {m}"),
+                    local=local)
             else:
                 # Lo que el fichero sabe de sí mismo viaja al resolver: es lo
                 # que desempata entre ediciones sin preguntarle a nadie.
