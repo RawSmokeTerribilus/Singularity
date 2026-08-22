@@ -386,17 +386,34 @@ def _analyze_pdf(path):
 
     paginas  = len(re.findall(rb'/Type\s*/Page[^s]', d))
     imagenes = len(re.findall(rb'/Subtype\s*/Image', d))
-    fuentes  = len(re.findall(rb'/Type\s*/Font', d))
 
-    # Sin fuentes declaradas y con imagenes = paginas escaneadas sin OCR: no
-    # se puede buscar dentro ni copiar texto. Es la peor calidad posible.
-    return {
-        'paginas': paginas,
-        'imagenes': imagenes,
-        'fuentes': fuentes,
-        'capa_texto': fuentes > 0,
-        'escaneo': fuentes == 0 and imagenes > 0,
-    }
+    # `/Type` es OPCIONAL dentro de un diccionario de fuente, así que buscar
+    # `/Type /Font` se deja fuera a un PDF con texto perfectamente normal.
+    # Medido: el de Omegalfa trae 57 referencias `/Font` y ninguna `/Type
+    # /Font`, y se anunciaba como escaneo en la descripción pública.
+    fuentes = max(
+        len(re.findall(rb'/Type\s*/Font', d)),
+        len(re.findall(rb'/BaseFont', d)),
+        len(re.findall(rb'/Font\b', d)),
+    )
+
+    out = {'paginas': paginas, 'imagenes': imagenes, 'fuentes': fuentes}
+
+    if fuentes:
+        out['capa_texto'] = True
+        return out
+
+    # Sin rastro de fuentes hay dos explicaciones, y no son lo mismo: que no
+    # las haya, o que estén dentro de un stream de objetos comprimido y desde
+    # aquí no se vean. Si el PDF usa /ObjStm estamos ciegos, y afirmar
+    # "escaneo" sería inventarse un defecto. Mejor no decir nada.
+    if re.search(rb'/ObjStm', d):
+        return out
+
+    out['capa_texto'] = False
+    out['escaneo'] = imagenes > 0
+
+    return out
 
 
 def _analyze_comic(path):
