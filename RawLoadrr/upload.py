@@ -268,9 +268,29 @@ def build_recursive_queue(root_path, only=None):
                            if _quiere('audiobook') else [])
 
         if audiobook_files:
-            queue.append(dirpath if len(audiobook_files) > 1 else os.path.join(dirpath, audiobook_files[0]))
-            processed_paths.add(dirpath)
-            dirnames.clear()
+            # Varios ficheros de audio en una carpeta son DOS cosas muy
+            # distintas: los capítulos de un audiolibro, que son una obra, o
+            # varios audiolibros sueltos, que son varias. Se distinguen por el
+            # título de sus etiquetas -- los capítulos comparten el del libro.
+            #
+            # Medido: tres .m4b de Laura Gallego en una carpeta se encolaban
+            # como UN torrent de la carpeta entera.
+            carpeta_entera = False
+
+            for grupo in _bi.agrupar_audiolibros(dirpath, audiobook_files):
+                if len(grupo) == 1:
+                    queue.append(os.path.join(dirpath, grupo[0]))
+                else:
+                    queue.append(dirpath)
+                    carpeta_entera = True
+
+            # Dejar de bajar sólo tiene sentido si la carpeta ENTERA es una
+            # obra (sus capítulos). Si lo que hay son varias obras sueltas, los
+            # subdirectorios pueden tener más cosas y hay que seguir mirando:
+            # cortando aquí se perdía el e-book que colgaba de una subcarpeta.
+            if carpeta_entera:
+                processed_paths.add(dirpath)
+                dirnames.clear()
             # OJO: aquí NO se hace `continue`. Una carpeta puede tener el
             # audiolibro y el e-book de la misma obra, y son dos torrents
             # distintos: cortar aquí es lo que hacía que sólo subiera el pdf.
@@ -349,7 +369,14 @@ def _resolver_only(meta, root_path):
     """
     from src import library
 
-    only = [k for k in (meta.get('only') or []) if k]
+    # args.py aplana TODA lista a una cadena, así que `--only audiobook` llega
+    # como "audiobook" y no como ["audiobook"]. Iterarlo daba letras sueltas
+    # --['a','u','d',...]-- y la cola salía vacía sin decir por qué.
+    crudo = meta.get('only') or []
+    if isinstance(crudo, str):
+        crudo = crudo.replace(',', ' ').split()
+
+    only = [k for k in crudo if k]
     if 'all' in only:
         return []
     if only:

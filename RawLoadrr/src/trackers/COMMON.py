@@ -238,6 +238,15 @@ class COMMON():
         if line:
             await descfile.write(f"[center]{line}[/center]\n\n")
 
+        # Una lectura libre no está en ningún catálogo comercial, pero la obra
+        # sí: la portada y la sinopsis de arriba son del libro y valen igual.
+        # Lo único que no se puede afirmar es la grabación, y se dice.
+        if meta.get('lectura_libre'):
+            await descfile.write(
+                "[center][i]Lectura libre: esta grabación no figura en ningún "
+                "catálogo comercial. La portada y la sinopsis son de la obra; "
+                "el narrador no está identificado.[/i][/center]\n\n")
+
         genres = meta.get('genres') or []
         if genres:
             await descfile.write(f"[center][i]{' · '.join(str(g) for g in genres[:8])}[/i][/center]\n\n")

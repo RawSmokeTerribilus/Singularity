@@ -532,3 +532,34 @@ def original_title(path):
             return titulo
 
     return ''
+
+
+def agrupar_audiolibros(carpeta, nombres):
+    """
+    Reparte los ficheros de audio de una carpeta en obras.
+
+    -> lista de listas de nombres; cada lista es un audiolibro.
+
+    Varios ficheros juntos son dos cosas opuestas: los capítulos de UNA obra,
+    o varias obras sueltas. Los capítulos comparten el título en las etiquetas
+    -- ahí va el nombre del libro, no el del capítulo -- y las obras distintas
+    no. Medido con tres .m4b de Laura Gallego en una carpeta: tres títulos
+    distintos, tres torrents.
+
+    Sin etiquetas legibles se agrupa por nombre de fichero: es peor, pero un
+    fichero suelto por obra falla menos que meterlo todo en el mismo saco.
+    """
+    import os as _os
+
+    por_titulo = {}
+
+    for nombre in nombres:
+        etiquetas = from_audiobook(_os.path.join(carpeta, nombre))
+        clave = (etiquetas.get('title') or '').strip().lower()
+
+        if not clave:
+            clave = _os.path.splitext(nombre)[0].lower()
+
+        por_titulo.setdefault(clave, []).append(nombre)
+
+    return [sorted(v) for v in por_titulo.values()]

@@ -2316,6 +2316,19 @@ class Prep():
 
             return meta
 
+        if not found and is_audio:
+            # La grabación no está en Audible, pero eso NO dice nada del libro.
+            # Una lectura libre de *El arte de la guerra* sigue siendo *El arte
+            # de la guerra*: la portada, la sinopsis y el autor son de la OBRA,
+            # no del narrador, y no tiene menos derecho a ellos por ser libre.
+            #
+            # Así que se pregunta al segundo proveedor. Si Google Books conoce
+            # el libro, la subida se compone con los datos de la obra y sin
+            # ASIN, marcada como lectura libre. Si luego resulta ser una
+            # zarzuela, para eso están los reportes y el propio uploader.
+            if self._vestir_lectura_libre(meta, title, author, year):
+                return meta
+
         if not found:
             # Antes se subía igual, sin id. Así es como un `Contrato.pdf` de la
             # carpeta de descargas acaba de torrent: la extensión no distingue
@@ -2359,6 +2372,63 @@ class Prep():
     # delante: el lote de descargas murió en el cuarto item en vez de saltarlo.
     # Estas dos dejan la entrada con la misma forma que la de vídeo, para que
     # el informe de pendientes se pueda leer de una sola pasada.
+    def _vestir_lectura_libre(self, meta, title, author, year):
+        """
+        Grabación desconocida, obra conocida: se sube como lectura libre.
+
+        -> True si la obra queda identificada y la subida puede seguir.
+
+        Una lectura de aficionado o de un canal no existe en ningún catálogo
+        comercial, y ahí acababa bloqueada. Pero el libro sí existe, y la
+        portada, la sinopsis, el autor y los géneros son de la obra: no
+        cambian porque los lea otra voz.
+
+        Lo único que no se puede afirmar es la grabación, así que el ASIN se
+        queda vacío y se dice en la descripción. Lo que no se sabe se calla;
+        lo que se sabe se usa.
+        """
+        # El "autor" de un audiolibro suele NO ser el autor: las etiquetas
+        # traen la productora o el canal. El de la prueba decía "AMA
+        # Audiolibros", y con eso en `inauthor:` Google Books no encuentra
+        # nada. Así que se intenta con él y, si falla, sin él: el título ya
+        # suele llevar el autor dentro ("Sun Tzu - El Arte de la Guerra").
+        obra = None
+        for autor_intento in (author, None):
+            try:
+                r = _resolve_book(title, autor_intento, year, config=self.config,
+                                  log=lambda m: log.info(f"[book_resolver/obra] {m}"))
+            except Exception as e:                              # noqa: BLE001
+                log.info(f"[book_resolver/obra] {e}")
+                continue
+
+            if r.get('confidence') == 'high' and r.get('record'):
+                obra = r
+                break
+
+        if not obra:
+            return False
+
+        # Aquí SÍ se pisa el título y el autor locales, al revés que en el
+        # camino normal. Si se ha llegado hasta aquí es porque los del fichero
+        # no identificaron nada: "AMA Audiolibros" como autor y el bitrate
+        # pegado al título. Los del proveedor son mejores por definición.
+        rec = obra['record']
+        if rec.get('title'):
+            meta['title'] = rec['title']
+        if rec.get('authors'):
+            meta['authors'] = rec['authors']
+
+        self._merge_book_record(meta, rec)
+        meta['lectura_libre'] = True
+        meta['isbn13_obra'] = obra.get('isbn13') or ''
+
+        console.print(
+            f"[green]Lectura libre:[/green] la grabación no está en Audible, "
+            f"pero la obra sí — [bold]{obra['record'].get('title')}[/bold]. "
+            f"[dim]Se sube con portada y sinopsis del libro y sin ASIN.[/dim]")
+
+        return True
+
     def _report_book_pending(self, meta, title, label, res):
         rec = res.get('record') or {}
         _report_pending({
