@@ -255,22 +255,87 @@ class COMMON():
         if synopsis:
             await descfile.write(f"[quote]{synopsis}[/quote]\n\n")
 
-        info = meta.get('bookinfo') or {}
-        if info:
-            await descfile.write("[spoiler=BookInfo][code]\n")
-            for key, value in info.items():
-                if value in (None, ""):
-                    continue
-                if key == 'bytes':
-                    value = f"{int(value) / (1024 * 1024):.2f} MiB"
-                elif key == 'pct_texto':
-                    value = f"{value}%"
-                elif isinstance(value, bool):
-                    value = "sí" if value else "no"
-                await descfile.write(f"{key.replace('_', ' '):<12}: {value}\n")
-            await descfile.write("[/code][/spoiler]\n\n")
+        await self._write_bookinfo(descfile, meta)
 
         await self._provider_badges(descfile, meta)
+
+    # Etiquetas legibles y ORDEN fijo. Un volcado de un diccionario sale en el
+    # orden en que se rellenó, que no es el orden en que se lee.
+    _BOOKINFO_CAMPOS = [
+        ('formato',     'Formato'),
+        ('codec',       'Códec'),
+        ('duracion',    'Duración'),
+        ('capitulos',   'Capítulos'),
+        ('bitrate',     'Bitrate'),
+        ('frecuencia',  'Frecuencia'),
+        ('canales',     'Canales'),
+        ('mb_por_hora', 'MB por hora'),
+        ('bytes',       'Tamaño'),
+        ('paginas',     'Páginas'),
+        ('version',     'Versión EPUB'),
+        ('maquetado',   'Maquetado'),
+        ('drm',         'DRM'),
+        ('capa_texto',  'Capa de texto'),
+        ('escaneo',     'Escaneo sin OCR'),
+        ('pct_texto',   'Proporción de texto'),
+        ('imagenes',    'Imágenes'),
+        ('fuentes',     'Fuentes'),
+    ]
+
+    async def _write_bookinfo(self, descfile, meta):
+        """
+        El bloque técnico, que es el mediainfo de un libro o de un audiolibro.
+
+        Antes era un volcado crudo del diccionario, con las claves tal cual y
+        en orden de relleno. Y en un audiolibro no decía NADA útil -- ni
+        duración, ni bitrate, ni capítulos -- porque el análisis de audio no
+        existía: se anunciaba con el formato y el tamaño, que no distinguen una
+        lectura de 126 kbps de otra de 63.
+        """
+        info = meta.get('bookinfo') or {}
+        if not info:
+            return
+
+        filas = []
+
+        for clave, etiqueta in self._BOOKINFO_CAMPOS:
+            if clave not in info:
+                continue
+
+            valor = info[clave]
+
+            if valor in (None, ""):
+                continue
+
+            if clave == 'bytes':
+                valor = f"{int(valor) / (1024 * 1024):.2f} MiB"
+            elif clave == 'pct_texto':
+                valor = f"{valor}%"
+            elif clave == 'mb_por_hora':
+                valor = f"{valor} MiB/h"
+            elif isinstance(valor, bool):
+                valor = "sí" if valor else "no"
+
+            filas.append((etiqueta, valor))
+
+        # Lo que no esté en la lista de arriba se enseña igual, al final:
+        # más vale un campo con nombre feo que un campo perdido.
+        conocidas = {c for c, _e in self._BOOKINFO_CAMPOS}
+        for clave, valor in info.items():
+            # `duracion_min` es para desempatar grabaciones, no para leerla.
+            if clave in conocidas or clave.endswith('_min') or valor in (None, "", [], {}):
+                continue
+            filas.append((clave.replace('_', ' ').capitalize(), valor))
+
+        if not filas:
+            return
+
+        ancho = max(len(e) for e, _v in filas)
+
+        await descfile.write("[spoiler=BookInfo][code]\n")
+        for etiqueta, valor in filas:
+            await descfile.write(f"{etiqueta:<{ancho}} : {valor}\n")
+        await descfile.write("[/code][/spoiler]\n\n")
 
     async def _provider_badges(self, descfile, meta):
         """

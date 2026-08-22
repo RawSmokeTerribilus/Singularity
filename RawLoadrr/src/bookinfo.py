@@ -326,6 +326,8 @@ def analyze(path):
         out.update(_analyze_pdf(path))
     elif ext in ('.cbz', '.cbr'):
         out.update(_analyze_comic(path))
+    elif ext in AUDIOBOOK_EXTS:
+        out.update(_analyze_audio(path))
 
     return out
 
@@ -563,3 +565,117 @@ def agrupar_audiolibros(carpeta, nombres):
         por_titulo.setdefault(clave, []).append(nombre)
 
     return [sorted(v) for v in por_titulo.values()]
+
+
+# Códec por contenedor. No se deduce del bitrate ni se adivina: si el
+# contenedor no lo dice de forma inequívoca, no se afirma.
+_CODEC_POR_EXT = {
+    '.m4b': 'AAC', '.m4a': 'AAC', '.aax': 'AAC', '.aa': 'AAC (Audible)',
+    '.mp3': 'MP3', '.ogg': 'Vorbis', '.opus': 'Opus', '.flac': 'FLAC',
+    '.wma': 'WMA',
+}
+
+
+def _duracion_legible(segundos):
+    """22952 -> '6 h 22 min'. Un audiolibro se mide en horas, no en segundos."""
+    segundos = int(segundos)
+    horas, resto = divmod(segundos, 3600)
+    minutos = resto // 60
+
+    if horas:
+        return f"{horas} h {minutos:02d} min"
+
+    return f"{minutos} min {segundos % 60:02d} s"
+
+
+def _capitulos_m4b(path):
+    """
+    Cuántos capítulos declara un MP4, o None si no se puede saber.
+
+    Los .m4b los guardan en un átomo `chpl` (el de Nero) o en una pista de
+    capítulos. Se cuenta el `chpl` porque es el que se lee sin descomprimir
+    nada; si no está, se calla en vez de decir cero, que no es lo mismo que
+    "no lo sé".
+    """
+    try:
+        with open(path, 'rb') as fh:
+            cabeza = fh.read(4 * 1024 * 1024)
+            fh.seek(max(0, os.path.getsize(path) - 4 * 1024 * 1024))
+            cola = fh.read(4 * 1024 * 1024)
+    except OSError:
+        return None
+
+    for trozo in (cabeza, cola):
+        i = trozo.find(b'chpl')
+        if i == -1:
+            continue
+
+        # El `chpl` de Nero no tiene una sola forma: según la versión, la
+        # cuenta va en un byte o en cuatro, y el hueco reservado de delante
+        # cambia. Leer un desplazamiento fijo daba 301.989.888 capítulos.
+        #
+        # Así que se prueban los sitios donde puede estar y se acepta el
+        # primero que sea PLAUSIBLE. Un audiolibro tiene capítulos, no
+        # millones: fuera de 1..2000 no es la cuenta, es basura leída de
+        # cualquier otro sitio del fichero, y entonces se calla.
+        for desplazamiento, ancho in ((8, 1), (12, 1), (13, 1), (8, 4), (12, 4)):
+            try:
+                n = int.from_bytes(trozo[i + desplazamiento:i + desplazamiento + ancho], 'big')
+            except Exception:                                   # noqa: BLE001
+                continue
+
+            if 1 <= n <= 2000:
+                return n
+
+        return None
+
+    return None
+
+
+def _analyze_audio(path):
+    """
+    Lo que se está descargando, técnicamente.
+
+    El equivalente del mediainfo de una peli: cuánto dura, a qué bitrate, con
+    qué frecuencia y cuántos canales. Antes esta rama no existía y un
+    audiolibro se anunciaba sólo con su formato y su tamaño, que no dice nada
+    de la calidad de la lectura.
+    """
+    out = {}
+
+    try:
+        from tinytag import TinyTag
+        tag = TinyTag.get(path)
+    except Exception:                                           # noqa: BLE001
+        return out
+
+    ext = os.path.splitext(path)[1].lower()
+
+    if _CODEC_POR_EXT.get(ext):
+        out['codec'] = _CODEC_POR_EXT[ext]
+
+    if getattr(tag, 'duration', None):
+        out['duracion'] = _duracion_legible(tag.duration)
+        out['duracion_min'] = int(tag.duration // 60)
+
+    if getattr(tag, 'bitrate', None):
+        out['bitrate'] = f"{int(round(tag.bitrate))} kbps"
+
+    if getattr(tag, 'samplerate', None):
+        out['frecuencia'] = f"{int(tag.samplerate)} Hz"
+
+    if getattr(tag, 'channels', None):
+        canales = int(tag.channels)
+        out['canales'] = {1: 'mono', 2: 'estéreo'}.get(canales, f"{canales} canales")
+
+    capitulos = _capitulos_m4b(path) if ext in ('.m4b', '.m4a', '.aax') else None
+    if capitulos:
+        out['capitulos'] = capitulos
+
+    # Cuántos MB por hora: es la cifra que de verdad compara dos lecturas del
+    # mismo libro, porque el tamaño suelto sólo dice lo larga que es.
+    if out.get('duracion_min') and out['duracion_min'] > 0:
+        mb_hora = (os.path.getsize(path) / (1024 * 1024)) / (out['duracion_min'] / 60)
+        out['mb_por_hora'] = f"{mb_hora:.1f}"
+
+    return out
