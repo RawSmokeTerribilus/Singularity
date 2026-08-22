@@ -32,7 +32,7 @@ DISC_EXTS = ('.chd', '.cue', '.bin', '.gdi', '.iso', '.img', '.ccd')
 GAME_EXTS_AUTO = ARCHIVE_EXTS + (
     '.7z', '.chd', '.gdi', '.scummvm',
     '.nes', '.fds', '.sfc', '.smc', '.gba', '.gb', '.gbc',
-    '.n64', '.z64', '.v64', '.md', '.gen', '.smd', '.32x', '.sms', '.gg',
+    '.n64', '.z64', '.v64', '.gen', '.smd', '.32x', '.sms', '.gg',
     '.pce', '.sgx', '.a26', '.a78', '.lnx', '.ws', '.wsc', '.ngp', '.ngc',
     '.d64', '.t64', '.adf', '.nds', '.3ds', '.cia',
 )
@@ -45,6 +45,10 @@ GAME_EXTS_AUTO = ARCHIVE_EXTS + (
 #                      paletas, no ROMs de ColecoVision
 GAME_EXTS_EXPLICIT = DISC_EXTS + (
     '.col', '.int', '.vec', '.tap', '.dsk', '.st', '.z80', '.tzx', '.rom',
+    # .md es Mega Drive, sí, pero antes que eso es Markdown: en la prueba se
+    # tragó Home.md, Services.md y todos los README de la caja. Las ROMs de
+    # Mega Drive vienen casi siempre en .gen, .smd o dentro de un zip.
+    '.md',
 )
 
 GAME_EXTS = tuple(dict.fromkeys(GAME_EXTS_AUTO + GAME_EXTS_EXPLICIT))

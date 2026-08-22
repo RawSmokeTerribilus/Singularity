@@ -443,6 +443,20 @@ async def do_the_thing(base_dir):
             skipped_tmdb_files.append(path)
             continue
 
+        # Sin id determinante no se sube. La extensión no distingue un
+        # "Contrato.pdf" de "El Quijote.pdf" y nunca lo hará; quien sabe si eso
+        # es una obra es el proveedor, y si no la reconoce, no lo es.
+        #
+        # Se salta ESTE item, no la tirada: en un lote de 78 juegos uno sin
+        # identificar no puede tumbar los otros 77.
+        if meta.get('id_not_found') and not meta.get('allow_no_id'):
+            skipped_files += 1
+            skipped_details.append((path, f"Sin id: {meta['id_not_found']}"))
+            console.print(f"[bold red]Saltado[/bold red] — {meta['id_not_found']}. "
+                          f"[dim]Pásale el id a mano (--isbn / --asin / --igdb) "
+                          f"o usa --allow-no-id si de verdad quieres subirlo sin él.[/dim]")
+            continue
+
         try:
             meta['name_notag'], meta['name'], meta['clean_name'], meta['potential_missing'] = await prep.get_name(meta)
             if any(val is None for val in (meta['name_notag'], meta['name'], meta['clean_name'], meta['potential_missing'])):

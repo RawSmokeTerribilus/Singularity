@@ -49,6 +49,11 @@ class Args():
         parser.add_argument('-isbn', '--isbn', nargs='*', required=False, help="ISBN of the e-book edition (10 or 13 digits; converted to ISBN-13)", type=str)
         parser.add_argument('-asin', '--asin', nargs='*', required=False, help="Audible ASIN of the audiobook recording", type=str)
         parser.add_argument('-igdb', '--igdb', nargs='*', required=False, help="IGDB game ID", type=str)
+        # Sin id determinante no se sube. Esto es la salida de emergencia, y
+        # tiene que costar teclearla: es lo único que separa una biblioteca de
+        # una carpeta de descargas subida entera por error.
+        parser.add_argument('--allow-no-id', dest='allow_no_id', action='store_true', required=False,
+                            help="Subir libros/audiolibros/juegos aunque ningún proveedor los reconozca")
         parser.add_argument('-mbid', '--mbid', nargs='?', help="MusicBrainz Release ID", type=self.validate_mbid, dest='mbid_manual')
         parser.add_argument('-discogs', '--discogs', nargs='*', required=False, help="Discogs Release ID", type=str, dest='discogs_id')
         parser.add_argument('-g', '--tag', nargs='*', required=False, help="Group Tag", type=str)

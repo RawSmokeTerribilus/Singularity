@@ -15,6 +15,7 @@ from src.musicbrainz import MusicBrainzAPI
 from src.discogs import DiscogsAPI
 from src import bookinfo
 from src import gameinfo
+from src import library
 from src.book_resolver import (resolve_book as _resolve_book,
                               resolve_audiobook as _resolve_audiobook)
 from src.igdb_resolver import resolve_game as _resolve_game
@@ -841,6 +842,17 @@ class Prep():
 
         raw = meta.get('title') or filename
 
+        # Antes de gastar una petición: hay nombres que no pueden ser el título
+        # de nada. Un hash de 32 hex, un número de serie, algo sin una sola
+        # letra. Es a propósito conservador -- "Contrato" PASA de aquí, porque
+        # quien tiene que decir que no es el proveedor, no una lista negra.
+        plausible, motivo = library.looks_like_work(filename or title)
+        if not plausible:
+            console.print(f"[bold red]Saltado[/bold red] — {motivo}: '{filename or title}'")
+            meta['id_not_found'] = motivo
+
+            return meta
+
         try:
             res = _resolve_game(raw, igdb_hint=meta.get('igdb'),
                                 config=self.config,
@@ -859,15 +871,19 @@ class Prep():
             return meta
 
         if not found:
-            console.print(f"[yellow]Sin candidato en IGDB para '{raw}'. Se sube sin id.")
-            _report_pending(self._override_key(meta), raw, res.get('reason', ''))
+            console.print(f"[bold red]Sin id de IGDB para '{raw}': "
+                          f"IGDB no lo reconoce como juego.")
+            console.print(f"[dim]{res.get('reason', '')}[/dim]")
+            self._report_game_pending(meta, raw, res)
+            meta['id_not_found'] = "sin id de IGDB"
 
             return meta
 
         if meta.get('unattended'):
             console.print(f"[yellow]IGDB {found} sólo llega a '{res['confidence']}'. "
-                          f"Se salta en modo desatendido.")
-            _report_pending(self._override_key(meta), raw, res.get('reason', ''))
+                          f"En desatendido no se adivina.")
+            self._report_game_pending(meta, raw, res)
+            meta['id_not_found'] = "id de IGDB dudoso, y nadie a quien preguntar"
 
             return meta
 
@@ -881,6 +897,8 @@ class Prep():
             self._merge_game_record(meta, rec)
             _save_override(self._override_key(meta),
                            {'igdb': found, 'title': rec.get('title', raw)})
+        else:
+            meta['id_not_found'] = "id de IGDB rechazado por quien sube"
 
         return meta
 
@@ -2219,6 +2237,18 @@ class Prep():
         author = ', '.join(meta.get('authors') or []) or None
         is_audio = meta['category'] == 'AUDIOBOOK'
 
+        # Antes de gastar una petición: hay nombres que no pueden ser el título
+        # de nada. Un hash de 32 hex, un número de serie, algo sin una sola
+        # letra. Es a propósito conservador -- "Contrato" PASA de aquí, porque
+        # quien tiene que decir que no es el proveedor, no una lista negra.
+        plausible, motivo = library.looks_like_work(filename or title)
+        if not plausible:
+            console.print(f"[bold red]Saltado[/bold red] — {motivo}: '{filename or title}'")
+            meta['id_not_found'] = motivo
+
+            return meta
+
+
         try:
             if is_audio:
                 res = _resolve_audiobook(
@@ -2247,8 +2277,15 @@ class Prep():
             return meta
 
         if not found:
-            console.print(f"[yellow]No {label} found for '{title}'. Uploading without an id.")
-            _report_pending(self._override_key(meta), title, res.get('reason', ''))
+            # Antes se subía igual, sin id. Así es como un `Contrato.pdf` de la
+            # carpeta de descargas acaba de torrent: la extensión no distingue
+            # un contrato de El Quijote, y quien sí sabe es el proveedor. Sin
+            # id determinante no hay obra, y sin obra no hay subida.
+            console.print(f"[bold red]Sin {label} para '{title}': "
+                          f"ningún proveedor lo reconoce como obra.")
+            console.print(f"[dim]{res.get('reason', '')}[/dim]")
+            self._report_book_pending(meta, title, label, res)
+            meta['id_not_found'] = f"sin {label}"
 
             return meta
 
@@ -2256,9 +2293,10 @@ class Prep():
         # the common case: the same book has many editions and they all match
         # the title exactly. That is a question for a human, not a coin flip.
         if meta.get('unattended'):
-            console.print(f"[yellow]{label} {found} is only '{res['confidence']}'. "
-                          f"Skipping in unattended mode.")
-            _report_pending(self._override_key(meta), title, res.get('reason', ''))
+            console.print(f"[yellow]{label} {found} sólo llega a '{res['confidence']}'. "
+                          f"En desatendido no se adivina.")
+            self._report_book_pending(meta, title, label, res)
+            meta['id_not_found'] = f"{label} dudoso, y nadie a quien preguntar"
 
             return meta
 
@@ -2266,13 +2304,62 @@ class Prep():
         console.print(f"[cyan]Best guess: [/cyan]{rec.get('title', title)} "
                       f"[dim]{', '.join(rec.get('authors') or [])}[/dim] -> {label} {found}")
 
-        if Confirm.ask(f"Use this {label}?", default=True):
+        if Confirm.ask(f"¿Uso este {label}?", default=False):
             meta['asin' if is_audio else 'isbn'] = found
             self._merge_book_record(meta, rec)
             _save_override(self._override_key(meta),
                            {'asin' if is_audio else 'isbn': found, 'title': rec.get('title', title)})
+        else:
+            meta['id_not_found'] = f"{label} rechazado por quien sube"
 
         return meta
+
+    # report_pending() recibe UN diccionario, no tres posicionales. Pasarle
+    # tres reventaba con TypeError y, peor, se llevaba la tirada ENTERA por
+    # delante: el lote de descargas murió en el cuarto item en vez de saltarlo.
+    # Estas dos dejan la entrada con la misma forma que la de vídeo, para que
+    # el informe de pendientes se pueda leer de una sola pasada.
+    def _report_book_pending(self, meta, title, label, res):
+        rec = res.get('record') or {}
+        _report_pending({
+            "path": meta.get('path', ''),
+            "override_key": self._override_key(meta),
+            "filename": os.path.basename(str(meta.get('path', ''))),
+            "title": title,
+            "year": meta.get('year'),
+            "category": meta.get('category'),
+            "confidence": res.get('confidence'),
+            "reason": res.get('reason', ''),
+            "id_kind": label,
+            "best_guess": {
+                "isbn13": res.get('isbn13', ''),
+                "asin": res.get('asin', ''),
+                "title": rec.get('title', ''),
+                "authors": rec.get('authors') or [],
+                "score": res.get('score'),
+            },
+        })
+
+    def _report_game_pending(self, meta, raw, res):
+        rec = res.get('record') or {}
+        _report_pending({
+            "path": meta.get('path', ''),
+            "override_key": self._override_key(meta),
+            "filename": os.path.basename(str(meta.get('path', ''))),
+            "title": raw,
+            "year": meta.get('year'),
+            "category": "GAME",
+            "confidence": res.get('confidence'),
+            "reason": res.get('reason', ''),
+            "id_kind": "IGDB",
+            "best_guess": {
+                "igdb": res.get('igdb', 0),
+                "title": rec.get('title', ''),
+                "year": rec.get('year'),
+                "platforms": rec.get('platforms') or [],
+                "score": res.get('score'),
+            },
+        })
 
     def _merge_book_record(self, meta, record):
         """Copy the provider's fields in without overwriting anything local."""
