@@ -24,7 +24,11 @@ from difflib import SequenceMatcher
 import requests
 
 TIMEOUT = 12
-ATTEMPTS = 3                 # Google Books answers 503 at random; one try loses results
+# Google Books devuelve 503 de forma aleatoria. Medido con la clave puesta:
+# 3 de cada 15 peticiones, un 20%. Con tres intentos y esperas de 0,4 y 0,8
+# segundos se colaba igual -- las dos consultas de un mismo libro pueden caer
+# las dos -- y el libro se quedaba sin portada ni sinopsis.
+ATTEMPTS = 5
 MIN_CANDIDATE_SCORE = 0.50
 TRUST_SCORE = 0.90
 LEAD_MARGIN = 0.05           # two editions of one book tie exactly; that is a question, not a win
@@ -117,8 +121,12 @@ def _google_get(params, key, log):
             log(f"google books failed: {e}")
 
         if attempt < ATTEMPTS - 1:
+            import random
             import time
-            time.sleep(0.4 * (attempt + 1))
+            # Exponencial con algo de azar: si una tirada entera reintenta a la
+            # vez y siempre al mismo ritmo, vuelve a chocar toda junta.
+            espera = min(8.0, 0.6 * (2 ** attempt)) * (0.7 + random.random() * 0.6)
+            time.sleep(espera)
 
     return []
 
