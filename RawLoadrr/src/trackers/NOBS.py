@@ -94,9 +94,20 @@ class NOBS():
 
     @staticmethod
     def _isbn13(meta):
-        """13 digits and nothing else; the API validates the shape, not the book."""
-        raw = re.sub(r'[^0-9]', '', str(meta.get('isbn13') or meta.get('isbn') or ''))
-        return raw if len(raw) == 13 else None
+        """
+        13 dígitos y nada más; la API valida la forma, no el libro.
+
+        `isbn13_obra` es el del LIBRO cuando lo que se sube es una lectura
+        libre: la grabación no está en ningún catálogo y no tiene ASIN, pero
+        la obra sí tiene ISBN y con él el tracker saca portada, sinopsis y
+        autor. Va el último porque sólo aplica cuando no hay nada mejor.
+        """
+        for clave in ('isbn13', 'isbn', 'isbn13_obra'):
+            raw = re.sub(r'[^0-9]', '', str(meta.get(clave) or ''))
+            if len(raw) == 13:
+                return raw
+
+        return None
 
     @staticmethod
     def _asin(meta):
