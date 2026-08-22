@@ -292,9 +292,14 @@ class COMMON():
         if volume_id:
             enlaces.append(("Google Books", f"https://books.google.com/books?id={volume_id}"))
 
-        isbn13 = meta.get('isbn13') or meta.get('isbn')
-        if isbn13:
-            enlaces.append(("OpenLibrary", f"https://openlibrary.org/isbn/{isbn13}"))
+        # OpenLibrary sólo si de verdad tiene el libro. Medido sobre cuatro
+        # ISBN españoles reales: TRES devuelven 404 en la página. Enlazarlo
+        # siempre es mandar al lector a una página que no existe, y en un
+        # catálogo en castellano eso es la norma, no la excepción.
+        #
+        # El `olid` es la prueba: sólo lo hay si OpenLibrary contestó.
+        if meta.get('olid'):
+            enlaces.append(("OpenLibrary", f"https://openlibrary.org/works/{meta['olid']}"))
 
         asin = meta.get('asin')
         if asin:
