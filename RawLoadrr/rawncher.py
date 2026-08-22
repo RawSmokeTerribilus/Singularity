@@ -631,20 +631,43 @@ class Rawncher:
                 break
             console.print(f"[bold red]❌ No existe: {ruta_raw}[/bold red]")
 
+        # Este bloque sólo sabía de MKV y avisaba de "directorio sin archivos
+        # MKV" ante 77 juegos de ScummVM perfectamente subibles. Ahora cuenta
+        # lo que la cola sabe encolar, que es bastante más.
+        from src import bookinfo as _bi, gameinfo as _gi
+
+        _VIDEO = (".mkv", ".mp4", ".avi", ".ts", ".m2ts", ".m4v")
+        _CLASES = (
+            ("vídeo", _VIDEO),
+            ("e-book", _bi.EBOOK_EXTS),
+            ("audiolibro", _bi.AUDIOBOOK_EXTS),
+            ("juego", _gi.GAME_EXTS_AUTO),
+        )
+
+        def _clasificar(nombres):
+            return [(etiqueta, n) for etiqueta, exts in _CLASES
+                    if (n := sum(1 for f in nombres if f.lower().endswith(exts)))]
+
         if ruta.is_file():
-            if ruta.suffix.lower() == ".mkv":
-                console.print(f"[bold green]✅ Archivo MKV detectado:[/bold green] {ruta.name}")
+            hallado = _clasificar([ruta.name])
+            if hallado:
+                console.print(f"[bold green]✅ {hallado[0][0].capitalize()} detectado:"
+                              f"[/bold green] {ruta.name}")
             else:
-                console.print(f"[bold yellow]⚠️  Archivo no-MKV — se procesará de todas formas.[/bold yellow]")
+                console.print(f"[bold yellow]⚠️  Extensión no reconocida "
+                              f"({ruta.suffix or 'sin extensión'}) — se intentará "
+                              f"de todas formas.[/bold yellow]")
         elif ruta.is_dir():
-            mkv_files = list(ruta.rglob("*.mkv"))
-            if mkv_files:
-                console.print(
-                    f"[bold green]✅ Directorio con {len(mkv_files)} archivo(s) MKV.[/bold green]"
-                )
+            nombres = [f.name for f in ruta.rglob("*") if f.is_file()]
+            hallado = _clasificar(nombres)
+            if hallado:
+                detalle = ", ".join(f"{n} de {etiqueta}" for etiqueta, n in hallado)
+                console.print(f"[bold green]✅ Directorio con {detalle}.[/bold green]")
             else:
                 console.print(
-                    "[bold yellow]⚠️  Directorio sin archivos MKV — se procesará de todas formas.[/bold yellow]"
+                    "[bold yellow]⚠️  Directorio sin nada que RawLoadrr sepa subir "
+                    "(vídeo, e-books, audiolibros ni juegos) — se intentará de "
+                    "todas formas.[/bold yellow]"
                 )
 
         flags = self._args_opcionales(debug=debug)

@@ -193,14 +193,10 @@ def build_recursive_queue(root_path, game_mode=False):
     # e-books: electronic is electronic, and only the tracker category differs.
     book_extensions = ('.epub', '.mobi', '.azw3', '.azw', '.pdf', '.cbz', '.cbr', '.djvu', '.fb2')
     audiobook_extensions = ('.m4b',)
-    # Los juegos entran sólo si quien sube dijo --category game. Un .zip o un
-    # .iso no son juegos por sí mismos: MKVerything ya trata TODO .iso de un
-    # árbol como disco de vídeo para ripear, y adivinar aquí encolaría el mismo
-    # fichero dos veces. Fuera .iso y .bin a propósito, por lo mismo.
-    game_extensions = ('.zip', '.7z', '.chd', '.cue', '.gdi', '.scummvm',
-                       '.nes', '.fds', '.sfc', '.smc', '.gba', '.gb', '.gbc',
-                       '.n64', '.z64', '.v64', '.md', '.gen', '.smd', '.32x',
-                       '.sms', '.gg', '.pce', '.a26', '.a78', '.lnx', '.nds')
+    # Las inequívocas entran SIEMPRE; las ambiguas (.iso, .cue, .bin...) sólo
+    # con --category game. Una sola fuente de verdad, en gameinfo.
+    from src import gameinfo as _gi
+    game_extensions = _gi.GAME_EXTS if game_mode else _gi.GAME_EXTS_AUTO
     upload_extensions = video_extensions + book_extensions + audiobook_extensions
     # Sonarr names in English, so our own catalogue (1164 Season-N dirs) never
     # walked the failing branch. A Spanish "Temporada 1" did not match, so the
@@ -264,24 +260,6 @@ def build_recursive_queue(root_path, game_mode=False):
 
             continue
 
-        # Games, only when asked for. Like e-books, one archive is one work --
-        # a folder of ScummVM zips is a folder of different games. A folder
-        # that holds a game's loose data files instead is queued whole.
-        if game_mode:
-            game_files = [f for f in filenames if f.lower().endswith(game_extensions)]
-
-            if game_files:
-                for f in game_files:
-                    queue.append(os.path.join(dirpath, f))
-
-                continue
-
-            if filenames and not dirnames:
-                queue.append(dirpath)
-                processed_paths.add(dirpath)
-
-                continue
-
         # If not a season/show folder, check for movies or loose files
         video_files = [f for f in filenames if f.lower().endswith(video_extensions)]
         if video_files:
@@ -296,7 +274,33 @@ def build_recursive_queue(root_path, game_mode=False):
                 # Since this is a self-contained movie, don't descend into its subdirectories.
                 processed_paths.add(dirpath)
                 dirnames.clear()
-                
+
+            continue
+
+        # Los juegos van los ÚLTIMOS, después de vídeo, y no por capricho: una
+        # carpeta de pelis con un `caratulas.zip` suelto encolaría el zip como
+        # juego si esto fuera antes. Si el directorio tiene vídeo, es de vídeo.
+        #
+        # Como los e-books, un archivo es una obra: una carpeta con 77 zips de
+        # ScummVM son 77 juegos distintos, no uno en partes.
+        game_files = [f for f in filenames if f.lower().endswith(game_extensions)]
+
+        if game_files:
+            for f in game_files:
+                queue.append(os.path.join(dirpath, f))
+
+            continue
+
+        # Un directorio hoja con los ficheros sueltos de un juego (el caso de
+        # ScummVM instalado, sin comprimir) es UNA obra, así que va entero.
+        # Sólo con --category game: sin él, cualquier carpeta de basura del
+        # árbol acabaría en la cola.
+        if game_mode and filenames and not dirnames:
+            queue.append(dirpath)
+            processed_paths.add(dirpath)
+
+            continue
+
     return sorted(list(set(queue)))
 
 

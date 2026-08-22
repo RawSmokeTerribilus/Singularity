@@ -22,13 +22,32 @@ import zlib
 
 ARCHIVE_EXTS = ('.zip',)
 DISC_EXTS = ('.chd', '.cue', '.bin', '.gdi', '.iso', '.img', '.ccd')
-GAME_EXTS = ARCHIVE_EXTS + DISC_EXTS + (
-    '.7z', '.nes', '.fds', '.sfc', '.smc', '.gba', '.gb', '.gbc',
+
+# Extensiones que sólo pueden ser un juego. Se detectan SOLAS, sin que nadie
+# tenga que decir `--category game`: tirarle un directorio y que funcione es la
+# premisa de la suite, y los libros ya se comportan así.
+#
+# Ninguna de éstas se la quita a nadie: el barrido de vídeo sólo mira
+# mkv/mp4/avi/ts/m2ts/m4v, y el de música ficheros de audio.
+GAME_EXTS_AUTO = ARCHIVE_EXTS + (
+    '.7z', '.chd', '.gdi', '.scummvm',
+    '.nes', '.fds', '.sfc', '.smc', '.gba', '.gb', '.gbc',
     '.n64', '.z64', '.v64', '.md', '.gen', '.smd', '.32x', '.sms', '.gg',
     '.pce', '.sgx', '.a26', '.a78', '.lnx', '.ws', '.wsc', '.ngp', '.ngc',
-    '.col', '.int', '.vec', '.d64', '.t64', '.tap', '.adf', '.dsk', '.st',
-    '.z80', '.tzx', '.rom', '.nds', '.3ds', '.cia', '.scummvm',
+    '.d64', '.t64', '.adf', '.nds', '.3ds', '.cia',
 )
+
+# Éstas exigen `--category game` explícito, porque colisionan:
+#   .iso/.img/.ccd  -> MKVerything ripea TODO .iso de un árbol como disco de vídeo
+#   .cue/.bin       -> son también el sidecar de un rip de CD de audio
+#   .rom/.dsk/.st/.tap/.z80/.tzx/.col/.int/.vec -> chocan con ficheros de datos
+#                      corrientes; medido, un juego DOS traía 50 ".col" que eran
+#                      paletas, no ROMs de ColecoVision
+GAME_EXTS_EXPLICIT = DISC_EXTS + (
+    '.col', '.int', '.vec', '.tap', '.dsk', '.st', '.z80', '.tzx', '.rom',
+)
+
+GAME_EXTS = tuple(dict.fromkeys(GAME_EXTS_AUTO + GAME_EXTS_EXPLICIT))
 
 # Extensión -> sistema. Sólo lo que es inequívoco: .iso y .bin salen de aquí a
 # propósito, porque los comparten media docena de plataformas y adivinar es
@@ -84,8 +103,13 @@ _PACK_HINT = re.compile(
     re.IGNORECASE)
 
 
-def is_game_file(path):
-    return str(path).lower().endswith(GAME_EXTS)
+def is_game_file(path, explicit=False):
+    """
+    `explicit=True` sólo cuando quien sube ha dicho `--category game`: entonces
+    entran también las extensiones ambiguas.
+    """
+    exts = GAME_EXTS if explicit else GAME_EXTS_AUTO
+    return str(path).lower().endswith(exts)
 
 
 def _crc32_of_file(path, chunk=1024 * 1024):

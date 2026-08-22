@@ -145,11 +145,11 @@ class Prep():
                         # audio file too, and whoever gets there first wins.
                         meta['filelist'][file_name] = full_path
                         meta['is_audiobook'] = True
-                    elif _is_game_category(meta) and gameinfo.is_game_file(file_name):
-                        # Only when the uploader said "game". A .zip or a .iso
-                        # is not self-evidently a game -- MKVerything already
-                        # treats every .iso in a tree as a video disc to rip --
-                        # so guessing here would queue the same file twice.
+                    elif _is_game_category(meta) and gameinfo.is_game_file(file_name, explicit=True):
+                        # Aquí sí se exige --category game, al revés que en la
+                        # rama de fichero suelto. Un directorio es una mezcla:
+                        # una carpeta de MKVs con un `caratulas.zip` marcaría
+                        # is_game y se saltaría el pipeline de vídeo entero.
                         meta['filelist'][file_name] = full_path
                         meta['is_game'] = True
                     elif ext in bookinfo.EBOOK_EXTS:
@@ -190,7 +190,10 @@ class Prep():
             file_extension = os.path.splitext(meta['path'])[1].lower()
             if file_extension in bookinfo.AUDIOBOOK_EXTS:
                 meta['is_audiobook'] = True
-            elif _is_game_category(meta) and gameinfo.is_game_file(meta['path']):
+            elif gameinfo.is_game_file(meta['path'], explicit=_is_game_category(meta)):
+                # Sin flag basta con que la extensión sea inequívoca: la cola
+                # entrega los juegos de uno en uno, así que aquí siempre llega
+                # un fichero concreto y no hay nada que confundir.
                 meta['is_game'] = True
             elif file_extension in bookinfo.EBOOK_EXTS:
                 meta['is_book'] = True
