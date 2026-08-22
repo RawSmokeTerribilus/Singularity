@@ -497,6 +497,48 @@ class Rawncher:
         elif sub == "3":
             self._flujo_triage(tracker)
 
+    def _elegir_tipos(self, ruta, hallado) -> list:
+        """
+        Acota QUÉ se busca en el árbol, y devuelve los flags `--only`.
+
+        Sólo pregunta cuando hay MEZCLA: un directorio de un solo tipo no es
+        ambiguo y hacer clicar por gusto sobra. La pregunta existe por un
+        accidente concreto -- apuntar esto a la carpeta de descargas -- donde
+        encolar todo junto es como se sube una factura a un tracker público.
+        """
+        if len(hallado) <= 1:
+            return []
+
+        console.print()
+        table = Table(
+            show_header=True,
+            header_style="bold cyan",
+            border_style="dim",
+            title="[bold yellow]Aquí hay de todo — ¿qué quieres subir?[/bold yellow]",
+        )
+        table.add_column("#", style="dim", justify="right")
+        table.add_column("Tipo")
+        table.add_column("Encontrados", justify="right")
+
+        from src.library import LABELS
+
+        for i, (kind, n) in enumerate(hallado, 1):
+            table.add_row(str(i), LABELS[kind], str(n))
+
+        table.add_row(str(len(hallado) + 1), "[dim]todo junto[/dim]",
+                      str(sum(n for _k, n in hallado)))
+        console.print(table)
+        console.print("[dim]Subir tipos distintos en la misma tirada casi nunca es lo "
+                      "que se quiere.[/dim]")
+
+        opciones = [str(i) for i in range(1, len(hallado) + 2)]
+        elegido = int(Prompt.ask("[bold]Opción[/bold]", choices=opciones, default="1"))
+
+        if elegido > len(hallado):
+            return ["--only", "all"]
+
+        return ["--only", hallado[elegido - 1][0]]
+
     def _args_opcionales(self, debug: bool = False) -> list:
         """Muestra lista de flags opcionales para upload.py y devuelve los seleccionados"""
         flags = [
@@ -632,37 +674,31 @@ class Rawncher:
             console.print(f"[bold red]❌ No existe: {ruta_raw}[/bold red]")
 
         # Este bloque sólo sabía de MKV y avisaba de "directorio sin archivos
-        # MKV" ante 77 juegos de ScummVM perfectamente subibles. Ahora cuenta
-        # lo que la cola sabe encolar, que es bastante más.
-        from src import bookinfo as _bi, gameinfo as _gi
-
-        _VIDEO = (".mkv", ".mp4", ".avi", ".ts", ".m2ts", ".m4v")
-        _CLASES = (
-            ("vídeo", _VIDEO),
-            ("e-book", _bi.EBOOK_EXTS),
-            ("audiolibro", _bi.AUDIOBOOK_EXTS),
-            ("juego", _gi.GAME_EXTS_AUTO),
-        )
-
-        def _clasificar(nombres):
-            return [(etiqueta, n) for etiqueta, exts in _CLASES
-                    if (n := sum(1 for f in nombres if f.lower().endswith(exts)))]
+        # MKV" ante 77 juegos de ScummVM perfectamente subibles.
+        #
+        # El conteo lo hace `library`, no este fichero: es el mismo que usa la
+        # cola de subida, así que lo que aquí se anuncia y lo que allí se
+        # encola no pueden discrepar. Contar por nuestra cuenta ya dio un
+        # falso positivo -- una carpeta de películas con un caratulas.zip
+        # salía como "1 de vídeo, 1 de juego".
+        from src import library as _lib
 
         if ruta.is_file():
-            hallado = _clasificar([ruta.name])
+            kind = _lib.classify(ruta.name)
+            hallado = [(kind, 1)] if kind else []
             if hallado:
-                console.print(f"[bold green]✅ {hallado[0][0].capitalize()} detectado:"
+                console.print(f"[bold green]✅ {_lib.LABELS[kind].capitalize()} detectado:"
                               f"[/bold green] {ruta.name}")
             else:
                 console.print(f"[bold yellow]⚠️  Extensión no reconocida "
                               f"({ruta.suffix or 'sin extensión'}) — se intentará "
                               f"de todas formas.[/bold yellow]")
-        elif ruta.is_dir():
-            nombres = [f.name for f in ruta.rglob("*") if f.is_file()]
-            hallado = _clasificar(nombres)
+        else:
+            encontrado = _lib.scan(str(ruta))
+            hallado = _lib.counts(encontrado)
             if hallado:
-                detalle = ", ".join(f"{n} de {etiqueta}" for etiqueta, n in hallado)
-                console.print(f"[bold green]✅ Directorio con {detalle}.[/bold green]")
+                console.print(f"[bold green]✅ Directorio con "
+                              f"{_lib.describe(encontrado)}.[/bold green]")
             else:
                 console.print(
                     "[bold yellow]⚠️  Directorio sin nada que RawLoadrr sepa subir "
@@ -670,9 +706,11 @@ class Rawncher:
                     "todas formas.[/bold yellow]"
                 )
 
+        only = self._elegir_tipos(ruta, hallado)
+
         flags = self._args_opcionales(debug=debug)
 
-        cmd = ["python3", "upload.py", "--tracker", tracker, "--input", str(ruta)] + flags
+        cmd = ["python3", "upload.py", "--tracker", tracker, "--input", str(ruta)] + only + flags
 
         # LÓGICA DE CONTINGENCIA: Si el cliente está caído, no intentes añadir el torrent.
         # El .torrent generado se quedará en su carpeta tmp/<uuid>/

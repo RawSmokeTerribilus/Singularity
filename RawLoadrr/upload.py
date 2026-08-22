@@ -178,7 +178,7 @@ except Exception as e:
     console.print(f"[bold red]Error initializing client or parser: {e}[/bold red]")
     sys.exit(1)
 
-def build_recursive_queue(root_path, game_mode=False):
+def build_recursive_queue(root_path, only=None):
     """
     Recursively scans a directory to build a queue of items to upload.
     - Identifies TV Show seasons and adds them as season packs.
@@ -194,9 +194,23 @@ def build_recursive_queue(root_path, game_mode=False):
     book_extensions = ('.epub', '.mobi', '.azw3', '.azw', '.pdf', '.cbz', '.cbr', '.djvu', '.fb2')
     audiobook_extensions = ('.m4b',)
     # Las inequívocas entran SIEMPRE; las ambiguas (.iso, .cue, .bin...) sólo
-    # con --category game. Una sola fuente de verdad, en gameinfo.
+    # cuando se ha declarado que se va a por juegos. Una sola fuente de verdad,
+    # en gameinfo.
     from src import gameinfo as _gi
+
+    # "all" no es un tipo, es la ausencia de filtro. El resolver ya lo traduce,
+    # pero esta función es pública y la llaman de fuera: si no se defiende
+    # sola, `--only all` acaba filtrando por un tipo que no existe y devuelve
+    # una cola vacía sin decir por qué.
+    if only and 'all' in only:
+        only = None
+
+    game_mode = bool(only) and 'game' in only
     game_extensions = _gi.GAME_EXTS if game_mode else _gi.GAME_EXTS_AUTO
+
+    def _quiere(kind):
+        """Sin --only se busca de todo; con él, sólo lo pedido."""
+        return not only or kind in only
     upload_extensions = video_extensions + book_extensions + audiobook_extensions
     # Sonarr names in English, so our own catalogue (1164 Season-N dirs) never
     # walked the failing branch. A Spanish "Temporada 1" did not match, so the
@@ -242,7 +256,8 @@ def build_recursive_queue(root_path, game_mode=False):
         # An audiobook is normally one folder of many .m4b chapters and has to
         # be queued as the folder, exactly like a season pack: queueing the
         # chapters individually would upload one torrent per chapter.
-        audiobook_files = [f for f in filenames if f.lower().endswith(audiobook_extensions)]
+        audiobook_files = ([f for f in filenames if f.lower().endswith(audiobook_extensions)]
+                           if _quiere('audiobook') else [])
 
         if audiobook_files:
             queue.append(dirpath if len(audiobook_files) > 1 else os.path.join(dirpath, audiobook_files[0]))
@@ -252,7 +267,8 @@ def build_recursive_queue(root_path, game_mode=False):
 
         # E-books are the opposite: several files in one folder are several
         # different books, not one book in parts, so each is its own upload.
-        book_files = [f for f in filenames if f.lower().endswith(book_extensions)]
+        book_files = ([f for f in filenames if f.lower().endswith(book_extensions)]
+                      if _quiere('book') else [])
 
         if book_files:
             for f in book_files:
@@ -261,7 +277,8 @@ def build_recursive_queue(root_path, game_mode=False):
             continue
 
         # If not a season/show folder, check for movies or loose files
-        video_files = [f for f in filenames if f.lower().endswith(video_extensions)]
+        video_files = ([f for f in filenames if f.lower().endswith(video_extensions)]
+                       if _quiere('video') else [])
         if video_files:
             if len(video_files) > 1:
                 # This directory contains multiple videos. Treat them as loose files.
@@ -283,7 +300,8 @@ def build_recursive_queue(root_path, game_mode=False):
         #
         # Como los e-books, un archivo es una obra: una carpeta con 77 zips de
         # ScummVM son 77 juegos distintos, no uno en partes.
-        game_files = [f for f in filenames if f.lower().endswith(game_extensions)]
+        game_files = ([f for f in filenames if f.lower().endswith(game_extensions)]
+                      if _quiere('game') else [])
 
         if game_files:
             for f in game_files:
@@ -295,13 +313,78 @@ def build_recursive_queue(root_path, game_mode=False):
         # ScummVM instalado, sin comprimir) es UNA obra, así que va entero.
         # Sólo con --category game: sin él, cualquier carpeta de basura del
         # árbol acabaría en la cola.
-        if game_mode and filenames and not dirnames:
+        if game_mode and _quiere('game') and filenames and not dirnames:
             queue.append(dirpath)
             processed_paths.add(dirpath)
 
             continue
 
     return sorted(list(set(queue)))
+
+
+def _resolver_only(meta, root_path):
+    """
+    Qué tipos hay que buscar en este árbol.
+
+    -> lista de tipos, `[]` para "todo", o `None` para cancelar la tirada.
+
+    Existe por un accidente muy concreto: apuntar esto a la carpeta de
+    descargas. Una biblioteca ordenada es homogénea y no ve nada de esto nunca;
+    una carpeta de cajón desastre trae vídeos, PDFs de facturas y zips sueltos,
+    y encolarlo todo junto es como se sube un contrato a un tracker público.
+
+    Con --only ya declarado no se pregunta. Sin él, sólo se para si hay MEZCLA:
+    un solo tipo no es ambiguo y no hay nada que consultar.
+    """
+    from src import library
+
+    only = [k for k in (meta.get('only') or []) if k]
+    if 'all' in only:
+        return []
+    if only:
+        return only
+
+    # --category game sigue valiendo como declaración, que es como se venía
+    # usando antes de que existiera --only.
+    if str(meta.get('category') or '').upper() == 'GAME':
+        return ['game']
+
+    found = library.scan(root_path)
+    if not library.is_mixed(found):
+        return []
+
+    kinds = [k for k, _n in library.counts(found)]
+
+    console.print()
+    console.print(Panel(
+        library.describe(found),
+        title="[bold yellow]Aquí hay de todo[/bold yellow]",
+        border_style="bold yellow", box=box.DOUBLE))
+    console.print("[dim]Subir tipos distintos en la misma tirada casi nunca es lo que "
+                  "se quiere: así es como se cuela una factura entre las películas.[/dim]")
+
+    if meta.get('unattended'):
+        console.print("[bold red]Modo desatendido y sin --only: no se adivina. "
+                      "Vuelve a lanzarlo con --only "
+                      f"{'|'.join(kinds)} (o --only all).[/bold red]")
+        return None
+
+    for n, kind in enumerate(kinds, 1):
+        console.print(f"  [bold cyan]{n}[/bold cyan]  sólo {library.LABELS[kind]}")
+    console.print(f"  [bold cyan]{len(kinds) + 1}[/bold cyan]  todo, lo quiero así")
+    console.print(f"  [bold cyan]{len(kinds) + 2}[/bold cyan]  cancelar")
+
+    opciones = [str(i) for i in range(1, len(kinds) + 3)]
+    elegido = Prompt.ask("[bold]Opción[/bold]", choices=opciones, default="1")
+    idx = int(elegido)
+
+    if idx <= len(kinds):
+        return [kinds[idx - 1]]
+    if idx == len(kinds) + 1:
+        return []
+
+    console.print("[yellow]Cancelado.[/yellow]")
+    return None
 
 
 async def do_the_thing(base_dir):
@@ -338,10 +421,10 @@ async def do_the_thing(base_dir):
             if os.path.isdir(root_path):
                 console.print(Rule("[bold green]RECURSIVE SCAN INITIATED[/bold green]", style="green"))
                 console.print(f"[dim]Scanning:[/dim] [cyan]{root_path}[/cyan]")
-                # --category game abre la puerta a extensiones que de otro
-                # modo son ambiguas; sin él, el barrido no cambia.
-                game_mode = str(meta.get('category') or '').upper() == 'GAME'
-                queue = build_recursive_queue(root_path, game_mode=game_mode)
+                only = _resolver_only(meta, root_path)
+                if only is None:
+                    return
+                queue = build_recursive_queue(root_path, only=only)
             else: # It's a file
                 queue.append(root_path)
         else:

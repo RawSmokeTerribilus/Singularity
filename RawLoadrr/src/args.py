@@ -54,6 +54,12 @@ class Args():
         # una carpeta de descargas subida entera por error.
         parser.add_argument('--allow-no-id', dest='allow_no_id', action='store_true', required=False,
                             help="Subir libros/audiolibros/juegos aunque ningún proveedor los reconozca")
+        # Acota QUÉ se busca al barrer un árbol. Sin esto, apuntar a una
+        # carpeta heterogénea encola todo lo que pilla, que es justo el
+        # accidente que nadie quiere.
+        parser.add_argument('--only', nargs='*', required=False, dest='only',
+                            choices=['video', 'book', 'audiobook', 'game', 'all'],
+                            help="Qué tipos buscar al barrer: video, book, audiobook, game, all")
         parser.add_argument('-mbid', '--mbid', nargs='?', help="MusicBrainz Release ID", type=self.validate_mbid, dest='mbid_manual')
         parser.add_argument('-discogs', '--discogs', nargs='*', required=False, help="Discogs Release ID", type=str, dest='discogs_id')
         parser.add_argument('-g', '--tag', nargs='*', required=False, help="Group Tag", type=str)

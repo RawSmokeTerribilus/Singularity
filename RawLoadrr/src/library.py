@@ -70,9 +70,25 @@ def classify(name, only=None):
     return None
 
 
+# Precedencia por directorio, la MISMA que aplica la cola de subida. El orden
+# no es estético: un `.m4b` es audio y es libro a la vez, y una carpeta de
+# películas con un `caratulas.zip` dentro es una carpeta de películas.
+_PRECEDENCIA = ('audiobook', 'book', 'video', 'game')
+
+
 def scan(root, only=None):
     """
     Recorre un árbol y devuelve `{tipo: [rutas]}`.
+
+    Clasifica **por directorio, no por fichero**, y ésa es la parte que
+    importa: contando ficheros sueltos, una carpeta con `peli.mkv` y
+    `caratulas.zip` sale como "1 de vídeo, 1 de juego" y dispara un aviso de
+    mezcla que no existe. Las bibliotecas guardan carátulas, subtítulos y
+    metadatos junto al vídeo; si eso cuenta como otro tipo, el aviso salta
+    siempre y deja de significar nada.
+
+    Un directorio es de UN tipo, el primero de `_PRECEDENCIA` que aparezca en
+    él, que es exactamente cómo decide `build_recursive_queue()`.
 
     Pensado también para el sistema de listados: quien quiera escribir un
     `.txt` de rutas para cebar a RawLoadrr sólo tiene que volcar la lista del
@@ -81,10 +97,17 @@ def scan(root, only=None):
     found = {kind: [] for kind in KINDS}
 
     for dirpath, _dirnames, filenames in os.walk(root):
+        por_tipo = {}
         for name in filenames:
             kind = classify(name, only)
             if kind and (not only or kind in only):
-                found[kind].append(os.path.join(dirpath, name))
+                por_tipo.setdefault(kind, []).append(os.path.join(dirpath, name))
+
+        if not por_tipo:
+            continue
+
+        gana = next(k for k in _PRECEDENCIA if k in por_tipo)
+        found[gana].extend(por_tipo[gana])
 
     return {k: v for k, v in found.items() if v}
 
