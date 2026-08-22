@@ -686,6 +686,7 @@ class Prep():
             source = candidates[0] if candidates else source
 
         local = bookinfo.gather(source)
+        meta['_origen_local'] = local.pop('_origen', {}) or {}
 
         # gather() answers "what work is this"; analyze() answers "what are you
         # actually downloading" -- format, DRM, fixed vs reflowable layout,
@@ -2472,13 +2473,33 @@ class Prep():
         })
 
     def _merge_book_record(self, meta, record):
-        """Copy the provider's fields in without overwriting anything local."""
+        """
+        Copia lo del proveedor sin pisar lo local... salvo lo sacado del NOMBRE.
+
+        No todo lo local vale igual. Un título que declara el EPUB en su
+        Dublin Core es un dato; uno deducido del nombre del fichero es una
+        conjetura, y encima fea: "el-arte-de-la-guerra" con el autor en
+        minúsculas producía el nombre "- el-arte-de-la-guerra (2020) [PDF]".
+
+        Así que lo del fichero sigue mandando y lo del nombre cede, que es
+        justo lo que el proveedor sabe hacer mejor.
+        """
+        origen = meta.get('_origen_local') or {}
+        del_nombre = {'title', 'authors', 'year'}
+
         for key in ('title', 'authors', 'narrators', 'publisher', 'series',
                     'language', 'cover_url', 'cover_fallbacks', 'description',
                     'runtime_min', 'genres', 'page_count', 'year',
                     'volume_id', 'isbn13', 'subtitle'):
-            if (record or {}).get(key) and not meta.get(key):
-                meta[key] = record[key]
+            valor = (record or {}).get(key)
+
+            if not valor:
+                continue
+
+            if not meta.get(key):
+                meta[key] = valor
+            elif key in del_nombre and origen.get(key) == 'nombre':
+                meta[key] = valor
 
         self._rehost_cover(meta)
 

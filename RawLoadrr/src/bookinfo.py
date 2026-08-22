@@ -278,21 +278,41 @@ def from_filename(path):
 
 
 def gather(path):
-    """Local metadata for one file, best source first, filename as the floor."""
+    """
+    Local metadata for one file, best source first, filename as the floor.
+
+    Cada campo se anota con su ORIGEN en `_origen`, y eso no es adorno: un
+    título sacado del nombre del fichero -- "el-arte-de-la-guerra" -- vale
+    mucho menos que el que declara un EPUB en su Dublin Core, y quien decida
+    después si el proveedor puede pisarlo necesita saber cuál de los dos tiene
+    delante. Sin esta pista, un PDF sin metadatos acababa subido como
+    "- el-arte-de-la-guerra (2020) [PDF]".
+    """
     path = str(path)
 
     if is_audiobook_file(path):
         found = from_audiobook(path)
+        origen = 'etiquetas'
     elif path.lower().endswith('.epub'):
         found = from_epub(path)
+        origen = 'epub'
     else:
         found = {}
+        origen = None
+
+    procedencia = {k: origen for k in found} if origen else {}
 
     # A Calibre sidecar is hand-curated often enough to outrank what the file
     # itself claims, so it fills gaps before the filename does.
-    for source in (from_calibre_sidecar(path), from_filename(path)):
-        for key, value in source.items():
-            found.setdefault(key, value)
+    for fuente, etiqueta in ((from_calibre_sidecar(path), 'calibre'),
+                             (from_filename(path), 'nombre')):
+        for key, value in fuente.items():
+            if key not in found:
+                found[key] = value
+                procedencia[key] = etiqueta
+
+    if procedencia:
+        found['_origen'] = procedencia
 
     return found
 
