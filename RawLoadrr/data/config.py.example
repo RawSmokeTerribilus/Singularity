@@ -12,6 +12,7 @@ config = {
 "version": "1.0.7",
 
 "DEFAULT": {
+    "google_books_api": "GOOGLE_BOOKS_API",
     "tmdb_api": "YOUR_TMDB_API_KEY",
     "imgbb_api": "YOUR_IMGBB_API_KEY",
     "ptscreens_api": "YOUR_PTSCREENS_API_KEY",

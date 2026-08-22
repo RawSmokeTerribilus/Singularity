@@ -187,6 +187,13 @@ def build_recursive_queue(root_path):
     """
     queue = []
     video_extensions = ('.mkv', '.mp4', '.avi', '.ts', '.m2ts', '.m4v')
+    # An e-book or an audiobook is a perfectly good upload, but nothing that is
+    # not video ever reached this queue, so the walk below skipped whole
+    # directories of them in silence. Comics and manga ride along with the
+    # e-books: electronic is electronic, and only the tracker category differs.
+    book_extensions = ('.epub', '.mobi', '.azw3', '.azw', '.pdf', '.cbz', '.cbr', '.djvu', '.fb2')
+    audiobook_extensions = ('.m4b',)
+    upload_extensions = video_extensions + book_extensions + audiobook_extensions
     season_patterns = [r'S[0-9]+', r'Season[\s-]*[0-9]+']
     
     processed_paths = set()
@@ -219,6 +226,27 @@ def build_recursive_queue(root_path):
             dirnames[:] = [d for d in dirnames if d not in season_subdirs]
             # Continue to the next directory in the walk. We don't want to accidentally
             # process loose files in the same directory as season folders.
+            continue
+
+        # An audiobook is normally one folder of many .m4b chapters and has to
+        # be queued as the folder, exactly like a season pack: queueing the
+        # chapters individually would upload one torrent per chapter.
+        audiobook_files = [f for f in filenames if f.lower().endswith(audiobook_extensions)]
+
+        if audiobook_files:
+            queue.append(dirpath if len(audiobook_files) > 1 else os.path.join(dirpath, audiobook_files[0]))
+            processed_paths.add(dirpath)
+            dirnames.clear()
+            continue
+
+        # E-books are the opposite: several files in one folder are several
+        # different books, not one book in parts, so each is its own upload.
+        book_files = [f for f in filenames if f.lower().endswith(book_extensions)]
+
+        if book_files:
+            for f in book_files:
+                queue.append(os.path.join(dirpath, f))
+
             continue
 
         # If not a season/show folder, check for movies or loose files
