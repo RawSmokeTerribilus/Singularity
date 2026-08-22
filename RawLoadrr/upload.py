@@ -541,8 +541,13 @@ async def do_the_thing(base_dir):
                     continue
                 tracker_class = tracker_class_map[tracker](config=config)
                 # Auto-upload by default (unless debug mode without unattended flag)
-                if meta.get('debug', False) and not meta.get('unattended', False):
-                    upload_to_tracker = Confirm.ask(f"Upload to {tracker_class.tracker}? {debug}")
+                # --debug NUNCA ha impedido subir: sólo convertía la subida en una
+                # pregunta, y con --unattended ni eso, así que el flag que promete
+                # ensayo desarmaba justo el guardarraíl. Sin nadie a quien
+                # preguntar, la respuesta segura es no.
+                if meta.get('debug', False):
+                    upload_to_tracker = (Confirm.ask(f"Upload to {tracker_class.tracker}? {debug}")
+                                         if not meta.get('unattended', False) else False)
                 else:
                     upload_to_tracker = True
                 if upload_to_tracker:
@@ -620,8 +625,13 @@ async def do_the_thing(base_dir):
             if tracker in tracker_data['http']:
                 tracker_class = tracker_class_map[tracker](config=config)
                 # Auto-upload by default (unless debug mode without unattended flag)
-                if meta.get('debug', False) and not meta.get('unattended', False):
-                    upload_to_tracker = Confirm.ask(f"Upload to {tracker_class.tracker}? {debug}", choices=["y", "N"])
+                # --debug NUNCA ha impedido subir: sólo convertía la subida en una
+                # pregunta, y con --unattended ni eso, así que el flag que promete
+                # ensayo desarmaba justo el guardarraíl. Sin nadie a quien
+                # preguntar, la respuesta segura es no.
+                if meta.get('debug', False):
+                    upload_to_tracker = (Confirm.ask(f"Upload to {tracker_class.tracker}? {debug}", choices=["y", "N"])
+                                         if not meta.get('unattended', False) else False)
                 else:
                     upload_to_tracker = True
                 if upload_to_tracker:
@@ -668,8 +678,13 @@ async def do_the_thing(base_dir):
             if tracker == "AR":
                 ar = tracker_class_map[tracker](config=config)
                 # Auto-upload by default (unless debug mode without unattended flag)
-                if meta.get('debug', False) and not meta.get('unattended', False):
-                    upload_to_ar = Confirm.ask(f"Upload to AlphaRatio? {debug}", choices=["y", "N"])
+                # --debug NUNCA ha impedido subir: sólo convertía la subida en una
+                # pregunta, y con --unattended ni eso, así que el flag que promete
+                # ensayo desarmaba justo el guardarraíl. Sin nadie a quien
+                # preguntar, la respuesta segura es no.
+                if meta.get('debug', False):
+                    upload_to_ar = (Confirm.ask(f"Upload to AlphaRatio? {debug}", choices=["y", "N"])
+                                    if not meta.get('unattended', False) else False)
                 else:
                     upload_to_ar = True
                 if upload_to_ar:
@@ -701,8 +716,13 @@ async def do_the_thing(base_dir):
                 draft_int = await bhd.get_live(meta)
                 draft = "Draft" if draft_int == 0 else "Live"
                 # Auto-upload by default (unless debug mode without unattended flag)
-                if meta.get('debug', False) and not meta.get('unattended', False):
-                    upload_to_bhd = Confirm.ask(f"Upload to BHD? ({draft}) {debug}")
+                # --debug NUNCA ha impedido subir: sólo convertía la subida en una
+                # pregunta, y con --unattended ni eso, así que el flag que promete
+                # ensayo desarmaba justo el guardarraíl. Sin nadie a quien
+                # preguntar, la respuesta segura es no.
+                if meta.get('debug', False):
+                    upload_to_bhd = (Confirm.ask(f"Upload to BHD? ({draft}) {debug}")
+                                     if not meta.get('unattended', False) else False)
                 else:
                     upload_to_bhd = True
                 if upload_to_bhd:
@@ -725,8 +745,13 @@ async def do_the_thing(base_dir):
             
             if tracker == "THR":
                 # Auto-upload by default (unless debug mode without unattended flag)
-                if meta.get('debug', False) and not meta.get('unattended', False):
-                    upload_to_thr = Confirm.ask(f"Upload to THR? {debug}")
+                # --debug NUNCA ha impedido subir: sólo convertía la subida en una
+                # pregunta, y con --unattended ni eso, así que el flag que promete
+                # ensayo desarmaba justo el guardarraíl. Sin nadie a quien
+                # preguntar, la respuesta segura es no.
+                if meta.get('debug', False):
+                    upload_to_thr = (Confirm.ask(f"Upload to THR? {debug}")
+                                     if not meta.get('unattended', False) else False)
                 else:
                     upload_to_thr = True
                 if upload_to_thr:
@@ -781,8 +806,13 @@ async def do_the_thing(base_dir):
 
             if tracker == "PTP":
                 # Auto-upload by default (unless debug mode without unattended flag)
-                if meta.get('debug', False) and not meta.get('unattended', False):
-                    upload_to_ptp = Confirm.ask(f"Upload to {tracker}? {debug}")
+                # --debug NUNCA ha impedido subir: sólo convertía la subida en una
+                # pregunta, y con --unattended ni eso, así que el flag que promete
+                # ensayo desarmaba justo el guardarraíl. Sin nadie a quien
+                # preguntar, la respuesta segura es no.
+                if meta.get('debug', False):
+                    upload_to_ptp = (Confirm.ask(f"Upload to {tracker}? {debug}")
+                                     if not meta.get('unattended', False) else False)
                 else:
                     upload_to_ptp = True
                 if upload_to_ptp:
@@ -849,8 +879,13 @@ async def do_the_thing(base_dir):
             if tracker == "TL":
                 tracker_class = tracker_class_map[tracker](config=config)
                 # Auto-upload by default (unless debug mode without unattended flag)
-                if meta.get('debug', False) and not meta.get('unattended', False):
-                    upload_to_tracker = Confirm.ask(f"Upload to {tracker_class.tracker}? {debug}")
+                # --debug NUNCA ha impedido subir: sólo convertía la subida en una
+                # pregunta, y con --unattended ni eso, así que el flag que promete
+                # ensayo desarmaba justo el guardarraíl. Sin nadie a quien
+                # preguntar, la respuesta segura es no.
+                if meta.get('debug', False):
+                    upload_to_tracker = (Confirm.ask(f"Upload to {tracker_class.tracker}? {debug}")
+                                         if not meta.get('unattended', False) else False)
                 else:
                     upload_to_tracker = True
                 if upload_to_tracker:
@@ -976,6 +1011,24 @@ def get_confirmation(meta):
             db_info.append(f"\n[bold]MBID[/bold]: https://musicbrainz.org/release/{meta['mbid']}")
         if meta.get('discogs_url'):
             db_info.append(f"[bold]Discogs[/bold]: {meta['discogs_url']}")
+    elif meta.get('is_book') or meta.get('is_audiobook'):
+        db_info = [
+            f"[bold]Title[/bold]: {meta.get('title', '?')} ({meta.get('year') or 's/f'})",
+            f"[bold]Author[/bold]: {', '.join(meta.get('authors') or []) or '?'}",
+            f"[bold]Category[/bold]: {meta['category']}",
+        ]
+        if meta.get('narrators'):
+            db_info.append(f"[bold]Narrator[/bold]: {', '.join(meta['narrators'])}")
+        if meta.get('description'):
+            db_info.append(f"\n[bold]Overview[/bold]: {meta['description'][:400]}")
+    elif meta.get('is_game'):
+        db_info = [
+            f"[bold]Title[/bold]: {meta.get('title', '?')} ({meta.get('year') or 's/f'})",
+            f"[bold]System[/bold]: {', '.join(meta.get('platforms') or []) or '?'}",
+            f"[bold]Category[/bold]: {meta['category']}",
+        ]
+        if meta.get('description'):
+            db_info.append(f"\n[bold]Overview[/bold]: {meta['description'][:400]}")
     else: 
         db_info = [
             f"[bold]Title[/bold]: {meta['title']} ({meta['year']})\n",
@@ -983,20 +1036,29 @@ def get_confirmation(meta):
             f"[bold]Category[/bold]: {meta['category']}\n",
         ]
 
-    if int(meta.get('tmdb', 0)) != 0:
+    # Todos éstos son ids de vídeo y en un libro o un juego no existen. Los
+    # int(meta.get(x, '0')) revientan en cuanto la clave está PRESENTE puesta a
+    # None, que es justo como la deja args.py: el default de get() no entra.
+    if int(meta.get('tmdb') or 0) != 0:
         db_info.append(f"TMDB: https://www.themoviedb.org/{meta['category'].lower()}/{meta['tmdb']}")
-    if int(meta.get('imdb_id', '0')) != 0:
+    if int(meta.get('imdb_id') or 0) != 0:
         db_info.append(f"IMDB: https://www.imdb.com/title/tt{meta['imdb_id']}")
-    if int(meta.get('tvdb_id', '0')) != 0:
+    if int(meta.get('tvdb_id') or 0) != 0:
         db_info.append(f"TVDB: https://www.thetvdb.com/?id={meta['tvdb_id']}&tab=series")
-    if int(meta.get('mal_id', 0)) != 0:
+    if int(meta.get('mal_id') or 0) != 0:
         db_info.append(f"MAL : https://myanimelist.net/anime/{meta['mal_id']}")
+    if meta.get('isbn13') or meta.get('isbn'):
+        db_info.append(f"ISBN: https://openlibrary.org/isbn/{meta.get('isbn13') or meta.get('isbn')}")
+    if meta.get('asin'):
+        db_info.append(f"ASIN: https://www.audible.es/pd/{meta['asin']}")
+    if meta.get('igdb'):
+        db_info.append(f"IGDB: https://www.igdb.com/games/{meta.get('igdb_slug') or meta['igdb']}")
 
     console.print(Panel("\n".join(db_info), title="[bold]DATABASE INFO[/bold]", border_style="bold yellow", box=box.DOUBLE))
     console.print()
-    if int(meta.get('freeleech', '0')) != 0:
+    if int(meta.get('freeleech') or 0) != 0:
         console.print(f"[bold]Freeleech[/bold]: {meta['freeleech']}")
-    if meta['tag'] == "":
+    if not meta.get('tag'):
             tag = ""
     else:
         tag = f" / {meta['tag'][1:]}"
@@ -1174,7 +1236,7 @@ def extract_size_from_torrent(base_dir, uuid):
 
 # Return True if banned group
 def check_banned_group(tracker, banned_group_list, meta, skipped_details, path):
-    if meta['tag'] == "":
+    if not meta.get('tag'):
         return False
     else:
         q = False

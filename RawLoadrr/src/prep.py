@@ -19,6 +19,18 @@ from src.book_resolver import (resolve_book as _resolve_book,
                               resolve_audiobook as _resolve_audiobook)
 from src.igdb_resolver import resolve_game as _resolve_game
 
+
+def _is_game_category(meta):
+    """
+    --category game llega en minúsculas.
+
+    meta['category'] no se normaliza a mayúsculas hasta prep.py:450, que es
+    DESPUÉS de esta detección, así que comparar con 'GAME' a secas daba
+    siempre False y el juego se colaba por el pipeline de vídeo hasta morir
+    pidiendo el FrameRate de un zip.
+    """
+    return str(meta.get('category') or '').upper() == 'GAME'
+
 try:
     import aiofiles
     import aiohttp
@@ -133,7 +145,7 @@ class Prep():
                         # audio file too, and whoever gets there first wins.
                         meta['filelist'][file_name] = full_path
                         meta['is_audiobook'] = True
-                    elif meta.get('category') == 'GAME' and gameinfo.is_game_file(file_name):
+                    elif _is_game_category(meta) and gameinfo.is_game_file(file_name):
                         # Only when the uploader said "game". A .zip or a .iso
                         # is not self-evidently a game -- MKVerything already
                         # treats every .iso in a tree as a video disc to rip --
@@ -178,7 +190,7 @@ class Prep():
             file_extension = os.path.splitext(meta['path'])[1].lower()
             if file_extension in bookinfo.AUDIOBOOK_EXTS:
                 meta['is_audiobook'] = True
-            elif meta.get('category') == 'GAME' and gameinfo.is_game_file(meta['path']):
+            elif _is_game_category(meta) and gameinfo.is_game_file(meta['path']):
                 meta['is_game'] = True
             elif file_extension in bookinfo.EBOOK_EXTS:
                 meta['is_book'] = True
@@ -197,17 +209,25 @@ class Prep():
                     nfo_files = [f for f in os.listdir(directory) if f.endswith('.nfo')]
                     if nfo_files:
                         meta['nfo_file'] = os.path.join(directory, nfo_files[0])
+        # Estos dos cortocircuitos saltan el pipeline de vídeo entero, y con él
+        # la llamada a resolve_ids() de más abajo. Hay que resolver AQUÍ, y
+        # antes de gen_desc(): la portada, la sinopsis y las capturas las trae
+        # el proveedor, así que sin este paso la descripción sale pelada y el
+        # payload viaja sin isbn13, sin asin y sin igdb -- que es exactamente
+        # lo que pasó en la primera subida de prueba.
         if meta.get('is_book') or meta.get('is_audiobook'):
             # Same shape as the music short-circuit below: there is no disc to
             # read, no resolution to detect and no screenshots to take, so the
             # whole video pipeline is skipped rather than guarded step by step.
             await self.get_book(meta)
+            meta = await self.resolve_ids(meta, os.path.basename(meta['path']))
             meta = await self.gen_desc(meta)
 
             return meta
 
         if meta.get('is_game'):
             await self.get_game(meta)
+            meta = await self.resolve_ids(meta, os.path.basename(meta['path']))
             meta = await self.gen_desc(meta)
 
             return meta
@@ -685,7 +705,11 @@ class Prep():
 
         # These only ever get set on the video branch, and every tracker's
         # get_res_id() reads them unguarded.
-        meta.setdefault('resolution', 'OTHER')
+        # setdefault() no vale aquí: args.py mete TODAS las opciones del
+        # parser en meta, así que 'type' y 'resolution' ya existen puestas a
+        # None y la clave presente gana. Hay que mirar el valor, no la clave.
+        if not meta.get('resolution'):
+            meta['resolution'] = 'OTHER'
 
         # The tracker types a book by its container, not by "is it a book":
         # EPUB, PDF, MOBI, AZW3 and CBZ/CBR are separate types, and so are M4B
@@ -698,12 +722,29 @@ class Prep():
             'djvu': 'PDF', 'fb2': 'EPUB',
             'm4b': 'M4B', 'mp3': 'MP3',
         }
-        meta.setdefault('type', by_ext.get(
-            ext, 'AUDIOBOOK' if meta.get('is_audiobook') else 'EBOOK'))
+        if not meta.get('type'):
+            meta['type'] = by_ext.get(
+                ext, 'AUDIOBOOK' if meta.get('is_audiobook') else 'EBOOK')
 
         # A book has nothing to screenshot; the cover is the artwork.
         meta['screens'] = 0
-        meta.setdefault('image_list', [])
+        if not meta.get('image_list'):
+            meta['image_list'] = []
+
+
+        # Claves estructurales que sólo se rellenan en la rama de vídeo y que
+        # el resto del pipeline lee sin guardas: clients.py hace
+        # meta['is_disc'] y len(meta['filelist']) para buscar un .torrent ya
+        # hecho en qBit. Un libro no es un disco y su lista de ficheros es una
+        # LISTA de rutas, que es la convención que usa vídeo.
+        if not meta.get('is_disc'):
+            meta['is_disc'] = ''
+        if meta.get('bdinfo') is None:
+            meta['bdinfo'] = None
+        if isinstance(meta.get('filelist'), dict):
+            meta['filelist'] = sorted(meta['filelist'].values()) or [source]
+        elif not meta.get('filelist'):
+            meta['filelist'] = [source]
 
         console.print(
             f"[green]Book metadata: [/green]{meta.get('title', '?')} "
@@ -748,9 +789,11 @@ class Prep():
 
         # Sin resolución que detectar y sin nada que capturar de un fichero que
         # no se ejecuta: las capturas salen de IGDB, más abajo.
-        meta.setdefault('resolution', 'OTHER')
+        if not meta.get('resolution'):
+            meta['resolution'] = 'OTHER'
         meta['screens'] = 0
-        meta.setdefault('image_list', [])
+        if not meta.get('image_list'):
+            meta['image_list'] = []
 
         if (meta['gameinfo'] or {}).get('es_pack'):
             # "Sony - PS1 (A-L).zip" no es una obra y no tiene id posible.
@@ -758,6 +801,21 @@ class Prep():
             # operador se pregunte luego por qué la ficha salió vacía.
             console.print("[yellow]Esto parece un pack por plataforma, no una obra: "
                           "se sube sin id de IGDB.")
+
+
+        # Claves estructurales que sólo se rellenan en la rama de vídeo y que
+        # el resto del pipeline lee sin guardas: clients.py hace
+        # meta['is_disc'] y len(meta['filelist']) para buscar un .torrent ya
+        # hecho en qBit. Un libro no es un disco y su lista de ficheros es una
+        # LISTA de rutas, que es la convención que usa vídeo.
+        if not meta.get('is_disc'):
+            meta['is_disc'] = ''
+        if meta.get('bdinfo') is None:
+            meta['bdinfo'] = None
+        if isinstance(meta.get('filelist'), dict):
+            meta['filelist'] = sorted(meta['filelist'].values()) or [source]
+        elif not meta.get('filelist'):
+            meta['filelist'] = [source]
 
         console.print(
             f"[green]Game metadata: [/green]{meta.get('title', '?')} "
@@ -3357,7 +3415,13 @@ class Prep():
                         no_sample_globs.append(os.path.abspath(f"{path}{os.sep}{file}"))
                 if len(no_sample_globs) == 1:
                     path = meta['filelist'][0]
-        if meta['full_dir'] or meta['is_disc'] or meta['is_music']:
+        # La rama de abajo excluye "*.*" y sólo readmite mkv/mp4/ts/avi, así que
+        # un .epub o una ROM quedaban fuera del torrent entero y torf abortaba
+        # con "Empty or all files excluded". En un libro o un juego TODO el
+        # contenido es contenido, igual que en música.
+        if (meta['full_dir'] or meta['is_disc'] or meta['is_music']
+                or meta.get('is_book') or meta.get('is_audiobook')
+                or meta.get('is_game')):
             desc = Path(meta['uuid']).stem
             include = ""
             exclude = ['._*', 'description.txt', desc + '.txt']
@@ -3890,8 +3954,12 @@ class Prep():
         part = meta.get('part', "")
         repack = meta.get('repack', "")
         three_d = meta.get('3D', "")
-        tag = meta.get('tag', "")
-        source = meta.get('source', "")
+        # `or ""` y no un default: args.py vuelca TODAS las opciones del parser
+        # en meta, así que la clave existe puesta a None y el default de get()
+        # nunca entra. En vídeo siempre venía rellena y no se notaba; en un
+        # libro `name_notag + tag` peta con None.
+        tag = meta.get('tag') or ""
+        source = meta.get('source') or ""
         uhd = meta.get('uhd', "")
         hdr = meta.get('hdr', "")
         episode_title = meta.get('episode_title', '')
@@ -4051,11 +4119,19 @@ class Prep():
             clean_name = self.clean_filename(name)
             name = name if not manual_name else manual_name             
             
-        except:
+        except Exception as e:                                  # noqa: BLE001
+            # Este bloque leía meta['source'] a pelo, y en una categoría sin
+            # vídeo esa clave no existe: el manejador reventaba con su propio
+            # KeyError y enterraba el error de verdad. Ahora lo enseña.
             console.print("[bold red]Unable to generate name. Please re-run and correct any of the following args if needed.")
-            console.print(f"--category [yellow]{meta['category']}")
-            console.print(f"--type [yellow]{meta['type']}")
-            console.print(f"--source [yellow]{meta['source']}")
+            # Nada de type(e) aquí: `type` es una variable local de esta
+            # función desde la primera línea y llamarla revienta con
+            # "'str' object is not callable", tapando otra vez el error real.
+            console.print(f"[bold red]Reason:[/bold red] {e.__class__.__name__}: {e}")
+            log.exception("get_name failed")
+            console.print(f"--category [yellow]{meta.get('category')}")
+            console.print(f"--type [yellow]{meta.get('type')}")
+            console.print(f"--source [yellow]{meta.get('source')}")
             name = "Error in Name Generation"
             # exit()
         return name_notag, name, clean_name, potential_missing
