@@ -425,6 +425,41 @@ def _resolver_only(meta, root_path):
     return None
 
 
+async def tracker_admite(tracker_class, meta):
+    """
+    ¿Este tracker acepta lo que se le va a subir?
+
+    -> mensaje de por qué no, o None si sí.
+
+    Un libro, un audiolibro o un juego no se pueden subir a un tracker que
+    sólo cataloga vídeo, y hasta ahora eso no se comprobaba: se le pasaba el
+    meta igual y reventaba con KeyError('tmdb') a mitad del dupe check --
+    medido, 33 de los 52 módulos leen esa clave a pelo y 46 abren MEDIAINFO.txt
+    sin guarda.
+
+    La comprobación va aquí y no en cada módulo por lo mismo: son 52 ficheros
+    y la mitad son de terceros. La convención ya existía -- `get_cat_id()`
+    devuelve '0' cuando no reconoce la categoría -- así que basta con
+    preguntarle antes de tocar nada, y un tracker gana soporte de libros el
+    día que su get_cat_id() sepa contestar.
+    """
+    categoria = str(meta.get('category') or '').upper()
+
+    if categoria not in ('BOOK', 'AUDIOBOOK', 'GAME'):
+        return None
+
+    try:
+        cat_id = await tracker_class.get_cat_id(categoria, meta)
+    except Exception:                                           # noqa: BLE001
+        cat_id = None
+
+    if str(cat_id or '0') != '0':
+        return None
+
+    return (f"{tracker_class.tracker} no tiene categoría para {categoria}: "
+            f"se salta este tracker")
+
+
 async def do_the_thing(base_dir):
     print_banner()
     meta = {'base_dir': base_dir}
@@ -700,6 +735,12 @@ async def do_the_thing(base_dir):
                     skipped_files += 1
                     skipped_details.append((path, f"Banned Group on {tracker_class.tracker}"))
                     continue
+                motivo = await tracker_admite(tracker_class, meta)
+                if motivo:
+                    console.print(f"[bold yellow]{motivo}[/bold yellow]")
+                    skipped_files += 1
+                    skipped_details.append((path, motivo))
+                    continue
                 dupes = await tracker_class.search_existing(meta)
                 if not meta.get('is_music', False):
                     dupes = await common.filter_dupes(dupes, meta)
@@ -780,6 +821,12 @@ async def do_the_thing(base_dir):
                         skipped_details.append((path, f"Banned group on {tracker_class.tracker}"))                        
                         continue
                     if await tracker_class.validate_credentials(meta):
+                        motivo = await tracker_admite(tracker_class, meta)
+                        if motivo:
+                            console.print(f"[bold yellow]{motivo}[/bold yellow]")
+                            skipped_files += 1
+                            skipped_details.append((path, motivo))
+                            continue
                         dupes = await tracker_class.search_existing(meta)
                         dupes = await common.filter_dupes(dupes, meta)
                         meta, skipped = dupe_check(dupes, meta, config, skipped_details, path)
@@ -834,6 +881,12 @@ async def do_the_thing(base_dir):
                         continue
                 console.print("[yellow]Searching for Existing Releases")
                 if await ar.validate_credentials(meta):
+                    motivo = await tracker_admite(ar, meta)
+                    if motivo:
+                        console.print(f"[bold yellow]{motivo}[/bold yellow]")
+                        skipped_files += 1
+                        skipped_details.append((path, motivo))
+                        continue
                     dupes = await ar.search_existing(meta)
                     dupes = await common.filter_dupes(dupes, meta)
                     meta, skipped = dupe_check(dupes, meta, config, skipped_details, path)
@@ -869,6 +922,12 @@ async def do_the_thing(base_dir):
                     if check_banned_group("BHD", bhd.banned_groups, meta, skipped_details, path):
                         skipped_files += 1
                         skipped_details.append((path, f"Banned group on {bhd.tracker}")) 
+                        continue
+                    motivo = await tracker_admite(bhd, meta)
+                    if motivo:
+                        console.print(f"[bold yellow]{motivo}[/bold yellow]")
+                        skipped_files += 1
+                        skipped_details.append((path, motivo))
                         continue
                     dupes = await bhd.search_existing(meta)
                     dupes = await common.filter_dupes(dupes, meta)
