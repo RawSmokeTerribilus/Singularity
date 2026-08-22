@@ -178,7 +178,7 @@ except Exception as e:
     console.print(f"[bold red]Error initializing client or parser: {e}[/bold red]")
     sys.exit(1)
 
-def build_recursive_queue(root_path):
+def build_recursive_queue(root_path, game_mode=False):
     """
     Recursively scans a directory to build a queue of items to upload.
     - Identifies TV Show seasons and adds them as season packs.
@@ -193,6 +193,14 @@ def build_recursive_queue(root_path):
     # e-books: electronic is electronic, and only the tracker category differs.
     book_extensions = ('.epub', '.mobi', '.azw3', '.azw', '.pdf', '.cbz', '.cbr', '.djvu', '.fb2')
     audiobook_extensions = ('.m4b',)
+    # Los juegos entran sólo si quien sube dijo --category game. Un .zip o un
+    # .iso no son juegos por sí mismos: MKVerything ya trata TODO .iso de un
+    # árbol como disco de vídeo para ripear, y adivinar aquí encolaría el mismo
+    # fichero dos veces. Fuera .iso y .bin a propósito, por lo mismo.
+    game_extensions = ('.zip', '.7z', '.chd', '.cue', '.gdi', '.scummvm',
+                       '.nes', '.fds', '.sfc', '.smc', '.gba', '.gb', '.gbc',
+                       '.n64', '.z64', '.v64', '.md', '.gen', '.smd', '.32x',
+                       '.sms', '.gg', '.pce', '.a26', '.a78', '.lnx', '.nds')
     upload_extensions = video_extensions + book_extensions + audiobook_extensions
     # Sonarr names in English, so our own catalogue (1164 Season-N dirs) never
     # walked the failing branch. A Spanish "Temporada 1" did not match, so the
@@ -256,6 +264,24 @@ def build_recursive_queue(root_path):
 
             continue
 
+        # Games, only when asked for. Like e-books, one archive is one work --
+        # a folder of ScummVM zips is a folder of different games. A folder
+        # that holds a game's loose data files instead is queued whole.
+        if game_mode:
+            game_files = [f for f in filenames if f.lower().endswith(game_extensions)]
+
+            if game_files:
+                for f in game_files:
+                    queue.append(os.path.join(dirpath, f))
+
+                continue
+
+            if filenames and not dirnames:
+                queue.append(dirpath)
+                processed_paths.add(dirpath)
+
+                continue
+
         # If not a season/show folder, check for movies or loose files
         video_files = [f for f in filenames if f.lower().endswith(video_extensions)]
         if video_files:
@@ -308,7 +334,10 @@ async def do_the_thing(base_dir):
             if os.path.isdir(root_path):
                 console.print(Rule("[bold green]RECURSIVE SCAN INITIATED[/bold green]", style="green"))
                 console.print(f"[dim]Scanning:[/dim] [cyan]{root_path}[/cyan]")
-                queue = build_recursive_queue(root_path)
+                # --category game abre la puerta a extensiones que de otro
+                # modo son ambiguas; sin él, el barrido no cambia.
+                game_mode = str(meta.get('category') or '').upper() == 'GAME'
+                queue = build_recursive_queue(root_path, game_mode=game_mode)
             else: # It's a file
                 queue.append(root_path)
         else:

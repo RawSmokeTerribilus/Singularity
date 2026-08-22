@@ -162,7 +162,7 @@ class NOBS():
             # audiobook on its Audible ASIN, and it fills the header card from
             # whichever one arrives. It nulls the ids that do not belong to the
             # category, so an id sent to the wrong one is dropped, not rejected.
-            'igdb' : meta.get('igdb') or 0,
+            'igdb' : int(meta.get('igdb') or 0),
             'isbn13' : self._isbn13(meta),
             'asin' : self._asin(meta),
             'anonymous' : anon,

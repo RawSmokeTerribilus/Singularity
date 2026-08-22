@@ -14,8 +14,10 @@ from src.trackers.COMMON import COMMON
 from src.musicbrainz import MusicBrainzAPI
 from src.discogs import DiscogsAPI
 from src import bookinfo
+from src import gameinfo
 from src.book_resolver import (resolve_book as _resolve_book,
                               resolve_audiobook as _resolve_audiobook)
+from src.igdb_resolver import resolve_game as _resolve_game
 
 try:
     import aiofiles
@@ -94,6 +96,7 @@ class Prep():
             is_music=False,
             is_book=False,
             is_audiobook=False,
+            is_game=False,
             is_video=False,
             filelist={},
             user_images=[],
@@ -130,6 +133,13 @@ class Prep():
                         # audio file too, and whoever gets there first wins.
                         meta['filelist'][file_name] = full_path
                         meta['is_audiobook'] = True
+                    elif meta.get('category') == 'GAME' and gameinfo.is_game_file(file_name):
+                        # Only when the uploader said "game". A .zip or a .iso
+                        # is not self-evidently a game -- MKVerything already
+                        # treats every .iso in a tree as a video disc to rip --
+                        # so guessing here would queue the same file twice.
+                        meta['filelist'][file_name] = full_path
+                        meta['is_game'] = True
                     elif ext in bookinfo.EBOOK_EXTS:
                         meta['filelist'][file_name] = full_path
                         meta['is_book'] = True
@@ -168,6 +178,8 @@ class Prep():
             file_extension = os.path.splitext(meta['path'])[1].lower()
             if file_extension in bookinfo.AUDIOBOOK_EXTS:
                 meta['is_audiobook'] = True
+            elif meta.get('category') == 'GAME' and gameinfo.is_game_file(meta['path']):
+                meta['is_game'] = True
             elif file_extension in bookinfo.EBOOK_EXTS:
                 meta['is_book'] = True
             elif file_extension in ['.aac', '.alac', '.flac', '.m4a', '.mp3', '.opus', '.wav']:
@@ -190,6 +202,12 @@ class Prep():
             # read, no resolution to detect and no screenshots to take, so the
             # whole video pipeline is skipped rather than guarded step by step.
             await self.get_book(meta)
+            meta = await self.gen_desc(meta)
+
+            return meta
+
+        if meta.get('is_game'):
+            await self.get_game(meta)
             meta = await self.gen_desc(meta)
 
             return meta
@@ -694,6 +712,159 @@ class Prep():
         )
 
         return meta
+
+    async def get_game(self, meta):
+        """
+        Lo que necesita la subida de un juego, sin tocar el pipeline de vídeo.
+
+        Espejo de get_book(): primero lo local y gratis -- qué sistema, cuántos
+        ficheros, con qué CRC32 -- y la identificación se deja para
+        resolve_ids(), que es donde se deciden los ids de todo lo demás.
+        """
+        meta['category'] = 'GAME'
+
+        source = meta['path']
+        meta['gameinfo'] = gameinfo.analyze(source)
+        meta['game_file'] = source
+
+        sistema = (meta['gameinfo'] or {}).get('sistema', '')
+
+        # El tipo del tracker es CÓMO se ejecuta, no en qué plataforma salió:
+        # ScummVM, ROM o PC. Un juego de ScummVM y una ROM de Mega Drive son
+        # cosas distintas de instalar aunque ambas sean "retro".
+        if not meta.get('type'):
+            if sistema == 'ScummVM':
+                meta['type'] = 'SCUMMVM'
+            elif sistema and not sistema.startswith('Disco'):
+                meta['type'] = 'ROM'
+            else:
+                meta['type'] = 'PC'
+
+        if sistema and not meta.get('platforms'):
+            meta['platforms'] = [sistema]
+
+        if not meta.get('title'):
+            meta['title'] = os.path.splitext(os.path.basename(str(source)))[0]
+
+        # Sin resolución que detectar y sin nada que capturar de un fichero que
+        # no se ejecuta: las capturas salen de IGDB, más abajo.
+        meta.setdefault('resolution', 'OTHER')
+        meta['screens'] = 0
+        meta.setdefault('image_list', [])
+
+        if (meta['gameinfo'] or {}).get('es_pack'):
+            # "Sony - PS1 (A-L).zip" no es una obra y no tiene id posible.
+            # Decirlo aquí evita que el resolver se invente uno y que el
+            # operador se pregunte luego por qué la ficha salió vacía.
+            console.print("[yellow]Esto parece un pack por plataforma, no una obra: "
+                          "se sube sin id de IGDB.")
+
+        console.print(
+            f"[green]Game metadata: [/green]{meta.get('title', '?')} "
+            f"[dim]{sistema or 'sistema sin determinar'} · "
+            f"{len((meta['gameinfo'] or {}).get('entradas', []))} ficheros[/dim]"
+        )
+
+        return meta
+
+    async def resolve_game_ids(self, meta, filename):
+        """
+        Identificar un juego contra IGDB.
+
+        Mismo contrato que resolve_ids(): 'high' se aplica solo, y todo lo que
+        no llegue nunca se adivina en silencio -- desatendido lo apunta y
+        sigue, interactivo pregunta y recuerda la respuesta.
+        """
+        if (meta.get('gameinfo') or {}).get('es_pack') and not meta.get('igdb'):
+            return meta
+
+        raw = meta.get('title') or filename
+
+        try:
+            res = _resolve_game(raw, igdb_hint=meta.get('igdb'),
+                                config=self.config,
+                                log=lambda m: log.info(f"[igdb_resolver] {m}"))
+        except Exception as e:                                  # noqa: BLE001
+            console.print(f"[yellow]IGDB resolver error: {e} — se sube sin id.")
+            return meta
+
+        found = res.get('igdb')
+
+        if res['confidence'] == 'high' and found:
+            meta['igdb'] = found
+            self._merge_game_record(meta, res.get('record'))
+            console.print(f"[green]IGDB {found} — {res['reason']}")
+
+            return meta
+
+        if not found:
+            console.print(f"[yellow]Sin candidato en IGDB para '{raw}'. Se sube sin id.")
+            _report_pending(self._override_key(meta), raw, res.get('reason', ''))
+
+            return meta
+
+        if meta.get('unattended'):
+            console.print(f"[yellow]IGDB {found} sólo llega a '{res['confidence']}'. "
+                          f"Se salta en modo desatendido.")
+            _report_pending(self._override_key(meta), raw, res.get('reason', ''))
+
+            return meta
+
+        rec = res.get('record') or {}
+        console.print(f"[cyan]Mejor apuesta: [/cyan]{rec.get('title', raw)} "
+                      f"[dim]({rec.get('year') or 's/f'})[/dim] -> IGDB {found}")
+        console.print(f"[dim]{res.get('reason', '')}[/dim]")
+
+        if Confirm.ask("¿Uso este id?", default=False):
+            meta['igdb'] = found
+            self._merge_game_record(meta, rec)
+            _save_override(self._override_key(meta),
+                           {'igdb': found, 'title': rec.get('title', raw)})
+
+        return meta
+
+    def _merge_game_record(self, meta, record):
+        """Igual que _merge_book_record: no pisa nada que ya venga puesto."""
+        for key in ('title', 'year', 'description', 'cover_url', 'genres',
+                    'platforms', 'companies', 'trailer', 'igdb_slug'):
+            if (record or {}).get(key) and not meta.get(key):
+                meta[key] = record[key]
+
+        # Las capturas de IGDB viajan por image_list para que las renderice el
+        # mismo bucle que las de una peli. Se REHOSTEAN, no se enlazan en
+        # caliente: enlazar al CDN de IGDB es dejar la descripción a merced de
+        # un host ajeno, que es justo la avería que ya hubo que reparar a mano
+        # en cientos de torrents cuando cayó un host de imágenes.
+        shots = (record or {}).get('screenshots') or []
+        if shots and not meta.get('image_list'):
+            local = self._download_images(meta, shots[:6])
+            if local:
+                image_list, _ = self.upload_screens(meta, len(local), 1, 0,
+                                                    len(local), local, {})
+                if image_list:
+                    meta['image_list'] = image_list
+                    meta['screens'] = len(image_list)
+
+    def _download_images(self, meta, urls):
+        """Baja unas imágenes al tmp del torrent y devuelve las rutas locales."""
+        import requests as _requests
+
+        outdir = os.path.join(meta['base_dir'], 'tmp', str(meta['uuid']))
+        os.makedirs(outdir, exist_ok=True)
+
+        paths = []
+        for n, url in enumerate(urls, 1):
+            dest = os.path.join(outdir, f"igdb-{n:02d}.jpg")
+            try:
+                r = _requests.get(url, timeout=20)
+                r.raise_for_status()
+                with open(dest, 'wb') as fh:
+                    fh.write(r.content)
+                paths.append(dest)
+            except Exception as e:                              # noqa: BLE001
+                log.info(f"[igdb] no se pudo bajar {url}: {e}")
+
+        return paths
 
     async def get_music(self, meta, mode):
         log.debug("Starting get_music")
@@ -2072,6 +2243,8 @@ class Prep():
         # the unattended / prompt handling below is unchanged.
         if category in ('BOOK', 'AUDIOBOOK'):
             return await self.resolve_book_ids(meta, filename, year)
+        if category == 'GAME':
+            return await self.resolve_game_ids(meta, filename)
         mal_hint = self._looks_anime(meta, filename)
         okey = self._override_key(meta)
         try:
@@ -3823,6 +3996,17 @@ class Prep():
             elif type == "HDTV": #HDTV
                 name = f"{title} {year} {alt_title} {season}{episode} {episode_title} {part} {cut} {ratio} {edition} {repack} {resolution} {source} {audio} {video_encode}"
                 potential_missing = []
+        elif meta['category'] == "GAME": #GAME SPECIFIC
+            # "Título (Año) [Sistema]". El sistema va porque es lo que decide
+            # si te sirve: la misma obra en ScummVM y en ROM de Mega Drive son
+            # descargas distintas para gente distinta.
+            potential_missing = []
+            game_title = meta.get('title', '') or title
+            game_year = f"({meta.get('year')})" if meta.get('year') else ''
+            system = ', '.join(meta.get('platforms') or [])
+            system = f"[{system}]" if system else ''
+            name = f"{game_title} {game_year} {system}"
+
         elif meta['category'] in ("BOOK", "AUDIOBOOK"): #BOOK SPECIFIC
             # "Author - Title (Year) [FORMAT]", with the narrator appended for
             # audiobooks because that is what makes two recordings of the same
