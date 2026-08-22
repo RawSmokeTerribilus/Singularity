@@ -262,7 +262,125 @@ def query_variants(title, author=None):
     return vistos
 
 
-def resolve_book(title, author=None, year=None, isbn_hint=None, config=None, log=None):
+
+# ─── una obra con muchas ediciones NO es una duda ────────────────────────────
+def _mismo_trabajo(a, b, umbral=0.85):
+    """
+    ¿Estos dos títulos son la misma obra?
+
+    No basta la similitud cruda. Las ediciones añaden coletillas -- "completo",
+    "3ª Edición", "(Spanish Edition)" -- que dejan el parecido en 0.88, justo
+    por debajo de cualquier umbral razonable, y entonces diez ediciones del
+    mismo libro parecen diez libros distintos.
+
+    Lo que de verdad distingue una coletilla de otra obra es la CONTENCIÓN: si
+    todas las palabras del título corto están en el largo, el largo es el
+    mismo libro con algo añadido.
+    """
+    ta, tb = set(_norm(a).split()), set(_norm(b).split())
+
+    if not ta or not tb:
+        return False
+
+    corto, largo = (ta, tb) if len(ta) <= len(tb) else (tb, ta)
+
+    if corto <= largo:
+        return True
+
+    return _title_score(a, b) >= umbral
+
+
+def _misma_obra(cands, minimo=0.70):
+    """
+    ¿La mayoría de estos candidatos son el mismo libro en ediciones distintas?
+
+    Es la distinción que faltaba. "No sé qué obra es esto" y "sé perfectamente
+    qué obra es, pero hay doce ediciones" son incertidumbres distintas y sólo
+    una merece molestar a nadie. Medido con *El arte de la guerra*: los diez
+    candidatos eran Sun Tzu y sólo cambiaban editorial, año y páginas.
+
+    Mayoría y no unanimidad: en una lista de diez ediciones se cuela siempre
+    una antología o un comentario sobre la obra, y un solo intruso no puede
+    convertir una decisión evidente en una pregunta.
+
+    -> lista de candidatos de la obra dominante, o `[]` si no hay tal.
+    """
+    if not cands:
+        return []
+
+    ref = cands[0]
+    ref_a = _norm(", ".join(ref.get("authors") or []))
+
+    grupo = []
+    for c in cands:
+        if not _mismo_trabajo(ref["title"], c["title"]):
+            continue
+
+        autores = _norm(", ".join(c.get("authors") or []))
+        # Si alguno no declara autor no se cuenta como desacuerdo: sería
+        # castigar la falta de dato.
+        if ref_a and autores and _title_score(ref_a, autores) < 0.70:
+            continue
+
+        grupo.append(c)
+
+    return grupo if len(grupo) >= max(2, int(len(cands) * minimo)) else []
+
+
+def _elegir_edicion(cands, local, log):
+    """
+    De varias ediciones de la misma obra, la que más se parece AL FICHERO.
+
+    Nada de preguntar: el fichero ya sabe cosas de sí mismo -- cuántas páginas
+    tiene, de qué editorial es, de qué año, en qué idioma -- y eso desempata
+    solo. Cuando no sabe nada, gana el registro más completo, que es el que
+    mejor ficha va a producir.
+    """
+    local = local or {}
+    paginas = local.get('paginas') or local.get('page_count')
+    editorial = (local.get('publisher') or '').strip()
+    anio = local.get('year')
+    idioma = (local.get('language') or '').strip().lower()
+
+    def puntos(c):
+        p = 0.0
+
+        if paginas and c.get('page_count'):
+            # Un PDF nunca cuadra exacto con una edición impresa: portada y
+            # cortesías bailan. Se premia la cercanía, no la igualdad.
+            diff = abs(int(paginas) - int(c['page_count']))
+            if diff == 0:
+                p += 3.0
+            elif diff <= 5:
+                p += 2.0
+            elif diff <= 20:
+                p += 1.0
+
+        if editorial and c.get('publisher') and _title_score(editorial, c['publisher']) >= 0.85:
+            p += 2.0
+
+        if anio and c.get('year') and abs(int(anio) - int(c['year'])) <= 1:
+            p += 1.5
+
+        if idioma and (c.get('language') or '').lower() == idioma:
+            p += 0.5
+
+        # Desempate final: el registro más completo hace mejor ficha.
+        p += 0.1 * sum(1 for k in ('publisher', 'page_count', 'year') if c.get(k))
+
+        return p
+
+    ordenados = sorted(cands, key=lambda c: (-puntos(c), -c['score']))
+    ganador = ordenados[0]
+
+    log(f"misma obra, {len(cands)} ediciones -> elegida "
+        f"{ganador.get('publisher') or 's/editorial'} {ganador.get('year') or ''} "
+        f"({ganador.get('page_count') or '?'}p) por parecido con el fichero")
+
+    return ganador
+
+
+def resolve_book(title, author=None, year=None, isbn_hint=None, config=None, log=None, local=None):
     """
     -> {'confidence': high|low|none, 'isbn13': str, 'score': float,
         'record': dict|None, 'reason': str}
@@ -283,8 +401,15 @@ def resolve_book(title, author=None, year=None, isbn_hint=None, config=None, log
     if not key:
         return _verdict("none", 0.0, None, "no google books api key configured")
 
+    # El título original que declara el fichero va PRIMERO: es un dato, no una
+    # deducción, y es lo único que encuentra a una traducción de aficionados.
+    variantes = query_variants(title, author)
+    declarado = ((local or {}).get('original_title') or '').strip()
+    if declarado and declarado.lower() not in [v.lower() for v in variantes]:
+        variantes.insert(0, declarado)
+
     cands = []
-    for variante in query_variants(title, author):
+    for variante in variantes:
         q = f"intitle:{variante}"
         if author:
             q += f" inauthor:{author}"      # a literal space; a '+' is sent as %2B and 503s
@@ -315,11 +440,26 @@ def resolve_book(title, author=None, year=None, isbn_hint=None, config=None, log
     lead = best["score"] - cands[1]["score"] if len(cands) > 1 else 1.0
 
     if best["score"] >= TRUST_SCORE and lead >= LEAD_MARGIN:
-        conf, reason = "high", "clear single match"
+        conf, reason = "high", "coincidencia única y clara"
+    elif best["score"] >= TRUST_SCORE and _misma_obra(
+            [c for c in cands if c["score"] >= TRUST_SCORE]):
+        # Empataban porque son la MISMA OBRA en ediciones distintas. Eso no es
+        # una duda sobre qué es el libro, así que no se pregunta: se elige la
+        # edición que más se parece al fichero.
+        #
+        # Y es lo correcto para esta biblioteca: medido sobre 300 epubs, sólo
+        # el 4,3% trae ISBN dentro -- el resto son ediciones digitales de
+        # bibliotecas libres, reproducciones del original, que no tienen ISBN
+        # propio que registrar.
+        best = _elegir_edicion(
+            _misma_obra([c for c in cands if c["score"] >= TRUST_SCORE]), local, log)
+        conf = "high"
+        reason = "misma obra en varias ediciones; elegida la más parecida al fichero"
     else:
         conf = "low"
-        reason = ("best candidate below trust score" if best["score"] < TRUST_SCORE
-                  else "several editions score the same; a human picks the edition")
+        reason = ("el mejor candidato no llega al umbral de confianza"
+                  if best["score"] < TRUST_SCORE
+                  else "varias obras distintas puntúan igual; lo elige una persona")
 
     log(f"resolved book '{title}' -> {conf} isbn13={best['isbn13']} "
         f"score={best['score']:.3f} lead={lead:.3f} ({reason})")

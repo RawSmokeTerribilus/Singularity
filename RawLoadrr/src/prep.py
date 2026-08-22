@@ -695,6 +695,13 @@ class Prep():
         meta['bookinfo'] = bookinfo.analyze(source)
         meta['book_file'] = source
 
+        # El 52% de los epubs de una biblioteca en castellano declaran su
+        # título original. Cuando el libro es una traducción, ése es el que
+        # los proveedores indexan y el español no existe.
+        original = bookinfo.original_title(source)
+        if original:
+            meta['original_title'] = original
+
         if local.get('title') and not meta.get('title'):
             meta['title'] = local['title']
 
@@ -2271,11 +2278,22 @@ class Prep():
                     asin_hint=meta.get('asin'),
                     log=lambda m: log.info(f"[book_resolver] {m}"))
             else:
+                # Lo que el fichero sabe de sí mismo viaja al resolver: es lo
+                # que desempata entre ediciones sin preguntarle a nadie.
+                local = dict(meta.get('bookinfo') or {})
+                for k in ('publisher', 'language', 'year', 'page_count'):
+                    if meta.get(k):
+                        local.setdefault(k, meta[k])
+
+                if meta.get('original_title'):
+                    local['original_title'] = meta['original_title']
+
                 res = _resolve_book(
                     title, author, year,
                     isbn_hint=meta.get('isbn'),
                     config=self.config,
-                    log=lambda m: log.info(f"[book_resolver] {m}"))
+                    log=lambda m: log.info(f"[book_resolver] {m}"),
+                    local=local)
         except Exception as e:                                  # noqa: BLE001
             console.print(f"[yellow]Book resolver error: {e} — uploading without an id.")
             return meta

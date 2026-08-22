@@ -483,3 +483,52 @@ def looks_like_audiobook(path, declared=False):
         return any(h.lower().endswith(EBOOK_EXTS) for h in hermanos)
 
     return False
+
+
+# ─── el título original, que el propio fichero declara ───────────────────────
+#
+# Medido: el 52% de los epubs de la biblioteca traen "Título original" en su
+# página de créditos. Cuando el libro es una traducción, ése es el título que
+# Google Books indexa y el español no existe -- las traducciones de aficionados
+# no llegan a tener ISBN propio, pero el original sí.
+#
+# Y a diferencia del puente de Wikipedia que hubo que montar para los juegos,
+# aquí NO se infiere nada ni se encadena confianza: es el fichero el que
+# afirma la equivalencia. No hay salto que demostrar.
+_TITULO_ORIGINAL = re.compile(
+    r'T[íi]tulo\s+original\s*:?\s*(?:</[^>]+>\s*)?(?:<[^>]+>\s*)*([^<\n\r]{3,90})',
+    re.IGNORECASE)
+
+
+def original_title(path):
+    """El título original declarado dentro del epub, o ''."""
+    if not str(path).lower().endswith('.epub'):
+        return ''
+
+    try:
+        z = zipfile.ZipFile(path)
+    except Exception:                                           # noqa: BLE001
+        return ''
+
+    # La página de créditos suele ir de las primeras; no hace falta leer el
+    # libro entero para encontrarla.
+    candidatos = [n for n in z.namelist()
+                  if n.lower().endswith(('.opf', '.xhtml', '.html', '.htm'))]
+
+    for name in candidatos[:40]:
+        try:
+            texto = z.read(name).decode('utf-8', 'ignore')
+        except Exception:                                       # noqa: BLE001
+            continue
+
+        m = _TITULO_ORIGINAL.search(texto)
+        if not m:
+            continue
+
+        titulo = _clean_title(re.sub(r'&[a-z]+;|&#\d+;', ' ', m.group(1)))
+        titulo = re.sub(r'\s+', ' ', titulo).strip(' .,;:-')
+
+        if len(titulo) >= 3:
+            return titulo
+
+    return ''
