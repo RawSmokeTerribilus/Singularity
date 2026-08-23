@@ -52,3 +52,4 @@ RawLoadrr/docs-loadrr/
 *.bkp
 *.bkp_ui
 work_data/
+docker-compose.yml.bak-selinux-20260822_191918
