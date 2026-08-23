@@ -33,6 +33,8 @@ MIN_CANDIDATE_SCORE = 0.50
 TRUST_SCORE = 0.90
 LEAD_MARGIN = 0.05           # two editions of one book tie exactly; that is a question, not a win
 
+from src.placeholders import limpiar
+
 GOOGLE_BOOKS = "https://www.googleapis.com/books/v1/volumes"
 AUDNEXUS = "https://api.audnex.us"
 
@@ -108,7 +110,9 @@ def to_isbn13(raw):
 
 # ─── Google Books ────────────────────────────────────────────────────────────
 def _google_get(params, key, log):
-    params = dict(params, key=key)
+    # Sin clave se consulta igual, pero el parametro NO puede ir vacio: Google
+    # trata `key=` como una clave invalida, no como su ausencia.
+    params = dict(params, key=key) if key else dict(params)
 
     for attempt in range(ATTEMPTS):
         try:
@@ -394,7 +398,12 @@ def resolve_book(title, author=None, year=None, isbn_hint=None, config=None, log
         'record': dict|None, 'reason': str}
     """
     log = log or (lambda m: None)
-    key = ((config or {}).get("DEFAULT", {}) or {}).get("google_books_api") or ""
+    # Un hueco sin rellenar vale MENOS que ninguna clave: Google Books
+    # responde sin ella --con un limite mas bajo-- pero devuelve 400 si se le
+    # manda una que no vale, y el usuario veia ese 400 en vez de "te falta
+    # configurar la clave".
+    key = limpiar(((config or {}).get("DEFAULT", {}) or {}).get("google_books_api"),
+                  "GOOGLE_BOOKS_API", "google_books_api")
 
     hint = to_isbn13(isbn_hint or "")
     if hint:

@@ -38,6 +38,8 @@ MIN_CANDIDATE_SCORE = 0.50
 BRIDGE_HOP1_MIN = 0.85       # el puente tiene que demostrar CADA salto
 BRIDGE_HOP2_MIN = 0.90
 
+from src.placeholders import es_placeholder
+
 TWITCH_TOKEN_URL = "https://id.twitch.tv/oauth2/token"
 IGDB_API = "https://api.igdb.com/v4"
 WIKIPEDIA_API = "https://es.wikipedia.org/w/api.php"
@@ -195,7 +197,15 @@ class IgdbClient:
 
     @property
     def configured(self):
-        return bool(self.client_id and self.client_secret)
+        """Con un hueco sin rellenar NO esta configurado.
+
+        Antes bastaba con que las dos cadenas fueran no vacias, asi que los
+        placeholders "TWITCH_CLIENT_ID"/"TWITCH_CLIENT_SECRET" contaban como
+        credenciales: se intentaba el OAuth y el usuario recibia un error de
+        Twitch en vez del honesto "faltan las claves".
+        """
+        return not es_placeholder(self.client_id, "TWITCH_CLIENT_ID", "igdb_client_id") \
+            and not es_placeholder(self.client_secret, "TWITCH_CLIENT_SECRET", "igdb_client_secret")
 
     def _auth(self):
         if self._token and time.time() < self._token_expires - 60:

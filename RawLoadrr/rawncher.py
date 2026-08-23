@@ -29,6 +29,7 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 from core.status_manager import update_status
 from src.console import console
+from src.placeholders import es_placeholder
 from rich.prompt import Prompt, Confirm
 from rich.panel import Panel
 from rich.table import Table
@@ -72,34 +73,80 @@ class Rawncher:
             console.print("[bold yellow]⚠️  Asegúrate de que 'data/config.py' existe y es válido.[/bold yellow]")
         else:
             # Comprobamos APIs globales (TMDB/IMGBB) que son críticas para upload.py
+            # Cada entrada: campo en config.py -> (nombre visible, pista de dónde sale).
+            # Las tres últimas son las que necesitan libros y juegos, y faltaban:
+            # una instalación anterior a ellas no tiene el campo en su config.py
+            # —que es un fichero del usuario y NO se regenera— así que nunca se
+            # le preguntaba y el resolver le respondía "faltan las claves" sin
+            # decirle dónde ponerlas.
             master_keys = {
-                "tmdb_api": "TMDB_API_KEY",
-                "imdb_api": "IMDB_API_KEY",
-                "imgbb_api": "IMGBB_API_KEY",
-                "ptscreens_api": "PTSCREENS_API_KEY",
-                "ptpimg_api": "PTPIMG_API_KEY",
-                "lensdump_api": "LENSDUMP_API_KEY",
-                "oeimg_api": "OEIMG_API_KEY",
+                "tmdb_api":           ("TMDB_API_KEY", "themoviedb.org/settings/api"),
+                "imdb_api":           ("IMDB_API_KEY", ""),
+                "imgbb_api":          ("IMGBB_API_KEY", ""),
+                "ptscreens_api":      ("PTSCREENS_API_KEY", ""),
+                "ptpimg_api":         ("PTPIMG_API_KEY", ""),
+                "lensdump_api":       ("LENSDUMP_API_KEY", ""),
+                "oeimg_api":          ("OEIMG_API_KEY", ""),
+                "google_books_api":   ("GOOGLE_BOOKS_API", "console.cloud.google.com — identifica e-books y audiolibros"),
+                "igdb_client_id":     ("TWITCH_CLIENT_ID", "dev.twitch.tv/console — IGDB va detrás de una app de Twitch"),
+                "igdb_client_secret": ("TWITCH_CLIENT_SECRET", "la misma app de Twitch que el id"),
             }
             needs_save = False
             default_config = self.config.get("DEFAULT", {})
-            for python_key, env_key in master_keys.items():
+            for python_key, (env_key, pista) in master_keys.items():
                 val = default_config.get(python_key, "")
-                
-                # Heurística mejorada para detectar cualquier placeholder (YOUR_...) o vacío
-                if not val or val.startswith("YOUR_") or val in ["tu_clave_tmdb_aqui", "CAMBIAME"]:
+
+                # El hueco se reconoce en src/placeholders.py, no aquí: había
+                # tres formatos distintos y la comprobación de antes sólo veía
+                # el prefijo YOUR_.
+                if es_placeholder(val, env_key, python_key):
+                    obligatoria = python_key == "tmdb_api"
+
                     console.print(f"\n[bold red]✖ {env_key} no configurada o tiene valor por defecto.[/bold red]")
-                    # Permitir saltar las opcionales (hosts de imágenes extra)
-                    msg = f"[bold cyan]▶ Introduce el valor para {env_key}[/bold cyan]" + ("[dim] (Enter para saltar)[/dim]" if "tmdb" not in python_key else "")
+
+                    if pista:
+                        console.print(f"[dim]  {pista}[/dim]")
+
+                    msg = f"[bold cyan]▶ Introduce el valor para {env_key}[/bold cyan]"
+
+                    if not obligatoria:
+                        msg += "[dim] (Enter para dejarla vacía; no se vuelve a preguntar)[/dim]"
+
                     new_val = Prompt.ask(msg)
-                    
+
+                    if "DEFAULT" not in self.config:
+                        self.config["DEFAULT"] = {}
+
+                    # Se escribe clave a clave y en sitio. `_guardar_config()`
+                    # regeneraría config.py entero desde pformat() y se llevaría
+                    # por delante los comentarios del usuario --en el config de
+                    # producción hay 48 líneas de notas sobre la cascada de
+                    # hosts de imágenes que no están en ningún otro sitio.
                     if new_val.strip():
-                        if "DEFAULT" not in self.config:
-                            self.config["DEFAULT"] = {}
-                        self.config["DEFAULT"][python_key] = new_val.strip()
-                        needs_save = True
+                        if self._persistir_clave_default(python_key, new_val.strip()):
+                            needs_save = True
+                        else:
+                            # No se pudo escribir con garantías: el valor vale
+                            # para esta sesión, pero hay que decir que no queda.
+                            self.config["DEFAULT"][python_key] = new_val.strip()
+                            console.print(
+                                f"[bold yellow]  ⚠ No se pudo escribir en data/config.py. "
+                                f"Vale para esta sesión; ponla a mano en DEFAULT -> {python_key}.[/bold yellow]"
+                            )
+                    elif not obligatoria:
+                        # Saltar dejaba el campo AUSENTE, así que la aduana lo
+                        # volvía a preguntar en CADA arranque. Se persiste vacío:
+                        # el campo pasa a existir en config.py --visible y
+                        # editable a mano, que es lo que le faltaba a quien viene
+                        # de una versión anterior-- y deja de molestar. Es la
+                        # misma idea que ensure_env_keys() en Mass Edition.
+                        if self._persistir_clave_default(python_key, ""):
+                            needs_save = True
+                            console.print(
+                                f"[dim]  Se deja vacía. Para ponerla luego: "
+                                f"data/config.py -> DEFAULT -> {python_key}[/dim]"
+                            )
             if needs_save:
-                self._guardar_config()
                 console.print("[bold green]✅ Claves de API globales guardadas.[/]")
                 self._reload_config()  # Recargamos para que todo esté fresco
 
@@ -991,6 +1038,119 @@ class Rawncher:
         except Exception as e:
             console.print(f"[bold red]❌ Error al leer config.py: {e}[/bold red]")
             return None
+
+    def _persistir_clave_default(self, campo: str, valor: str) -> bool:
+        """Escribe UNA clave de DEFAULT en config.py sin reconstruir el fichero.
+
+        Por qué no vale `_guardar_config()` aquí: ese método regenera config.py
+        entero desde `pformat(self.config)`, y eso **borra todos los
+        comentarios**. En el config.py de producción hay 48 líneas de notas
+        escritas a mano sobre la cascada de hosts de imágenes —por qué imgbox y
+        pixhost están fuera, qué devolvió cada host en la última prueba en
+        vivo— que no viven en ningún otro sitio. Perderlas por rellenar una
+        clave no compensa.
+
+        Es la misma idea que `ensure_env_keys()` en Mass Edition: añadir sólo
+        lo que falta y no tocar nada más.
+
+        Devuelve True si lo escribió. Si no puede hacerlo con garantías
+        devuelve False sin tocar el fichero, y el llamante decide qué hacer;
+        nunca lo deja a medias.
+
+        Limitación conocida: un `'DEFAULT': {}` literalmente vacío y todo en
+        una línea no se puede ampliar por aquí. Falla en seguro --devuelve
+        False y no toca nada-- y no se ha cubierto porque config.py.example
+        trae cuarenta claves, así que esa forma no se da en la práctica.
+        """
+        ruta = self.base_dir / "data" / "config.py"
+
+        try:
+            original = ruta.read_text(encoding="utf-8")
+        except OSError as e:
+            self._logger.error(f"No se pudo leer config.py: {e}")
+            return False
+
+        literal = repr(str(valor))
+        lineas = original.splitlines(keepends=True)
+        nuevo = None
+
+        # 1) El campo ya existe: se sustituye SÓLO su línea, conservando sangría
+        #    y la coma final. Se exige que la línea termine en coma para no
+        #    comerse un cierre de llave que compartiera línea.
+        patron_campo = re.compile(r"^(\s*)['\"]" + re.escape(campo) + r"['\"]\s*:\s*.*,\s*$")
+
+        for i, linea in enumerate(lineas):
+            m = patron_campo.match(linea)
+
+            if m:
+                copia = list(lineas)
+                copia[i] = f"{m.group(1)}'{campo}': {literal},\n"
+                nuevo = "".join(copia)
+                break
+
+        # 2) No existe: se inserta justo después de la apertura de DEFAULT. La
+        #    sangría dentro de un literal es libre, así que basta con una línea
+        #    propia; la verificación de abajo confirma que quedó bien.
+        if nuevo is None:
+            # `search`, no `match`: pformat deja la apertura pegada a lo
+            # anterior ("config = {'AUTO': {...}, 'DEFAULT': {'add_logo': ...")
+            # y anclar al principio de línea no la encontraba.
+            patron_default = re.compile(r"['\"]DEFAULT['\"]\s*:\s*\{")
+            patron_hermano = re.compile(r"^(\s*)['\"][A-Za-z_][\w]*['\"]\s*:")
+
+            for i, linea in enumerate(lineas):
+                if not patron_default.search(linea):
+                    continue
+
+                # La sangría se copia de la clave hermana de debajo, no se
+                # calcula: pformat alinea con la llave y una sangría inventada
+                # queda torcida aunque sea válida.
+                sangria = None
+
+                if i + 1 < len(lineas):
+                    h = patron_hermano.match(lineas[i + 1])
+
+                    if h:
+                        sangria = h.group(1)
+
+                if sangria is None:
+                    sangria = " " * (len(linea) - len(linea.lstrip()) + 4)
+
+                copia = list(lineas)
+                copia.insert(i + 1, f"{sangria}'{campo}': {literal},\n")
+                nuevo = "".join(copia)
+                break
+
+        if nuevo is None:
+            self._logger.warning(f"No se encontró dónde escribir '{campo}' en config.py")
+            return False
+
+        # 3) Antes de escribir, se comprueba que el resultado sigue siendo un
+        #    config válido Y que la clave quedó con el valor pedido. Si algo no
+        #    cuadra, el fichero se queda como estaba.
+        try:
+            ns: dict = {}
+            exec(compile(nuevo, str(ruta), "exec"), ns)  # noqa: S102
+
+            if ns.get("config", {}).get("DEFAULT", {}).get(campo) != str(valor):
+                raise ValueError("la clave no quedó con el valor esperado")
+        except Exception as e:                                    # noqa: BLE001
+            self._logger.error(f"Edición de config.py descartada ({campo}): {e}")
+            return False
+
+        try:
+            # write_text trunca el fichero EN SITIO y conserva el inodo. Es
+            # obligatorio: config.py se monta como fichero suelto en el
+            # contenedor y sustituirlo (os.replace) rompería el bind-mount.
+            ruta.write_text(nuevo, encoding="utf-8")
+        except OSError as e:
+            self._logger.error(f"No se pudo escribir config.py: {e}")
+            return False
+
+        self.config.setdefault("DEFAULT", {})[campo] = str(valor)
+        importlib.invalidate_caches()
+
+        return True
 
     def _reload_config(self) -> None:
         """Recarga la configuración desde el archivo."""
