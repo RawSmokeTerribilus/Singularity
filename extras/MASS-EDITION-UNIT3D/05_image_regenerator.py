@@ -83,7 +83,9 @@ ENV_DEFAULTS = [
     ("ME_REGEN_SCREENS",    "",   "Nº de capturas. Vacío = tantas como haya que reponer"),
     ("ME_REGEN_KEEP_PNG",   "0",  "1 conserva los PNG en tmp; 0 los borra tras subirlos"),
     ("ME_REGEN_DRY_RUN",    "0",  "1 = simulacro. Los flags --real/--dry-run mandan sobre esto"),
-    ("ME_REGEN_IMG_SIZE",   "350","Ancho del [img=N] si la etiqueta original no traía uno"),
+    ("ME_REGEN_IMG_SIZE",   "600","Ancho del [img=N] de las capturas repuestas. Vacío = respetar el de la etiqueta vieja"),
+    ("ME_REGEN_IMG_SIZE_RESPETAR", "0",
+     "1 = conservar el ancho que ya tenía cada etiqueta y usar ME_REGEN_IMG_SIZE sólo cuando no traía ninguno"),
     ("ME_REGEN_STATE_DIR",  "",   "Dónde viven mapeo_qbit_*.json y completados_regen_*.txt"),
     ("ME_REGEN_ALL",        "0",  "1 = procesa todo el cliente e ignora ID_START/ID_END"),
     ("ME_REGEN_LIMIT",      "0",  "Tope de torrents por tirada. 0 = sin tope"),
@@ -200,7 +202,8 @@ def _hosts_muertos():
 DEAD_HOSTS = _hosts_muertos()
 REGEN_IMG_HOST  = os.getenv("ME_REGEN_IMG_HOST", "").strip().lower()
 REGEN_SCREENS   = os.getenv("ME_REGEN_SCREENS", "").strip()
-REGEN_IMG_SIZE  = os.getenv("ME_REGEN_IMG_SIZE", "350").strip()
+REGEN_IMG_SIZE  = os.getenv("ME_REGEN_IMG_SIZE", "600").strip().lstrip("=")
+REGEN_IMG_SIZE_RESPETAR = flag("ME_REGEN_IMG_SIZE_RESPETAR", "0")
 REGEN_STATE_DIR = os.getenv("ME_REGEN_STATE_DIR", "").strip() or "."
 REGEN_LIMIT     = int(os.getenv("ME_REGEN_LIMIT", "0") or 0)
 REGEN_KEEP_PNG  = flag("ME_REGEN_KEEP_PNG", "0")
@@ -1017,8 +1020,8 @@ def regenerar_imagenes(media_path, uuid, screens, img_host, rl_config, reanudar)
 # ✂️ SUSTITUCIÓN QUIRÚRGICA EN LA DESCRIPCIÓN
 # ==========================================
 def _tag(img, size_attr):
-    """Mismo formato que COMMON.py:121, conservando el ancho que ya tenía la
-    etiqueta original ('=600', '' , …) para no alterar la maquetación.
+    """Mismo formato que COMMON.py:121. El ancho lo decide `_size_attr`:
+    ME_REGEN_IMG_SIZE si está puesto, y si no el que ya tenía la etiqueta.
 
     Las DOS urls apuntan a la imagen directa, no al visualizador del host.
     Antes el `[url=]` llevaba `web_url`, así que pinchar una captura sacaba al
@@ -1035,9 +1038,30 @@ def _tag(img, size_attr):
 
 
 def _size_attr(match=None):
-    if match is not None:
-        return match.group("size") or ""
-    return f"={REGEN_IMG_SIZE}" if REGEN_IMG_SIZE else ""
+    """El ancho del [img=N] que se va a escribir.
+
+    ME_REGEN_IMG_SIZE MANDA cuando está puesto. Antes era sólo un respaldo para
+    cuando la etiqueta vieja no traía ancho, y eso hacía que la variable no
+    sirviera para nada en la práctica: medido sobre las 2.900 descripciones de
+    la cola de MILNU, de las 13.327 etiquetas muertas 9.756 traían "=500",
+    3.439 "=600", 118 "=350" y sólo DIEZ venían sin ancho. O sea que el 99,9%
+    de las veces se reponía con el ancho viejo y la configuración se ignoraba
+    en silencio. Ya había mordido antes en NOBS.
+
+    Quien quiera la maquetación original tiene ME_REGEN_IMG_SIZE_RESPETAR=1, y
+    dejar ME_REGEN_IMG_SIZE vacío sigue significando "no forzar nada".
+    """
+    forzado = f"={REGEN_IMG_SIZE}" if REGEN_IMG_SIZE else ""
+
+    if match is None:
+        return forzado
+
+    original = match.group("size") or ""
+
+    if forzado and not REGEN_IMG_SIZE_RESPETAR:
+        return forzado
+
+    return original or forzado
 
 
 def _texto_sin_imagenes(s):

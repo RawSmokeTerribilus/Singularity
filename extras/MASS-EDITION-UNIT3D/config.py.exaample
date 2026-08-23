@@ -23,7 +23,8 @@ ENV_DEFAULTS = [
     ("ME_REGEN_SCREENS",     "",                      "Nº de capturas. Vacío = tantas como imágenes haya que reponer"),
     ("ME_REGEN_KEEP_PNG",    "0",                     "1 conserva los PNG en tmp; 0 los borra tras subirlos"),
     ("ME_REGEN_DRY_RUN",     "0",                     "1 = simulacro. Los flags --real/--dry-run mandan sobre esto"),
-    ("ME_REGEN_IMG_SIZE",    "350",                   "Ancho del [img=N] si la etiqueta original no traía uno"),
+    ("ME_REGEN_IMG_SIZE",    "600",                   "Ancho del [img=N] de las capturas repuestas. Vacío = respetar el de la etiqueta vieja"),
+    ("ME_REGEN_IMG_SIZE_RESPETAR", "0",              "1 = conservar el ancho de cada etiqueta vieja y usar ME_REGEN_IMG_SIZE sólo si no traía ninguno"),
     ("ME_REGEN_STATE_DIR",   "",                      "Dónde viven mapeo_qbit_*.json y completados_regen_*.txt. Vacío = directorio actual"),
     ("ME_REGEN_ALL",         "0",                     "1 = procesa todo el cliente e ignora ID_START/ID_END"),
     ("ME_REGEN_LIMIT",       "0",                     "Tope de torrents por tirada. 0 = sin tope"),
@@ -220,7 +221,13 @@ REGEN_KEEP_PNG = flag("ME_REGEN_KEEP_PNG", "0")
 REGEN_DRY_RUN = flag("ME_REGEN_DRY_RUN", "0")
 
 # Ancho del [img=N] en el BBCode nuevo (mismo formato que COMMON.py).
-REGEN_IMG_SIZE = os.getenv("ME_REGEN_IMG_SIZE", "350").strip()
+# MANDA sobre el ancho que tuviera la etiqueta vieja. Vacío = respetar el suyo.
+REGEN_IMG_SIZE = os.getenv("ME_REGEN_IMG_SIZE", "600").strip().lstrip("=")
+
+# 1 = respetar el ancho de cada etiqueta vieja, usando el de arriba sólo cuando
+# no traía ninguno. Era el comportamiento anterior, y hacía que configurar el
+# ancho no sirviera de nada: casi todas las etiquetas traen el suyo.
+REGEN_IMG_SIZE_RESPETAR = flag("ME_REGEN_IMG_SIZE_RESPETAR", "0")
 
 # Directorio donde viven los ficheros de estado (mapeo_qbit.json,
 # completados_regen.txt). Por defecto el cwd, igual que 01-04.
