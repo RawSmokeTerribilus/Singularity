@@ -564,7 +564,36 @@ PUERTO      = int(os.getenv("ME_INTRUSO_PUERTO", "0"))  # 0 = puerto libre
 # Puerto de escucha efímero (:0). Con uno fijo, dos torrentes seguidos pueden
 # solaparse mientras el anterior suelta el socket, y la sesión nueva se queda
 # sin escuchar — menos peers y ventanas que no llegan.
-IFACE       = os.getenv("ME_INTRUSO_IFACE", "0.0.0.0:0")
+def _iface_salida():
+    """La interfaz por la que de verdad se sale a internet, como `ip:0`.
+
+    Por qué NO vale `0.0.0.0:0`: este contenedor corre en modo `host`, asi que
+    libtorrent ve TODAS las interfaces de la maquina y anuncia una vez por
+    cada una. Medido el 2026-08-24 contra un torrent real: **29 anuncios para
+    un solo torrent** --loopback, LAN, tailscale y una docena de puentes de
+    Docker--. Los puentes fallan con "skipping tracker announce (unreachable)",
+    pero los reales SI llegan, y entonces el tracker ve varios peers distintos
+    con el mismo passkey y acaba rechazando el anuncio con
+    "You already have N peers on this torrent". El sintoma que se ve arriba es
+    "ningun peer respondio" en torrents con seeds de sobra.
+
+    El truco del socket UDP no manda nada: solo le pregunta al kernel que
+    origen usaria para ese destino.
+    """
+    import socket
+
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        try:
+            s.connect(("1.1.1.1", 53))
+            return f"{s.getsockname()[0]}:0"
+        finally:
+            s.close()
+    except OSError:
+        return "0.0.0.0:0"
+
+
+IFACE       = os.getenv("ME_INTRUSO_IFACE") or _iface_salida()
 
 
 def _descargar_torrent(session, tid):
