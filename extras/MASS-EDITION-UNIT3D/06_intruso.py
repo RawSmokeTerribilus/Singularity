@@ -865,15 +865,60 @@ class _ServidorPiezas:
             pass
 
 
+_MAPA_LOCAL = None
+
+
+def _fichero_local(tid, rl_config):
+    """La ruta en disco de este torrent, si el cliente ya lo tiene sembrando.
+
+    Por que existe: el 82% de la cola de MILNU son torrents que esta misma
+    maquina ya siembra. Bajarselos por BitTorrent es absurdo --y encima suele
+    FALLAR, porque el tracker nos devuelve nuestro propio peer con la IP
+    publica y el router no hace hairpin NAT: nos pasamos 60 segundos
+    intentando conectarnos a nosotros mismos para leer un fichero que esta a
+    un `open()` de distancia.
+
+    El mapeo id -> fichero lo construye ya `05_image_regenerator` leyendo el
+    comentario que UNIT3D deja dentro del .torrent. Se reutiliza tal cual: se
+    carga el cacheado y, si no esta, se pregunta al cliente UNA vez por tirada.
+    """
+    global _MAPA_LOCAL
+
+    if _MAPA_LOCAL is None:
+        _MAPA_LOCAL = R._cargar_json(R.MAPA_QBIT) or {}
+
+        if not _MAPA_LOCAL:
+            try:
+                _MAPA_LOCAL = R.construir_mapa(SITE_BASE, rl_config) or {}
+            except Exception as e:                            # noqa: BLE001
+                print(f"   (no se pudo consultar el cliente torrent: {e})", flush=True)
+                _MAPA_LOCAL = {}
+
+    ruta = _MAPA_LOCAL.get(str(tid))
+
+    if not ruta or not os.path.exists(ruta):
+        return None
+
+    # content_path puede ser una carpeta (packs de temporada).
+    return R.elegir_fichero(ruta)
+
+
 def capturar_desde_torrent(entrada, rl_config, img_host, session):
     """Baja unas ventanas del fichero, saca capturas y las sube.
 
     Devuelve (image_list, None) o (None, motivo). No deja datos en disco.
     """
     tid = entrada["id"]
-    ruta_torrent, err = _descargar_torrent(session, tid)
-    if err:
-        return None, err
+
+    # Atajo: si el fichero ya esta en disco no hace falta ni el .torrent.
+    local = _fichero_local(tid, rl_config)
+
+    ruta_torrent = None
+
+    if local is None:
+        ruta_torrent, err = _descargar_torrent(session, tid)
+        if err:
+            return None, err
 
     destino = os.path.join(DATOS_TMP, f"d{tid}")
     os.makedirs(destino, exist_ok=True)
@@ -881,12 +926,18 @@ def capturar_desde_torrent(entrada, rl_config, img_host, session):
     os.makedirs(carpeta, exist_ok=True)
     srv = None
     try:
-        srv = _ServidorPiezas(ruta_torrent, destino)
-        peers = srv.esperar_peers()
-        if not peers:
-            return None, f"ningún peer conectó — {srv.diagnostico or 'sin datos'}"
+        if local is not None:
+            # Ni libtorrent, ni peers, ni esperas: ffprobe y ffmpeg aceptan una
+            # ruta igual que una URL, asi que el resto del camino no cambia.
+            url = local
+            print(f"    📁 en disco: {os.path.basename(local)}", flush=True)
+        else:
+            srv = _ServidorPiezas(ruta_torrent, destino)
+            peers = srv.esperar_peers()
+            if not peers:
+                return None, f"ningún peer conectó — {srv.diagnostico or 'sin datos'}"
 
-        url = srv.arrancar()
+            url = srv.arrancar()
 
         # stdin cerrado por lo mismo que ffmpeg: ver la nota de _captura.
         # El tope baja de 300s a 200s a proposito: `_asegurar` se rinde a los
@@ -904,6 +955,9 @@ def capturar_desde_torrent(entrada, rl_config, img_host, session):
             # le da. El motivo de verdad --que piezas faltaban, si se supero el
             # tope-- lo guardo el hilo del servidor; sin esto salia un
             # "Command [...] timed out" de 200 caracteres que no dice nada.
+            if srv is None:
+                return None, "ffprobe no pudo leer el fichero local (¿corrupto o incompleto?)"
+
             return None, (f"las piezas no llegaron — {srv.ultimo_error}"
                           if srv.ultimo_error else
                           f"ffprobe agotó {max(60, ESPERA_MAX + 20)}s sin recibir datos"
@@ -913,7 +967,8 @@ def capturar_desde_torrent(entrada, rl_config, img_host, session):
             # El servidor de piezas corre en otro hilo y guarda ahi lo que de
             # verdad fallo. Sin esto, un "las piezas no llegaron" se veia como
             # un escueto "ffprobe no pudo leer la duracion".
-            return None, srv.ultimo_error or "ffprobe no pudo leer la duración"
+            return None, ((srv.ultimo_error if srv else None)
+                          or "ffprobe no pudo leer la duración")
 
         # Aquí el tonemap va EN ORIGEN, no al recodificar: estas capturas las
         # genera nuestro propio ffmpeg, así que se convierte desde el vídeo de
@@ -982,10 +1037,14 @@ def capturar_desde_torrent(entrada, rl_config, img_host, session):
             srv.cerrar()
         for d in (destino, carpeta):
             shutil.rmtree(d, ignore_errors=True)
-        try:
-            os.remove(ruta_torrent)
-        except OSError:
-            pass
+        # Con fichero local no se descarga ningun .torrent, asi que aqui no hay
+        # nada que borrar. `os.remove(None)` lanzaria TypeError, que este
+        # `except OSError` NO atrapa: reventaria la limpieza entera.
+        if ruta_torrent:
+            try:
+                os.remove(ruta_torrent)
+            except OSError:
+                pass
 
 
 def _descripcion_con_galeria(original, actual, image_list):
