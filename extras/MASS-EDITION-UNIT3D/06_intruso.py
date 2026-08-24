@@ -1172,11 +1172,30 @@ def reponer_uno(session, entrada, rl_config, img_host):
 def fase_reponer(session, cola, rl_config):
     img_host = R._elegir_img_host(rl_config)
     hechos = _leer_marcador(REPUESTOS)
-    # El selector es la COLA, no los enlaces: la fase 1 ya los quitó. Primero
-    # los que más seeds tienen, que son los que menos van a hacer esperar.
+    # El selector es la COLA, no los enlaces: la fase 1 ya los quitó.
     pend = [e for e in cola
             if e["id"] not in hechos and int(e.get("seeders") or 0) > 0]
-    pend.sort(key=lambda e: -int(e.get("seeders") or 0))
+
+    # Primero los que ya están en disco: no dependen de nadie, no pueden
+    # fallar por falta de peers y se despachan en segundos. Son el 82% de la
+    # cola de MILNU, y antes caían al final porque su recuento de seeds es
+    # bajo. Dentro de cada grupo, los que más seeds tienen primero: son los
+    # que menos van a hacer esperar.
+    #
+    # El mapeo se consulta UNA vez aquí, no una por torrent.
+    try:
+        mapa = R._cargar_json(R.MAPA_QBIT) or {}
+    except Exception:                                         # noqa: BLE001
+        mapa = {}
+
+    pend.sort(key=lambda e: (0 if str(e["id"]) in mapa else 1,
+                             -int(e.get("seeders") or 0)))
+
+    en_disco = sum(1 for e in pend if str(e["id"]) in mapa)
+
+    if en_disco:
+        print(f"\n📁 {en_disco} de {len(pend)} ya están en disco: esos van primero "
+              f"y no necesitan BitTorrent.")
     if LIMITE:
         pend = pend[:LIMITE]
 
