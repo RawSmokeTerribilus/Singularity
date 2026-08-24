@@ -1027,7 +1027,12 @@ def capturar_desde_torrent(entrada, rl_config, img_host, session):
         from src.prep import Prep
         prep = Prep(screens=len(pngs), img_host=img_host, config=rl_config)
         meta = {"base_dir": R.RAWLOADRR_DIR, "uuid": os.path.basename(carpeta),
-                "path": srv.ruta, "filename": "intruso", "image_list": [],
+                # Con servidor de piezas es el fichero a medio bajar del
+                # temporal; en local, el de la biblioteca. `upload_screens` no
+                # lo lee --sube lo que haya en base_dir/tmp/uuid-- pero va
+                # correcto por si algun dia lo mira.
+                "path": srv.ruta if srv else local,
+                "filename": "intruso", "image_list": [],
                 "imghost": img_host, "ffdebug": False, "vapoursynth": False}
         cwd = os.getcwd()
         try:
