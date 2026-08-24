@@ -634,7 +634,14 @@ class _ServidorPiezas:
             "listen_interfaces": IFACE,
             "enable_dht": False, "enable_lsd": False,
             "enable_upnp": False, "enable_natpmp": False,
-            "alert_mask": lt.alert.category_t.error_notification,
+            # Sin `tracker` ni `peer` en la mascara no hay forma de saber POR QUE
+            # no hubo peers: el sintoma "ningun peer respondio" tapaba por igual
+            # un rechazo del tracker, cero peers devueltos y peers devueltos que
+            # no conectan. Son tres problemas distintos con tres arreglos
+            # distintos.
+            "alert_mask": (lt.alert.category_t.error_notification
+                           | lt.alert.category_t.tracker_notification
+                           | lt.alert.category_t.peer_notification),
         })
         self.ti = lt.torrent_info(ruta_torrent)
         par = lt.add_torrent_params()
@@ -687,6 +694,8 @@ class _ServidorPiezas:
         # llegan, tope superado), la excepción moría ahí y ffmpeg sólo recibía
         # datos truncados. Se guarda para poder decir QUÉ pasó de verdad.
         self.ultimo_error = None
+        # Lo que se sepa sobre por que no hubo peers; lo rellena esperar_peers.
+        self.diagnostico = None
 
         # Cabecera y cola DEL FICHERO elegido. Sin nada deseado libtorrent
         # anuncia numwant=0 y el tracker no devuelve ni un peer (bloqueo
@@ -701,11 +710,56 @@ class _ServidorPiezas:
                 self.h.set_piece_deadline(p, 1000, 0)
 
     def esperar_peers(self, seg=60):
+        """Peers conectados, y de paso guarda POR QUE no los hubo.
+
+        `self.diagnostico` queda con lo que dijo el tracker y con lo que les
+        paso a las conexiones. Sin eso, un fallo del tracker, un tracker que
+        devuelve cero peers y unos peers que no conectan se veian los tres
+        igual, y no se puede arreglar lo que no se distingue.
+        """
+        import collections
+
+        devueltos = 0
+        del_tracker = []
+        caidas = collections.Counter()
         t0 = time.time()
+
         while time.time() - t0 < seg:
-            if self.h.status().num_peers > 0:
-                return self.h.status().num_peers
+            for a in self.ses.pop_alerts():
+                nombre = type(a).__name__
+
+                if nombre == "tracker_reply_alert":
+                    devueltos = max(devueltos, getattr(a, "num_peers", 0))
+                elif nombre in ("tracker_error_alert", "tracker_warning_alert"):
+                    texto = str(a)
+                    # Los puentes sin salida son ruido conocido, no un motivo.
+                    if "unreachable" not in texto:
+                        del_tracker.append(texto[-120:])
+                elif nombre == "peer_disconnected_alert":
+                    m = str(a)
+                    caidas["upload to upload" if "upload to upload" in m
+                           else "timeout" if "timed out" in m or "timed out" in m.lower()
+                           else "otra"] += 1
+
+            n = self.h.status().num_peers
+
+            if n > 0:
+                self.diagnostico = f"{devueltos} devueltos por el tracker"
+
+                return n
+
             time.sleep(0.5)
+
+        partes = [f"el tracker devolvió {devueltos} peer(s)"]
+
+        if del_tracker:
+            partes.append("dijo: " + " | ".join(dict.fromkeys(del_tracker))[:160])
+
+        if caidas:
+            partes.append("caídas: " + ", ".join(f"{v}×{k}" for k, v in caidas.most_common()))
+
+        self.diagnostico = "; ".join(partes)
+
         return 0
 
     def bajado_mib(self):
@@ -824,17 +878,26 @@ def capturar_desde_torrent(entrada, rl_config, img_host, session):
         srv = _ServidorPiezas(ruta_torrent, destino)
         peers = srv.esperar_peers()
         if not peers:
-            return None, "ningún peer respondió (¿sin seeds ahora mismo?)"
+            return None, f"ningún peer conectó — {srv.diagnostico or 'sin datos'}"
 
         url = srv.arrancar()
 
         # stdin cerrado por lo mismo que ffmpeg: ver la nota de _captura.
+        # El tope baja de 300s a 200s a proposito: `_asegurar` se rinde a los
+        # ESPERA_MAX (180s por defecto), asi que esperar 300 solo anadia dos
+        # minutos de nada por cada fallo y tapaba el motivo real con un
+        # "timed out" generico.
         pr = subprocess.run(["ffprobe", "-v", "error", "-seekable", "1",
                              "-show_entries", "format=duration", "-of", "csv=p=0", url],
-                            capture_output=True, text=True, timeout=300)
+                            capture_output=True, text=True,
+                            timeout=max(60, ESPERA_MAX + 20),
+                            stdin=subprocess.DEVNULL)
         dur = float((pr.stdout or "0").strip() or 0)
         if dur <= 0:
-            return None, "ffprobe no pudo leer la duración"
+            # El servidor de piezas corre en otro hilo y guarda ahi lo que de
+            # verdad fallo. Sin esto, un "las piezas no llegaron" se veia como
+            # un escueto "ffprobe no pudo leer la duracion".
+            return None, srv.ultimo_error or "ffprobe no pudo leer la duración"
 
         # Aquí el tonemap va EN ORIGEN, no al recodificar: estas capturas las
         # genera nuestro propio ffmpeg, así que se convierte desde el vídeo de
