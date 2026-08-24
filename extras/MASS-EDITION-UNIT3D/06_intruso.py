@@ -762,6 +762,12 @@ class _ServidorPiezas:
 
         return 0
 
+    def peers_ahora(self):
+        try:
+            return self.h.status().num_peers
+        except Exception:                                    # noqa: BLE001
+            return -1
+
     def bajado_mib(self):
         return self.h.status().total_done / 2 ** 20
 
@@ -887,11 +893,21 @@ def capturar_desde_torrent(entrada, rl_config, img_host, session):
         # ESPERA_MAX (180s por defecto), asi que esperar 300 solo anadia dos
         # minutos de nada por cada fallo y tapaba el motivo real con un
         # "timed out" generico.
-        pr = subprocess.run(["ffprobe", "-v", "error", "-seekable", "1",
-                             "-show_entries", "format=duration", "-of", "csv=p=0", url],
-                            capture_output=True, text=True,
-                            timeout=max(60, ESPERA_MAX + 20),
-                            stdin=subprocess.DEVNULL)
+        try:
+            pr = subprocess.run(["ffprobe", "-v", "error", "-seekable", "1",
+                                 "-show_entries", "format=duration", "-of", "csv=p=0", url],
+                                capture_output=True, text=True,
+                                timeout=max(60, ESPERA_MAX + 20),
+                                stdin=subprocess.DEVNULL)
+        except subprocess.TimeoutExpired:
+            # ffprobe se queda esperando datos que el servidor de piezas nunca
+            # le da. El motivo de verdad --que piezas faltaban, si se supero el
+            # tope-- lo guardo el hilo del servidor; sin esto salia un
+            # "Command [...] timed out" de 200 caracteres que no dice nada.
+            return None, (f"las piezas no llegaron — {srv.ultimo_error}"
+                          if srv.ultimo_error else
+                          f"ffprobe agotó {max(60, ESPERA_MAX + 20)}s sin recibir datos"
+                          f" ({srv.bajado_mib():.1f} MiB bajados, {srv.peers_ahora()} peer(s))")
         dur = float((pr.stdout or "0").strip() or 0)
         if dur <= 0:
             # El servidor de piezas corre en otro hilo y guarda ahi lo que de
