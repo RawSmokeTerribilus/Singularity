@@ -863,9 +863,13 @@ def a_jpg(carpeta, nombres, calidad=None, tonemap=False):
             continue
         destino = os.path.splitext(origen)[0] + ".jpg"
         try:
-            subprocess.run(["ffmpeg", "-y", "-v", "error", "-i", origen,
+            # `-nostdin` y stdin cerrado: sin esto, un ffmpeg que muere por el
+            # `timeout=` deja el terminal en modo crudo y el lanzador parece
+            # colgado despues, esperando un Enter que nunca llega.
+            subprocess.run(["ffmpeg", "-nostdin", "-y", "-v", "error", "-i", origen,
                             *vf, "-q:v", q, destino],
-                           capture_output=True, text=True, timeout=180)
+                           capture_output=True, text=True, timeout=180,
+                           stdin=subprocess.DEVNULL)
         except Exception:
             pass
         if os.path.exists(destino) and os.path.getsize(destino) > 0:

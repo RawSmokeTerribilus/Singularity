@@ -799,6 +799,7 @@ def capturar_desde_torrent(entrada, rl_config, img_host, session):
 
         url = srv.arrancar()
 
+        # stdin cerrado por lo mismo que ffmpeg: ver la nota de _captura.
         pr = subprocess.run(["ffprobe", "-v", "error", "-seekable", "1",
                              "-show_entries", "format=duration", "-of", "csv=p=0", url],
                             capture_output=True, text=True, timeout=300)
@@ -824,10 +825,19 @@ def capturar_desde_torrent(entrada, rl_config, img_host, session):
                 if ts >= dur:
                     continue
                 salida = os.path.join(carpeta, f"intruso-{int(v)}-{k}.{_EXT_CAP}")
-                subprocess.run(["ffmpeg", "-y", "-v", "error", "-seekable", "1",
+                # `-nostdin` y stdin cerrado: ffmpeg pone el terminal en modo
+                # crudo para sus atajos interactivos y, si muere de mala manera
+                # --y este `timeout=` lo mata con SIGKILL-- NO lo restaura. El
+                # terminal se queda sin icanon, sin echo y sin icrnl, o sea que
+                # Enter pasa a mandar CR y ningun input() vuelve a ver un salto
+                # de linea: el lanzador parece colgado cuando lo unico roto es
+                # la terminal. Paso justo lo que tenia que pasar: el tracker se
+                # cayo, ffmpeg se quedo esperando datos, salto el timeout.
+                subprocess.run(["ffmpeg", "-nostdin", "-y", "-v", "error", "-seekable", "1",
                                 "-ss", str(int(ts)), "-i", url,
                                 "-frames:v", "1", *vf, "-q:v", _Q_CAP, salida],
-                               capture_output=True, text=True, timeout=600)
+                               capture_output=True, text=True, timeout=600,
+                               stdin=subprocess.DEVNULL)
                 if os.path.exists(salida) and os.path.getsize(salida) > _MIN_CAP:
                     pngs.append(os.path.basename(salida))
                 if len(pngs) >= MAX_CAPS:
