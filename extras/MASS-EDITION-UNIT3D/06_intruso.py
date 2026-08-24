@@ -89,6 +89,46 @@ MANUAL    = os.path.join(ESTADO, f"intruso_manual_{_SUF}.txt")
 
 _ARGS = set(sys.argv[1:])
 
+# Identificador de tirada. Los informes se abren en modo append, asi que sin
+# esto lo de hoy y lo de hace tres dias quedan pegados en el mismo fichero sin
+# nada que los separe: 10.128 lineas seguidas de varias pasadas distintas, y
+# ninguna forma de saber cual es de cual salvo borrar el fichero entero.
+_TIRADA = time.strftime("%Y%m%d_%H%M%S")
+
+# Los ficheros que ya llevan cabecera de ESTA tirada. Se escribe una sola vez
+# por fichero, en la primera anotacion, y no antes: una tirada que no anota
+# nada no ensucia el informe con una cabecera huerfana.
+_CON_CABECERA = set()
+
+
+def _modo_tirada():
+    """Como se lanzo, para que la cabecera lo diga."""
+    modos = [a.lstrip("-") for a in ("--limpiar", "--reponer", "--barrer")
+             if a in _ARGS]
+
+    return "+".join(modos) or "sin-modo"
+
+
+def _cabecera_tirada(ruta, columnas=None):
+    """Abre el bloque de esta tirada en `ruta`, una vez.
+
+    Devuelve lo que hay que escribir antes de la primera fila: la linea de
+    columnas si el fichero es nuevo, y siempre el separador de tirada.
+    """
+    if ruta in _CON_CABECERA:
+        return ""
+
+    _CON_CABECERA.add(ruta)
+    trozos = []
+
+    if not os.path.exists(ruta) and columnas:
+        trozos.append(columnas)
+
+    trozos.append(f"# === tirada {_TIRADA} · {_modo_tirada()} · {_SUF} · "
+                  f"{'SIMULACRO' if DRY_RUN else 'REAL'} ===")
+
+    return "\n".join(trozos) + "\n"
+
 
 def _dry_run():
     if _ARGS & {"--real", "--no-dry-run"}:
@@ -263,11 +303,23 @@ def _leer_marcador(ruta):
     if not os.path.exists(ruta):
         return set()
     with open(ruta, "r", encoding="utf-8") as f:
-        return {l.split("\t")[0].strip() for l in f if l.strip()}
+        # Las lineas de `#` son cabeceras de tirada y de columnas: fuera. Sin
+        # esto la cabecera entera entraria como un id "hecho" --inofensivo por
+        # casualidad, porque ningun id se llama asi, pero es una trampa puesta.
+        return {l.split("\t")[0].strip() for l in f
+                if l.strip() and not l.startswith("#")}
 
 
 def _marcar(ruta, tid, extra=""):
+    # La cabecera se resuelve ANTES de abrir: `open(..., "a")` crea el fichero,
+    # asi que preguntar por os.path.exists() con el ya abierto siempre dice que
+    # si y la linea de columnas no se escribiria nunca.
+    cab = _cabecera_tirada(ruta)
     with open(ruta, "a", encoding="utf-8") as f:
+        # Los marcadores de reanudacion (limpiados, repuestos) se releen con
+        # `_leer_marcador`, que salta las lineas de `#`, asi que la cabecera no
+        # les estorba y de paso dice cuando se hizo cada tramo.
+        f.write(cab)
         f.write(f"{tid}\t{extra}\n" if extra else f"{tid}\n")
 
 
@@ -278,10 +330,10 @@ def _anotar_manual(entrada, motivo):
     sin seeds, o el fichero no da capturas aprovechables.
     """
     try:
-        nuevo = not os.path.exists(MANUAL)
+        cab = _cabecera_tirada(
+            MANUAL, "# id\tseeders\tuploader\tmotivo\tnombre\turl")
         with open(MANUAL, "a", encoding="utf-8") as f:
-            if nuevo:
-                f.write("# id\tseeders\tuploader\tmotivo\tnombre\turl\n")
+            f.write(cab)
             f.write("\t".join([
                 str(entrada.get("id", "?")),
                 str(entrada.get("seeders", "?")),
