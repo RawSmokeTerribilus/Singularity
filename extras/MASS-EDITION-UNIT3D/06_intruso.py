@@ -939,13 +939,20 @@ def capturar_desde_torrent(entrada, rl_config, img_host, session):
 
             url = srv.arrancar()
 
+        # `-seekable 1` es una opcion del protocolo HTTP: le dice al servidor de
+        # piezas que acepta peticiones por rango. Contra un fichero local el
+        # rango valido es [-1 - 0] y ffprobe se planta con "Numerical result out
+        # of range" sin leer nada, o sea que la captura fallaba justo en los
+        # torrents que YA estaban en disco. Va solo cuando hay servidor.
+        op_seek = [] if srv is None else ["-seekable", "1"]
+
         # stdin cerrado por lo mismo que ffmpeg: ver la nota de _captura.
         # El tope baja de 300s a 200s a proposito: `_asegurar` se rinde a los
         # ESPERA_MAX (180s por defecto), asi que esperar 300 solo anadia dos
         # minutos de nada por cada fallo y tapaba el motivo real con un
         # "timed out" generico.
         try:
-            pr = subprocess.run(["ffprobe", "-v", "error", "-seekable", "1",
+            pr = subprocess.run(["ffprobe", "-v", "error", *op_seek,
                                  "-show_entries", "format=duration", "-of", "csv=p=0", url],
                                 capture_output=True, text=True,
                                 timeout=max(60, ESPERA_MAX + 20),
@@ -996,7 +1003,7 @@ def capturar_desde_torrent(entrada, rl_config, img_host, session):
                 # de linea: el lanzador parece colgado cuando lo unico roto es
                 # la terminal. Paso justo lo que tenia que pasar: el tracker se
                 # cayo, ffmpeg se quedo esperando datos, salto el timeout.
-                subprocess.run(["ffmpeg", "-nostdin", "-y", "-v", "error", "-seekable", "1",
+                subprocess.run(["ffmpeg", "-nostdin", "-y", "-v", "error", *op_seek,
                                 "-ss", str(int(ts)), "-i", url,
                                 "-frames:v", "1", *vf, "-q:v", _Q_CAP, salida],
                                capture_output=True, text=True, timeout=600,
@@ -1009,10 +1016,13 @@ def capturar_desde_torrent(entrada, rl_config, img_host, session):
                 break
 
         if not pngs:
-            motivo = srv.ultimo_error or "ffmpeg no devolvió ningún fotograma útil"
+            motivo = (srv.ultimo_error if srv else None) or "ffmpeg no devolvió ningún fotograma útil"
             return None, f"sin capturas aprovechables ({motivo})"
 
-        print(f"    📥 {srv.bajado_mib():.0f} MiB bajados · {len(pngs)} capturas", flush=True)
+        if srv:
+            print(f"    📥 {srv.bajado_mib():.0f} MiB bajados · {len(pngs)} capturas", flush=True)
+        else:
+            print(f"    🎞️  {len(pngs)} capturas desde el fichero local", flush=True)
 
         from src.prep import Prep
         prep = Prep(screens=len(pngs), img_host=img_host, config=rl_config)
