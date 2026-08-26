@@ -27,6 +27,7 @@ Uso:
     python3 06_intruso.py --reponer [--real] [--limite N]
 """
 
+import collections
 import json
 import os
 import random
@@ -276,6 +277,95 @@ def _imagenes_vivas(s):
     return vivas
 
 
+# ==========================================
+# 🖼️  QUÉ CUENTA COMO CAPTURA
+# ==========================================
+# Contar etiquetas `[img]` NO es contar capturas. Auditoría del 2026-08-26
+# sobre los 7138 torrents vivos de NOBS: 3540 descripciones llevan el banner de
+# firma del uploader, así que una página con SÓLO su firma parecía tener
+# galería. El inventario salió a 52 cuando la cifra real era 113.
+#
+# La separación no necesita lista blanca de hosts escrita a mano: una URL de
+# imagen que aparece en MUCHAS descripciones es plantilla; una que aparece en
+# una sola es una captura. Medido en ese corpus: 35554 URLs salen una vez y
+# sólo 7 salen más de cinco veces — las 7 son firmas y banners. El umbral se
+# recalibra solo cuando mañana haya otra firma.
+UMBRAL_FIRMA = int(os.getenv("ME_INTRUSO_UMBRAL_FIRMA", "5") or 5)
+
+# Qué es una galería COMPLETA. Las tiradas publican 4 (3 ventanas × 2 capturas,
+# topadas por tamaño), así que 4 es el listón.
+#
+# OJO, y esto no es lo mismo: "galería incompleta" no es "página rota". Reparto
+# medido el 2026-08-26 sobre los 7138 vivos, con la cola de la campaña al lado:
+#
+#     capturas   torrents   en la cola
+#            0        113          111   <- lo que rompió la limpieza
+#            1        431           37   <- 394 nadie los tocó: una captura de toda la vida
+#            2         41           30
+#            3         56           39
+#            4       4512         1213   <- repuestos
+#
+# O sea: `tiene_galeria()` sirve para decidir si una página YA está servida
+# (guardarraíl antes de publicar encima), no para inventariar. Como criterio de
+# inventario daría 641 e incluiría 422 páginas que nunca estuvieron rotas. Para
+# inventariar, `sin_capturas()`.
+MIN_CAPTURAS = int(os.getenv("ME_INTRUSO_MIN_CAPTURAS", "4") or 4)
+
+# Aquí no todo el mundo sube con la suite. Hay quien publica UNA imagen ancha
+# que por dentro es un mosaico de 9 capturas, y contarla como "una captura" la
+# marcaría rota para siempre. El ancho declarado en `[img=N]` la delata, y el
+# corte sale limpio del reparto medido:
+#
+#     350-800px   capturas normales (500 y 600 son el 97%)
+#     1080px      capturas grandes sueltas — NO son mosaicos (5219, 5486)
+#     1273-1973px 18 torrents, todos mosaico de una pieza
+#
+# De ahí 1200: por encima sólo hay mosaicos. Se mide el ancho DECLARADO, no el
+# real, porque es lo único que trae la descripción; un mosaico sin `[img=N]` se
+# escapa y cae en la lista de revisión, que es el lado seguro por el que fallar.
+ANCHO_MOSAICO = int(os.getenv("ME_INTRUSO_ANCHO_MOSAICO", "1200") or 1200)
+
+RX_IMG_ANCHO = re.compile(r"\[img=(\d+)\]\s*([^\[\s]+)\s*\[/img\]", re.IGNORECASE)
+
+
+def firmas_del_corpus(descripciones):
+    """URLs de imagen que se repiten entre descripciones: firmas y banners.
+
+    Se calcula sobre el corpus que ya se está leyendo, no sobre una lista fija:
+    cada tracker tiene sus propias plantillas y cambian con el tiempo.
+    """
+    veces = collections.Counter()
+    for d in descripciones:
+        for u in set(_imagenes_vivas(d)):
+            veces[u] += 1
+    return {u for u, n in veces.items() if n > UMBRAL_FIRMA}
+
+
+def capturas(desc, firmas=()):
+    """Las imágenes de la descripción que de verdad son capturas."""
+    return [u for u in _imagenes_vivas(desc) if u not in firmas]
+
+
+def mosaicos(desc, firmas=()):
+    """Imágenes anchas: una sola pieza que ES la galería entera."""
+    return [u for a, u in RX_IMG_ANCHO.findall(desc or "")
+            if u not in firmas and int(a) >= ANCHO_MOSAICO]
+
+
+def tiene_galeria(desc, firmas=()):
+    """¿Esta página ya está servida? Ojo: `not tiene_galeria` no es `sin nada`."""
+    return (len(capturas(desc, firmas)) >= MIN_CAPTURAS
+            or bool(mosaicos(desc, firmas)))
+
+
+def sin_capturas(desc, firmas=()):
+    """Ni una sola captura. ESTE es el criterio de inventario, no el de arriba.
+
+    Un mosaico cuenta: la página tiene capturas aunque vengan en una pieza.
+    """
+    return not capturas(desc, firmas) and not mosaicos(desc, firmas)
+
+
 def comprobar_limpieza(antes, despues):
     """El invariante de ESTA fase. No vale el de 05.
 
@@ -323,25 +413,82 @@ def _marcar(ruta, tid, extra=""):
         f.write(f"{tid}\t{extra}\n" if extra else f"{tid}\n")
 
 
+def _leer_manual():
+    """Lo ya anotado, como pares (id, motivo). Cacheado: se relee una vez."""
+    global _MANUAL_YA
+    if _MANUAL_YA is None:
+        _MANUAL_YA = set()
+        try:
+            with open(MANUAL, encoding="utf-8") as f:
+                for l in f:
+                    if l.strip() and not l.startswith("#"):
+                        c = l.rstrip("\n").split("\t")
+                        if len(c) > 3:
+                            _MANUAL_YA.add((c[0].strip(), c[3]))
+        except OSError:
+            pass
+    return _MANUAL_YA
+
+
+_MANUAL_YA = None
+
+
 def _anotar_manual(entrada, motivo):
     """La lista que de verdad importa: lo que hay que mirar a mano.
 
     Dos escenarios previstos, los dos acaban en borrar el torrent tras revisar:
     sin seeds, o el fichero no da capturas aprovechables.
+
+    Se anota UNA vez por (id, motivo). Sin esa condición el fichero era un log,
+    no un informe: la auditoría del 2026-08-26 lo encontró con 1072 filas para
+    234 ids — el mismo torrent repetido hasta 28 veces, una por tirada. Un
+    motivo NUEVO para el mismo id sí entra: eso es información.
     """
+    tid = str(entrada.get("id", "?"))
+    ya = _leer_manual()
+    if (tid, motivo) in ya:
+        return
     try:
         cab = _cabecera_tirada(
             MANUAL, "# id\tseeders\tuploader\tmotivo\tnombre\turl")
         with open(MANUAL, "a", encoding="utf-8") as f:
             f.write(cab)
             f.write("\t".join([
-                str(entrada.get("id", "?")),
+                tid,
                 str(entrada.get("seeders", "?")),
                 str(entrada.get("uploader", "?")),
                 motivo,
                 str(entrada.get("nombre", ""))[:80],
                 f"{SITE_BASE}/torrents/{entrada.get('id')}",
             ]) + "\n")
+        ya.add((tid, motivo))
+    except OSError:
+        pass
+
+
+def _olvidar_manual(tid):
+    """Saca un torrent de la lista de revisión: ya no hay nada que revisar.
+
+    La otra mitad del mismo problema. Un fallo anotaba el torrent y el reintento
+    que salía bien no lo desanotaba, así que 127 de los 234 ids de la lista ya
+    tenían capturas cuando se auditó. La lista sólo sabía crecer.
+    """
+    tid = str(tid)
+    try:
+        with open(MANUAL, encoding="utf-8") as f:
+            lineas = f.readlines()
+    except OSError:
+        return
+    quedan = [l for l in lineas
+              if l.startswith("#") or not l.strip()
+              or l.split("\t")[0].strip() != tid]
+    if len(quedan) == len(lineas):
+        return
+    try:
+        with open(MANUAL, "w", encoding="utf-8") as f:
+            f.writelines(quedan)
+        _leer_manual()
+        _MANUAL_YA.difference_update({p for p in _MANUAL_YA if p[0] == tid})
     except OSError:
         pass
 
@@ -357,6 +504,16 @@ def barrer(session):
     cada ~30 páginas y pide hasta ~43 s de espera.
     """
     cola, vistos, pagina = [], set(), 1
+    # Las firmas se reconocen porque se repiten en el catálogo ENTERO, así que
+    # este recuento tiene que ver también las descripciones sanas — no sólo el
+    # subconjunto roto que acaba en la cola.
+    veces_url = collections.Counter()
+    # Y se guardan las descripciones para poder decir, al terminar, CUÁNTAS
+    # páginas se han quedado sin ninguna captura. No se puede decidir sobre la
+    # marcha porque las firmas no se conocen hasta haber visto el catálogo
+    # entero. Son unos 6 MB para 7000 torrents, al lado de la cola que ya se
+    # guarda con sus descripciones completas.
+    desc_por_id = {}
     print("🔭 Barriendo el tracker (esto tarda unos minutos)…", flush=True)
 
     while pagina <= 500:
@@ -386,6 +543,9 @@ def barrer(session):
                 continue
             vistos.add(tid)
             desc = a.get("description") or ""
+            desc_por_id[tid] = desc
+            for u in set(_imagenes_vivas(desc)):
+                veces_url[u] += 1
             muertos = quedan_muertos(desc)
             if not muertos:
                 continue
@@ -405,11 +565,23 @@ def barrer(session):
         pagina += 1
         time.sleep(0.25)
 
+    firmas = {u for u, n in veces_url.items() if n > UMBRAL_FIRMA}
+    huerfanos = sorted((t for t, d in desc_por_id.items() if sin_capturas(d, firmas)),
+                       key=int)
     print(f"✅ Barrido: {len(vistos)} torrents, {len(cola)} con enlaces muertos")
-    return cola, len(vistos)
+    if firmas:
+        print(f"🖼️  {len(firmas)} URL(s) de firma/banner detectadas: no cuentan "
+              f"como capturas.")
+    # El inventario que la lista de revisión nunca supo dar: se cuenta sobre el
+    # tracker, no sobre lo que fue fallando. Incluye páginas que ya estaban sin
+    # capturas antes de esta campaña.
+    print(f"📷 {len(huerfanos)} torrents sin NINGUNA captura "
+          f"({len(huerfanos) - len([t for t in huerfanos if t in {e['id'] for e in cola}])} "
+          f"de ellos fuera de la cola de esta tirada)")
+    return cola, len(vistos), firmas, huerfanos
 
 
-def guardar_cola(cola, total_vistos):
+def guardar_cola(cola, total_vistos, firmas=(), huerfanos=()):
     # Primero lo fácil: si se para a media tirada, queda arreglado lo más
     # rentable. `seeders` viene del barrido, así que el triaje sale gratis.
     cola.sort(key=lambda e: (-int(e.get("seeders") or 0), int(e["id"])))
@@ -417,6 +589,13 @@ def guardar_cola(cola, total_vistos):
         "tracker": _SUF,
         "creada": datetime.now().isoformat(timespec="seconds"),
         "total_en_tracker": total_vistos,
+        # Se guardan con la cola porque la fase 2 corre en otra tirada, horas
+        # después, y no rebarre: sin esto no tendría con qué distinguir una
+        # firma de una captura.
+        "firmas": sorted(firmas),
+        # Inventario del tracker entero, no sólo de lo que rompió la campaña.
+        # Es la lista que de verdad quiere el staff.
+        "sin_capturas": list(huerfanos),
         "entradas": cola,
     })
     print(f"💾 Cola guardada: {COLA}")
@@ -557,26 +736,40 @@ def main():
         cola = guardada["entradas"]
         print(f"\n📋 Cola existente de {guardada.get('creada', '?')}: "
               f"{len(cola)} entradas (no se rebarre).")
+        firmas = set(guardada.get("firmas") or ())
+        if not firmas:
+            # Cola de antes de que existiera el recuento de firmas. Se saca de
+            # las descripciones originales que la propia cola guarda: son menos
+            # que el catálogo entero, pero una firma se repite igual.
+            firmas = firmas_del_corpus(e.get("descripcion_original", "")
+                                       for e in cola)
+            if firmas:
+                print(f"🖼️  {len(firmas)} URL(s) de firma deducidas de la cola "
+                      f"(se barrió antes de que esto existiera).")
     else:
-        cola, total = barrer(session)
+        cola, total, firmas, huerfanos = barrer(session)
         if not cola:
             print("✨ Nada con enlaces muertos. No hay trabajo.")
             return 0
-        guardar_cola(cola, total)
+        guardar_cola(cola, total, firmas, huerfanos)
 
     sin_seeds = [e for e in cola if not int(e.get("seeders") or 0)]
     if sin_seeds:
-        print(f"\n⚠️  {len(sin_seeds)} sin seeds: se limpian igual, pero no se podrán "
-              f"reponer capturas. Van a {os.path.basename(MANUAL)}.")
+        antes = len(_leer_manual())
         for e in sin_seeds:
             _anotar_manual(e, "sin seeds: no se podrán regenerar capturas")
+        nuevos = len(_leer_manual()) - antes
+        print(f"\n⚠️  {len(sin_seeds)} sin seeds: se limpian igual, pero no se "
+              f"podrán reponer capturas."
+              + (f" {nuevos} nuevo(s) a {os.path.basename(MANUAL)}."
+                 if nuevos else " Ya estaban todos anotados."))
 
     if "--barrer" in _ARGS:
         print("\n(--barrer: sólo se ha construido la cola, no se ha tocado nada)")
         return 0
 
     if _ARGS & {"--reponer", "--reparar"}:
-        fase_reponer(session, cola, rl)
+        fase_reponer(session, cola, rl, firmas)
         return 0
 
     fase_limpiar(session, cola)
@@ -1200,7 +1393,7 @@ def _esperar_tracker(session):
     return False
 
 
-def reponer_uno(session, entrada, rl_config, img_host):
+def reponer_uno(session, entrada, rl_config, img_host, firmas=()):
     tid = entrada["id"]
     if not int(entrada.get("seeders") or 0):
         return False, "sin seeds: no hay de dónde sacar las capturas"
@@ -1211,6 +1404,15 @@ def reponer_uno(session, entrada, rl_config, img_host):
     actual, err = R.leer_descripcion(session, SITE_BASE, tid, soup)
     if err:
         return False, err
+
+    # Guardarraíl: la página puede haberse arreglado por otro camino desde que
+    # se hizo la cola —05, el propio uploader, una tirada anterior cuyo marcador
+    # no llegó a escribirse—. Sin esto se le planta una SEGUNDA galería encima,
+    # y no había nada en la ruta que lo impidiera. Va antes de capturar: así no
+    # gasta descarga, ni CPU, ni cuota del host de imágenes.
+    ya = capturas(actual, firmas)
+    if len(ya) >= MIN_CAPTURAS:
+        return True, f"ya tenía {len(ya)} capturas: no se toca"
 
     image_list, err = capturar_desde_torrent(entrada, rl_config, img_host, session)
     if err:
@@ -1236,7 +1438,7 @@ def reponer_uno(session, entrada, rl_config, img_host):
     return True, f"{len(image_list)} imagen(es) publicadas, {donde}"
 
 
-def fase_reponer(session, cola, rl_config):
+def fase_reponer(session, cola, rl_config, firmas=()):
     img_host = R._elegir_img_host(rl_config)
     hechos = _leer_marcador(REPUESTOS)
     # El selector es la COLA, no los enlaces: la fase 1 ya los quitó.
@@ -1285,7 +1487,7 @@ def fase_reponer(session, cola, rl_config):
         tracker_ko = False
         for _intento in range(3):
             try:
-                ok, msg = reponer_uno(session, e, rl_config, img_host)
+                ok, msg = reponer_uno(session, e, rl_config, img_host, firmas)
             except Exception as ex:
                 ok, msg = False, f"excepción: {ex}"
             if ok or not _es_tracker_caido(msg):
@@ -1308,6 +1510,9 @@ def fase_reponer(session, cola, rl_config):
             print(f"    ✨ {msg}", flush=True)
             if not DRY_RUN:
                 _marcar(REPUESTOS, e["id"])
+                # Este torrent ya no hay que mirarlo a mano. Si un intento
+                # anterior lo dejó anotado, la anotación caduca aquí.
+                _olvidar_manual(e["id"])
         else:
             fail_n += 1
             seguidos += 1
