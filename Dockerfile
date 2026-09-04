@@ -17,6 +17,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     ffmpeg \
     mkvtoolnix \
     mediainfo \
+    # bsdtar: listar lo que hay dentro de un .7z/.cab/.tar para saber de qué
+    # clase es el envase. Lista por cabecera, no descomprime. Es opcional --
+    # sin él esos formatos se le preguntan al operador -- pero es una línea.
+    libarchive-tools \
     tor \
     pciutils \
     # Dependencias MakeMKV
