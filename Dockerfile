@@ -183,6 +183,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends tini \
        -c "Singularity Suite runtime" singularity \
     && chown -R 1000:1000 /home/singularity
 
+# La version sale del fichero VERSION de la raiz, que es el unico sitio donde se
+# escribe. El ARG va AQUI y no arriba a proposito: declarado justo antes del
+# LABEL, cambiar de version solo invalida la cache de estas ultimas capas y no
+# obliga a recompilar zimg ni vapoursynth.
+ARG VERSION=dev
+
 # OCI image metadata — kills the "noname image" critique.
 LABEL org.opencontainers.image.title="Singularity Suite" \
       org.opencontainers.image.description="ARR-stack media management toolkit — CSI, RawLoadrr, MKVerything, Mass Editor" \
@@ -193,7 +199,7 @@ LABEL org.opencontainers.image.title="Singularity Suite" \
       org.opencontainers.image.authors="RawSmoke" \
       org.opencontainers.image.vendor="RawSmoke" \
       org.opencontainers.image.base.name="python:3.11-bookworm" \
-      org.opencontainers.image.version="3.0.2"
+      org.opencontainers.image.version="${VERSION}"
 
 # Dashboard port. EXPOSE doesn't publish on host-net mode, but it
 # self-documents the listening service for `docker inspect`/`docker ps`.

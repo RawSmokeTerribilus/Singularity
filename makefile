@@ -1,3 +1,9 @@
+# Unica fuente de la version: el fichero VERSION de la raiz. Antes se escribia
+# a mano aqui, en Push-The-Tank.sh y en el LABEL del Dockerfile, y los tres
+# acabaron diciendo cosas distintas (v3.0.9 / v3.1.2 / 3.0.2).
+VERSION := $(shell cat VERSION)
+IMAGE := rawsmoke/singularity-suite
+
 SCRIPTS_SRC := RawLoadrr/src/trackers
 WORK_TRACKERS := work_data/trackers
 
@@ -8,8 +14,8 @@ pull:
 	docker compose pull
 
 build:
-	docker build -t rawsmoke/singularity-suite:v3.0.9 .
-	docker tag rawsmoke/singularity-suite:v3.0.9 rawsmoke/singularity-suite:latest
+	docker build --build-arg VERSION=$(VERSION) -t $(IMAGE):v$(VERSION) .
+	docker tag $(IMAGE):v$(VERSION) $(IMAGE):latest
 
 up: prep
 	docker compose up -d
