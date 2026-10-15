@@ -45,18 +45,9 @@ prep:
 	@mkdir -p $(WORK_TRACKERS)
 	@mkdir -p work_data/tmp/qbit_backup
 	@mkdir -p work_data/tmp/TEMP_RESCUE
-	@if [ -z "$$(ls -A $(WORK_TRACKERS) 2>/dev/null)" ]; then \
-		if [ -d "$(SCRIPTS_SRC)" ] && [ -n "$$(ls -A $(SCRIPTS_SRC) 2>/dev/null)" ]; then \
-			echo "🧬 Infundiendo trackers desde el source local..."; \
-			cp -rn $(SCRIPTS_SRC)/* $(WORK_TRACKERS)/; \
-		else \
-			echo "🧬 Infundiendo trackers desde la imagen..."; \
-			docker image inspect rawsmoke/singularity-suite:latest >/dev/null 2>&1 || docker pull rawsmoke/singularity-suite:latest >/dev/null 2>&1 || true; \
-			cid=$$(docker create rawsmoke/singularity-suite:latest); \
-			docker cp $$cid:/app/RawLoadrr/src/trackers/. $(WORK_TRACKERS)/; \
-			docker rm $$cid >/dev/null; \
-		fi; \
-	fi
+	@# Antes solo sembraba si estaba vacío y los arreglos de los módulos no
+	@# llegaban nunca; la lógica (refrescar + fusionar registro) vive en el instalador.
+	@bash final-user-install.sh --solo-trackers
 	@mkdir -p config
 	@if [ ! -f config/.env ] && [ -f config/.env.example ]; then cp config/.env.example config/.env; echo "🧩 Creado config/.env desde plantilla NOBS"; fi
 	@if [ ! -f config/.env ] && [ -f .env.example ]; then cp .env.example config/.env; echo "🧩 Creado config/.env desde .env.example"; fi

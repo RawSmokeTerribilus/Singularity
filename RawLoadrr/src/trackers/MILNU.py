@@ -146,6 +146,10 @@ class MILNU():
         
         if meta['debug']:
             self.logger.info(f"DATA 2 SEND: {data}")
+            # --debug promete ensayo: se enseña lo que se mandaría y no se manda.
+            # False hace que upload.py lo apunte como «(DEBUG MODE)», no como rechazo.
+            console.print(f"[bold yellow]DEBUG: no se sube a {self.tracker}.[/bold yellow]")
+            return False
 
         return_value = False # Default return value
         try:

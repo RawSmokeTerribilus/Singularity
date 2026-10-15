@@ -34,6 +34,107 @@ for name, content in files.items():
 PY
 }
 
+# Los módulos de trackers que trae la suite son de la suite: se refrescan en
+# cada instalación y en cada `make prep`. work_data/trackers es un volumen, así
+# que una imagen nueva no lo toca y los arreglos (p. ej. que --debug no suba)
+# no llegaban nunca a quien ya tenía la suite instalada. Lo que haya añadido el
+# usuario y no conozcamos no se toca; el registro se fusiona: nuestras entradas
+# mandan y las suyas se quedan. Lo sustituido va a work_data/trackers_backup/.
+refresh_trackers() {
+    local dst="$WORK_DIR/trackers" src="$BASE_DIR/RawLoadrr/src/trackers" tmp="" img cid
+    mkdir -p "$dst"
+    if [ -z "$(ls -A "$src" 2>/dev/null)" ]; then
+        # La etiqueta que levanta el compose, no :latest a fuego: si no, una rc
+        # se queda con los módulos de la estable (y al revés).
+        img=$(docker compose config --images 2>/dev/null | grep '^rawsmoke/singularity-suite' | head -n1 || true)
+        # compose config falla si aún falta config/.env: leer el yml a pelo.
+        [ -n "$img" ] || img=$(grep -oE 'rawsmoke/singularity-suite:[^"'"'"'[:space:]]+' docker-compose.yml 2>/dev/null | head -n1 || true)
+        img=${img:-rawsmoke/singularity-suite:latest}
+        echo "🧬 Trackers desde la imagen $img"
+        tmp=$(mktemp -d)
+        if { docker image inspect "$img" >/dev/null 2>&1 || docker pull "$img" >/dev/null; } \
+            && cid=$(docker create "$img") \
+            && docker cp "$cid:/app/RawLoadrr/src/trackers/." "$tmp"/; then
+            docker rm "$cid" >/dev/null
+            src="$tmp"
+        else
+            if [ -n "${cid:-}" ]; then docker rm "$cid" >/dev/null 2>&1 || true; fi
+            rm -rf "$tmp"
+            if [ -n "$(ls -A "$dst" 2>/dev/null)" ]; then
+                echo "⚠️  No se pudieron sacar los trackers de $img; se quedan los que hay."
+                return 0
+            fi
+            echo "❌ Sin trackers: ni RawLoadrr/src/trackers ni la imagen $img."
+            exit 1
+        fi
+    fi
+    python3 - "$src" "$dst" "$WORK_DIR/trackers_backup" <<'PY'
+import json, shutil, sys, time
+from pathlib import Path
+src, dst, bk_root = map(Path, sys.argv[1:4])
+REG = 'trackers_registry.json'
+sello = time.strftime('%Y%m%d_%H%M%S')
+bk, i = bk_root / sello, 1
+while bk.exists():  # dos pasadas en el mismo segundo no se pisan el respaldo
+    i += 1
+    bk = bk_root / f'{sello}-{i}'
+nuevos, cambiados = [], []
+
+def respaldar(p):
+    bk.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(p, bk / p.name)
+
+for f in sorted(src.iterdir()):
+    if not f.is_file() or '.bak' in f.name or f.name == REG:
+        continue
+    d = dst / f.name
+    datos = f.read_bytes()
+    if not d.exists():
+        shutil.copy2(f, d)
+        nuevos.append(f.name)
+    elif d.read_bytes() != datos:
+        respaldar(d)
+        d.write_bytes(datos)  # en sitio: conserva dueño y permisos
+        cambiados.append(f.name)
+
+s_reg, d_reg = src / REG, dst / REG
+if s_reg.exists():
+    nuestro = json.loads(s_reg.read_text(encoding='utf-8'))
+    if not d_reg.exists():
+        shutil.copy2(s_reg, d_reg)
+        nuevos.append(REG)
+    else:
+        try:
+            suyo = json.loads(d_reg.read_text(encoding='utf-8'))
+        except ValueError:
+            print(f'⚠️  {REG} ilegible: se rehace con las entradas de la suite.')
+            suyo = {}
+        fusion = dict(nuestro)
+        fusion.update({k: v for k, v in suyo.items() if k not in nuestro})
+        if fusion != suyo:
+            respaldar(d_reg)
+            d_reg.write_text(json.dumps(fusion, indent=4) + '\n', encoding='utf-8')
+            cambiados.append(REG)
+
+if nuevos or cambiados:
+    print(f'🧬 Trackers: {len(cambiados)} actualizados, {len(nuevos)} nuevos.')
+    for n in cambiados:
+        print(f'   ↻ {n}')
+    if cambiados:
+        print(f'   Lo sustituido, en {bk}')
+else:
+    print('🧬 Trackers al día.')
+PY
+    if [ -n "$tmp" ]; then rm -rf "$tmp"; fi
+}
+
+# `make prep` solo necesita esto; lo demás (plantillas, /usr/local/bin con
+# sudo) es de la instalación.
+if [ "${1:-}" = "--solo-trackers" ]; then
+    refresh_trackers
+    exit 0
+fi
+
 echo "--- 🚀 Configurando Arsenal Singularity en: $BASE_DIR ---"
 
 mkdir -p "$CONFIG_DIR"
@@ -62,18 +163,7 @@ copy_if_missing "$BASE_DIR/config/mass_config.py.example" "$CONFIG_DIR/mass_conf
 # Si solo descargaste 3 archivos (compose + makefile + este script), se generan desde aquí.
 generate_embedded_defaults_if_missing
 
-if [ -z "$(ls -A "$WORK_DIR/trackers" 2>/dev/null)" ]; then
-    if [ -d "$BASE_DIR/RawLoadrr/src/trackers" ] && [ -n "$(ls -A "$BASE_DIR/RawLoadrr/src/trackers" 2>/dev/null)" ]; then
-        echo "🧬 Infundiendo trackers desde RawLoadrr/src/trackers..."
-        cp -rn "$BASE_DIR/RawLoadrr/src/trackers"/* "$WORK_DIR/trackers"/
-    else
-        echo "🧬 Infundiendo trackers desde la imagen..."
-        docker image inspect rawsmoke/singularity-suite:latest >/dev/null 2>&1 || docker pull rawsmoke/singularity-suite:latest >/dev/null 2>&1 || true
-        cid=$(docker create rawsmoke/singularity-suite:latest)
-        docker cp "$cid:/app/RawLoadrr/src/trackers/." "$WORK_DIR/trackers"/
-        docker rm "$cid" >/dev/null
-    fi
-fi
+refresh_trackers
 
 for required in     "$CONFIG_DIR/.env"     "$CONFIG_DIR/singularity_config.py"     "$CONFIG_DIR/config.py"     "$CONFIG_DIR/mass_config.py"
 do
