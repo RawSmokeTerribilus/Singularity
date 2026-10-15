@@ -104,6 +104,8 @@ class Rawncher:
                 "google_books_api":   ("GOOGLE_BOOKS_API", "console.cloud.google.com — identifica e-books y audiolibros"),
                 "igdb_client_id":     ("TWITCH_CLIENT_ID", "dev.twitch.tv/console — IGDB va detrás de una app de Twitch"),
                 "igdb_client_secret": ("TWITCH_CLIENT_SECRET", "la misma app de Twitch que el id"),
+                "mal_client_id":      ("MAL_CLIENT_ID", "myanimelist.net/apiconfig — Client ID de una app tuya; "
+                                                        "identifica anime (sin ella, solo AniList)"),
             }
             needs_save = False
             default_config = self.config.get("DEFAULT", {})
@@ -1696,6 +1698,7 @@ class Rawncher:
                 "ptpimg_api": "PTPIMG_API_KEY",
                 "lensdump_api": "LENSDUMP_API_KEY",
                 "oeimg_api": "OEIMG_API_KEY",
+                "mal_client_id": "MAL_CLIENT_ID",
             }
             default_config = self.config.get("DEFAULT", {})
             for python_key, env_key in master_keys.items():

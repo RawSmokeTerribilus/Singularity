@@ -10,8 +10,9 @@ Approach: query several providers, normalise every hit to a shared id-set,
 then vote.
   - General providers (always): TMDB, OMDb/IMDB, TVmaze.
         Voting key = the IMDB id (all three expose it).
-  - Anime providers (only when the release looks like anime): MAL via Jikan,
-        AniList. Voting key = the MAL id (AniList exposes idMal).
+  - Anime providers (only when the release looks like anime): MyAnimeList's
+        official API (only with the user's MAL Client ID) and AniList.
+        Voting key = the MAL id (AniList exposes idMal).
 When >=2 providers agree the result is trusted ('high'); a lone hit is 'low';
 nothing usable is 'none' -- the caller should then ask the user.
 
@@ -43,7 +44,7 @@ TMDB_LANGUAGE       = "es-ES"  # display language asked of TMDB; the catalogue
                               # is Spanish, so an English title scores badly
 
 IMDB_PROVIDERS = ("tmdb", "omdb", "tvmaze")   # vote on the IMDB id
-MAL_PROVIDERS  = ("jikan", "anilist")         # vote on the MAL id (anime)
+MAL_PROVIDERS  = ("mal", "anilist")           # vote on the MAL id (anime)
 
 
 # ─── text helpers ──────────────────────────────────────────────────────────
@@ -637,22 +638,42 @@ def prefer_path_id(res, verified, log=None):
     return out
 
 
-# ─── MAL via Jikan (keyless, anime) ────────────────────────────────────────
-def _jikan_search(title, log):
+# ─── MyAnimeList, API oficial v2 (anime, con Client ID del usuario) ────────
+# Antes era Jikan, un espejo no oficial sin clave: el 15-10-2026 no aceptaba
+# conexiones y cada subida de anime se comía ~70 s de timeouts. El tracker ya
+# habla con la API oficial de MAL; aquí igual, con el Client ID que pone cada
+# usuario en DEFAULT -> mal_client_id. Sin él, MAL no se consulta y el anime
+# se resuelve con AniList.
+def _mal_client_id(defaults):
+    v = str((defaults or {}).get("mal_client_id") or "").strip()
+    if not v or v.upper() == "MAL_CLIENT_ID" or v.upper().startswith("YOUR_"):
+        return ""
+    return v
+
+
+def _mal_search(title, client_id, log):
     out = []
+    if not client_id:
+        return out
     try:
-        r = requests.get("https://api.jikan.moe/v4/anime",
-                          params={"q": title, "limit": 5, "sfw": "true"},
-                          timeout=TIMEOUT)
+        r = requests.get("https://api.myanimelist.net/v2/anime",
+                         params={"q": title[:64], "limit": 5,
+                                 "fields": "alternative_titles,start_date"},
+                         headers={"X-MAL-CLIENT-ID": client_id},
+                         timeout=TIMEOUT)
         r.raise_for_status()
         for hit in (r.json().get("data") or [])[:5]:
-            ttl = hit.get("title_english") or hit.get("title") or ""
-            alt = hit.get("title") or ""
-            yr = _int(hit.get("year")) or None
-            out.append(_cand("jikan", ttl, yr, "TV", mal=hit.get("mal_id"),
+            node = hit.get("node") or {}
+            alt_titles = node.get("alternative_titles") or {}
+            ttl = alt_titles.get("en") or node.get("title") or ""
+            alt = node.get("title") or ""
+            yr = _int(str(node.get("start_date") or "")[:4]) or None
+            out.append(_cand("mal", ttl, yr, "TV", mal=node.get("id"),
                              alt=alt))
     except Exception as e:                                      # noqa: BLE001
-        log(f"jikan search failed: {e}")
+        # Solo el tipo y el código: el texto de requests lleva la URL.
+        codigo = getattr(getattr(e, "response", None), "status_code", "")
+        log(f"mal search failed: {type(e).__name__} {codigo}".strip())
     return out
 
 
@@ -704,7 +725,7 @@ def resolve(title, year, category, config, aliases=None, mal_hint=False,
         config    : RawLoadrr config dict (reads DEFAULT.tmdb_api / imdb_api).
         aliases   : extra title candidates (e.g. folder-derived names).
         mal_hint  : True when the release looks like anime -> the anime
-                    providers (Jikan, AniList) are queried; otherwise they
+                    providers (MAL, AniList) are queried; otherwise they
                     are skipped so non-anime jobs are not spammed.
 
     Returns a dict:
@@ -736,6 +757,7 @@ def resolve(title, year, category, config, aliases=None, mal_hint=False,
     defaults = (config or {}).get("DEFAULT", {})
     tmdb_key = defaults.get("tmdb_api") or ""
     omdb_key = defaults.get("imdb_api") or ""
+    mal_key = _mal_client_id(defaults)
 
     tmdb = _TMDB(tmdb_key, log)
 
@@ -762,7 +784,7 @@ def resolve(title, year, category, config, aliases=None, mal_hint=False,
             cands += _omdb_search(omdb_key, q, year, cat, log)
             cands += _tvmaze_search(q, cat, log)
             if mal_hint:                       # anime providers, gated
-                cands += _jikan_search(q, log)
+                cands += _mal_search(q, mal_key, log)
                 cands += _anilist_search(q, log)
         return cands
 
