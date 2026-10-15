@@ -1469,14 +1469,146 @@ class Rawncher:
     #  Opción 3 — Crear nuevo tracker                                     #
     # ------------------------------------------------------------------ #
 
+    def _ids_unit3d(self, base_url: str, api_key: str):
+        """Ids de categorías, tipos y resoluciones para un tracker nuevo.
+
+        Con la API key: se confirma que es UNIT3D y se leen los ids de sus
+        torrents. Si falta alguno, cookie de sesión opcional para leer la página
+        de subida (los tiene todos). Lo que siga faltando se pregunta, con los
+        ids por defecto de UNIT3D como sugerencia. Devuelve (categorias, tipos,
+        resoluciones, otra) o None si no es un UNIT3D: la plantilla sube por la
+        API de UNIT3D y con otro tracker no serviría.
+        """
+        from src import unit3d_ids as u
+
+        console.print()
+        console.print(Rule("[bold cyan]▸  Ids del tracker: categorías, tipos y resoluciones[/bold cyan]", style="cyan"))
+        console.print()
+        estado, detalle = u.detectar(base_url, api_key)
+        vistos = {}
+        if estado == "unit3d":
+            console.print("  [bold green]✓ UNIT3D detectado[/bold green] (su API contesta). Leyendo ids de sus torrents...")
+            vistos = u.ids_desde_api(base_url, api_key)
+        else:
+            motivo = {
+                "sin_clave": "la API pide clave y aún no hay API key",
+                "clave_mala": "la API rechaza la API key",
+                "caido": "no se pudo conectar",
+                "no": "no contesta como un UNIT3D",
+            }[estado]
+            console.print(f"  [bold yellow]⚠️  No se pudo confirmar que sea UNIT3D: {motivo} ({escape(detalle)}).[/bold yellow]")
+            if not Confirm.ask("  ¿Es un tracker UNIT3D?", default=estado != "no"):
+                console.print(
+                    Panel(
+                        "  «Crear nuevo tracker» solo genera módulos para UNIT3D: la plantilla sube\n"
+                        "  por su API (/api/torrents/upload). Otro tipo de tracker necesita un módulo propio.",
+                        border_style="red",
+                    )
+                )
+                return None
+
+        def _faltan(cats, tipos, res, otra):
+            return ([k for k in u.CLAVES_CATEGORIA if k not in cats]
+                    + [k for k in u.CLAVES_TIPO if k not in tipos]
+                    + [k for k in u.CLAVES_RESOLUCION if k not in res]
+                    + ([] if otra else ["Other"]))
+
+        cats, tipos, res, otra, sin_asignar = u.proponer(vistos)
+        faltan = _faltan(cats, tipos, res, otra)
+        if faltan:
+            if vistos:
+                console.print(f"  Faltan {len(faltan)} ids: la API solo enseña los que tienen torrents.")
+            console.print(
+                "  La página de subida de la web los tiene todos. Para leerla hace falta tu cookie de sesión:\n"
+                "  [dim]navegador con la sesión iniciada en el tracker → F12 → Red → recarga la página →\n"
+                "  la primera petición → Cabeceras de la petición → «Cookie» → copia el valor entero.\n"
+                "  Solo se usa para esta lectura; no se guarda.[/dim]"
+            )
+            if Confirm.ask("  ¿Pegar la cookie?", default=False):
+                cookie = Prompt.ask("  Cookie", password=True).strip()
+                web, error = u.ids_desde_web(base_url, cookie) if cookie else (None, "vacía")
+                if web:
+                    vistos = web
+                    cats, tipos, res, otra, sin_asignar = u.proponer(web)
+                    console.print("  [bold green]✓ Lista completa leída de la página de subida.[/bold green]")
+                else:
+                    console.print(f"  [bold yellow]⚠️  No se pudo leer la web: {escape(error)}.[/bold yellow]")
+
+        def _pedir_id(etiqueta: str, sugerido: str) -> Optional[str]:
+            while True:
+                val = Prompt.ask(f"    id de {etiqueta}", default=sugerido or "").strip()
+                if val in ("", "-"):
+                    return None
+                if val.isdigit():
+                    return val
+                console.print("    [red]Solo números («-» = el tracker no la tiene).[/red]")
+
+        if sin_asignar:
+            console.print(f"  Categorías del tracker que no casan con ninguna clave: [bold]{escape(', '.join(sin_asignar))}[/bold]")
+        cats_faltan = [k for k in u.CLAVES_CATEGORIA if k not in cats]
+        if cats_faltan:
+            console.print("  Categorías sin id [dim](Enter acepta la sugerencia; «-» = el tracker no la tiene)[/dim]:")
+            for k in cats_faltan:
+                val = _pedir_id(f"{k} ({u.DESCRIPCION[k]})", u.SEMILLA_CATEGORIA.get(k, ""))
+                if val:
+                    cats[k] = val
+        if any(k not in tipos for k in u.CLAVES_TIPO) or any(k not in res for k in u.CLAVES_RESOLUCION) or not otra:
+            if Confirm.ask("  Tipos y resoluciones que faltan: ¿usar los ids por defecto de UNIT3D?", default=True):
+                for k, v in u.SEMILLA_TIPO.items():
+                    tipos.setdefault(k, v)
+                for k, v in u.SEMILLA_RESOLUCION.items():
+                    res.setdefault(k, v)
+                otra = otra or u.SEMILLA_OTRA
+            else:
+                for k in u.CLAVES_TIPO:
+                    if k not in tipos:
+                        val = _pedir_id(f"tipo {k} ({u.DESCRIPCION[k]})", u.SEMILLA_TIPO[k])
+                        if val:
+                            tipos[k] = val
+                for k in u.CLAVES_RESOLUCION:
+                    if k not in res:
+                        val = _pedir_id(f"resolución {k}", u.SEMILLA_RESOLUCION[k])
+                        if val:
+                            res[k] = val
+                if not otra:
+                    otra = _pedir_id("resolución «Other»", u.SEMILLA_OTRA)
+
+        nombres = {"cat": vistos.get("categories", {}), "tipo": vistos.get("types", {}),
+                   "res": vistos.get("resolutions", {})}
+        while True:
+            tbl = Table(show_header=True, header_style="bold cyan", border_style="dim",
+                        title="[bold]Ids que llevará el módulo[/bold]")
+            tbl.add_column("Clave", style="bold")
+            tbl.add_column("id", justify="right")
+            tbl.add_column("En el tracker", style="dim")
+            for grupo, d, claves in (("cat", cats, u.CLAVES_CATEGORIA), ("tipo", tipos, u.CLAVES_TIPO),
+                                     ("res", res, u.CLAVES_RESOLUCION)):
+                for k, v in u.ordenado(d, claves).items():
+                    tbl.add_row(k, v, escape(nombres[grupo].get(v, "") or "(sugerido)"))
+                tbl.add_section()
+            tbl.add_row("Other", otra or "—", escape(nombres["res"].get(otra or "", "") or ("(sugerido)" if otra else "")))
+            console.print(tbl)
+            if Confirm.ask("  ¿Son correctos?", default=True):
+                return cats, tipos, res, otra
+            console.print("  [dim]Enter deja el valor; «-» lo quita.[/dim]")
+            for d, prefijo in ((cats, ""), (tipos, "tipo "), (res, "resolución ")):
+                for k in list(d):
+                    val = _pedir_id(f"{prefijo}{k}", d[k])
+                    if val:
+                        d[k] = val
+                    else:
+                        d.pop(k)
+            otra = _pedir_id("resolución «Other»", otra or "")
+
     def opcion_3_crear_tracker(self) -> None:
-        """Crea un nuevo tracker basado en la plantilla MILNU"""
+        """Crea un tracker UNIT3D nuevo desde la plantilla UNIT3D_TEMPLATE.py,
+        con los ids de categorías/tipos/resoluciones del propio tracker."""
         console.print()
         console.print(
             Panel(
                 "\n"
-                "  Crea un nuevo tracker usando [bold cyan]MILNU[/bold cyan] como plantilla.\n"
-                "  Se crearán los archivos necesarios y se configurará el sistema.\n",
+                "  Añade un tracker [bold cyan]UNIT3D[/bold cyan] desde la plantilla de la suite.\n"
+                "  Sus ids de categorías, tipos y resoluciones se leen del propio tracker.\n",
                 title="[bold cyan]Crear nuevo tracker[/bold cyan]",
                 border_style="cyan",
             )
@@ -1522,6 +1654,7 @@ class Rawncher:
             console.print("[bold red]❌ El nombre no puede estar vacío.[/bold red]")
             return
 
+        solo_config = False
         while True:
             abrev_raw = Prompt.ask(
                 "[bold]Abreviación del tracker[/bold] [dim](ej: MILNU — se fuerza a mayúsculas)[/dim]"
@@ -1533,21 +1666,41 @@ class Rawncher:
             if not re.match(r'^[A-Z0-9]+$', abrev):
                 console.print("[bold red]❌ Solo letras mayúsculas y números.[/bold red]")
                 continue
+            # Un módulo que ya existe no se regenera: antes se machacaba en
+            # silencio (el NABS.py bueno acabó apuntando a milnueve).
+            if abrev in (self.config or {}).get("TRACKERS", {}):
+                console.print(f"[bold yellow]⚠️  '{abrev}' ya está en tu config.py: se configura con [2].[/bold yellow]")
+                if Confirm.ask(f"[bold]¿Ir a configurar '{abrev}'?[/bold]", default=True):
+                    self.opcion_2_configurar(preselected_tracker=abrev)
+                return
+            modulo_existente = self.base_dir / "src" / "trackers" / f"{abrev}.py"
+            if modulo_existente.exists():
+                solo_config = True
+                console.print(
+                    f"[bold green]✓ '{abrev}' es un tracker de la suite:[/bold green] su módulo no se toca; "
+                    "solo se añade a tu config.py."
+                )
+                break
             existentes = self._get_tracker_names_from_upload()
             if abrev in existentes:
                 console.print(f"[bold red]❌ '{abrev}' ya existe en upload.py. Elige otra.[/bold red]")
                 continue
             break
 
-        while True:
+        base_url = ""
+        if solo_config:
+            m = re.search(r"(https?://[^/'\"\s]+)/api/torrents/upload|BASE_URL = '(https?://[^']+)'",
+                          modulo_existente.read_text(encoding="utf-8"))
+            base_url = (m.group(1) or m.group(2)) if m else ""
+        while not base_url:
             base_url = Prompt.ask(
                 "[bold]URL base del tracker[/bold] [dim](ej: https://mitracker.ejemplo.es)[/dim]"
             ).strip()
             if not base_url.startswith("https://") and not base_url.startswith("http://"):
                 console.print("[bold red]❌ La URL debe empezar por https:// o http://[/bold red]")
+                base_url = ""
                 continue
             base_url = base_url.rstrip("/")
-            break
 
         console.print()
         console.print(Rule("[bold cyan]▸  RECON — Configuración Inicial[/bold cyan]", style="cyan"))
@@ -1578,18 +1731,27 @@ class Rawncher:
             break
 
         tracker_py = self.base_dir / "src" / "trackers" / f"{abrev}.py"
-        milnu_py = self.base_dir / "src" / "trackers" / "MILNU.py"
+        plantilla_py = self.base_dir / "src" / "trackers" / "UNIT3D_TEMPLATE.py"
         upload_py = self.base_dir / "upload.py"
         config_py = self.base_dir / "data" / "config.py"
 
         errores = []
 
-        if not milnu_py.exists():
-            console.print("[bold red]❌ No se encontró la plantilla MILNU.py[/bold red]")
-            return
+        ids = None
+        if not solo_config:
+            if not plantilla_py.exists():
+                console.print("[bold red]❌ No se encontró la plantilla UNIT3D_TEMPLATE.py[/bold red]")
+                return
+            ids = self._ids_unit3d(base_url, api_key_inicial)
+            if ids is None:
+                return
 
         api_display = api_key_inicial[:8] + "..." if api_key_inicial else "[dim]pendiente[/dim]"
-        ann_display = announce_url_inicial if announce_url_inicial else "[dim]pendiente[/dim]"
+        # La announce lleva la passkey: solo el principio y el final.
+        ann_display = (f"{announce_url_inicial[:len(base_url) + 10]}...{announce_url_inicial[-4:]}"
+                       if announce_url_inicial else "[dim]pendiente[/dim]")
+        archivo = ("[dim]src/trackers/{0}.py (de la suite, no se toca)[/dim]" if solo_config
+                   else "[dim]src/trackers/{0}.py (nuevo, plantilla UNIT3D)[/dim]").format(abrev)
         console.print()
         console.print(
             Panel(
@@ -1598,7 +1760,7 @@ class Rawncher:
                 f"  URL base:     [bold]{base_url}[/bold]\n"
                 f"  API Key:      {api_display}\n"
                 f"  Announce URL: {ann_display}\n"
-                f"  Archivo:      [dim]src/trackers/{abrev}.py[/dim]",
+                f"  Archivo:      {archivo}",
                 title="[bold]Resumen de creación[/bold]",
                 border_style="blue",
             )
@@ -1608,32 +1770,39 @@ class Rawncher:
             console.print("[bold yellow]⚠️  Operación cancelada.[/bold yellow]")
             return
 
-        milnu_text = milnu_py.read_text(encoding="utf-8")
-        nuevo_text = milnu_text
-        nuevo_text = nuevo_text.replace(f"class MILNU(", f"class {abrev}(")
-        nuevo_text = nuevo_text.replace(f"self.tracker = 'MILNU'", f"self.tracker = '{abrev}'")
-        nuevo_text = nuevo_text.replace(
-            f"self.source_flag = 'Milnueve'",
-            f"self.source_flag = '{nombre_completo}'"
-        )
-        nuevo_text = nuevo_text.replace(
-            "https://milnueve.neklair.es/api/torrents/upload",
-            f"{base_url}/api/torrents/upload",
-        )
-        nuevo_text = nuevo_text.replace(
-            "https://milnueve.neklair.es/api/torrents/filter",
-            f"{base_url}/api/torrents/filter",
-        )
-        nuevo_text = re.sub(r'\bMILNU\b', abrev, nuevo_text)
-        nuevo_text = re.sub(r'\bMilnueve\b', nombre_completo, nuevo_text)
-        nuevo_text = re.sub(r'\bmilnu_name\b', f'{abrev.lower()}_name', nuevo_text)
+        if not solo_config:
+            from src.unit3d_ids import bloque_ids
+            nuevo_text = plantilla_py.read_text(encoding="utf-8")
+            try:
+                # Cada sustitución tiene que casar exactamente una vez: antes un
+                # replace que no casaba fallaba en silencio y el módulo nuevo
+                # salía apuntando a milnueve.
+                for viejo, nuevo in (
+                    ("class UNIT3D_TEMPLATE():", f"class {abrev}():"),
+                    ("self.tracker = 'UNIT3D_TEMPLATE'", f"self.tracker = '{abrev}'"),
+                    ("self.source_flag = 'UNIT3D_TEMPLATE'", f"self.source_flag = {nombre_completo!r}"),
+                    ("BASE_URL = 'https://tracker.example'", f"BASE_URL = {base_url!r}"),
+                ):
+                    if nuevo_text.count(viejo) != 1:
+                        raise ValueError(f"la plantilla no tiene «{viejo}» exactamente una vez")
+                    nuevo_text = nuevo_text.replace(viejo, nuevo)
+                ini = nuevo_text.index("\n", nuevo_text.index("    # >>> ids del tracker")) + 1
+                fin = nuevo_text.index("    # <<< ids del tracker")
+                nuevo_text = nuevo_text[:ini] + bloque_ids(*ids) + nuevo_text[fin:]
+                compile(nuevo_text, f"{abrev}.py", "exec")
+            except (ValueError, SyntaxError) as e:
+                console.print(f"[bold red]❌ No se pudo generar el módulo desde UNIT3D_TEMPLATE.py: {e}[/bold red]")
+                return
 
-        try:
-            tracker_py.write_text(nuevo_text, encoding="utf-8")
-            console.print(f"[bold green]✅ Creado:[/bold green] src/trackers/{abrev}.py")
-        except Exception as e:
-            console.print(f"[bold red]❌ No se pudo crear el archivo del tracker: {e}[/bold red]")
-            errores.append(f"tracker .py: {e}")
+            if tracker_py.exists():
+                console.print(f"[bold red]❌ src/trackers/{abrev}.py ya existe: no se sobrescribe.[/bold red]")
+                return
+            try:
+                tracker_py.write_text(nuevo_text, encoding="utf-8")
+                console.print(f"[bold green]✅ Creado:[/bold green] src/trackers/{abrev}.py")
+            except Exception as e:
+                console.print(f"[bold red]❌ No se pudo crear el archivo del tracker: {e}[/bold red]")
+                errores.append(f"tracker .py: {e}")
 
         cfg_api = api_key_inicial if api_key_inicial else f"{abrev}_API_KEY"
         cfg_announce = announce_url_inicial if announce_url_inicial else f"{base_url}/announce/Custom_Announce_URL"
@@ -1734,8 +1903,9 @@ class Rawncher:
         else:
             console.print(
                 Panel(
-                    f"  [bold green]✅[/bold green] src/trackers/{abrev}.py creado\n"
-                    f"  [bold green]✅[/bold green] data/config.py actualizado\n"
+                    (f"  [bold green]✅[/bold green] src/trackers/{abrev}.py de la suite (sin tocar)\n" if solo_config
+                     else f"  [bold green]✅[/bold green] src/trackers/{abrev}.py creado\n")
+                    + f"  [bold green]✅[/bold green] data/config.py actualizado\n"
                     f"  [bold green]✅[/bold green] trackers_registry.json actualizado\n",
                     title=f"[bold green]🚀 Tracker '{abrev}' creado con éxito[/bold green]",
                     border_style="green",
