@@ -110,6 +110,7 @@ def ids_desde_web(base_url, cookie, timeout=20):
     Devuelve (vistos, '') o (None, motivo).
     """
     from bs4 import BeautifulSoup
+    cookie = re.sub(r'^\s*cookie\s*:\s*', '', cookie or '', flags=re.I).strip()
     try:
         r = requests.get(f'{base_url}/torrents/create', timeout=timeout, allow_redirects=False,
                          headers={'User-Agent': UA, 'Cookie': cookie})
@@ -118,7 +119,8 @@ def ids_desde_web(base_url, cookie, timeout=20):
     except UnicodeEncodeError:
         return None, 'la cookie lleva caracteres raros: cópiala otra vez'
     if 300 <= r.status_code < 400:
-        return None, f'HTTP {r.status_code}: redirige al login (cookie caducada o incompleta)'
+        destino = urlparse(r.headers.get('location', '')).path or '?'
+        return None, f'HTTP {r.status_code} → {destino}; {_diagnostico_cookie(cookie)}'
     if r.status_code != 200:
         return None, f'HTTP {r.status_code}'
     soup = BeautifulSoup(r.text, 'html.parser')
@@ -132,6 +134,18 @@ def ids_desde_web(base_url, cookie, timeout=20):
     if not vistos['categories']:
         return None, 'la página no tiene el formulario de subida (¿cookie de otra web?)'
     return vistos, ''
+
+
+def _diagnostico_cookie(cookie):
+    """Lo que llegó, sin enseñar ningún valor: tamaño y nombres de las cookies."""
+    nombres = [p.split('=', 1)[0].strip() for p in cookie.split(';') if '=' in p]
+    pistas = []
+    if not any(n.endswith('_session') for n in nombres):
+        pistas.append('falta la de sesión («…_session»)')
+    if len(cookie) >= 4000:
+        pistas.append('el terminal corta lo pegado a 4095 caracteres: puede haber llegado cortada')
+    texto = f"llegaron {len(cookie)} caracteres, {len(nombres)} cookies ({', '.join(nombres[:10]) or 'ninguna'})"
+    return texto + ('; ' + '; '.join(pistas) if pistas else '; la sesión no vale (¿caducada, o de otra web?)')
 
 
 def _norm(texto):
