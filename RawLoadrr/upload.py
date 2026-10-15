@@ -24,6 +24,7 @@ from src.logger import set_debug_mode as set_upload_logger_debug_mode
 from rich.markdown import Markdown
 from rich.style import Style
 from rich.prompt import Prompt, Confirm
+from rich.markup import escape
 from rich.text import Text
 from rich.panel import Panel
 from rich.table import Table
@@ -533,7 +534,7 @@ async def do_the_thing(base_dir):
         if os.path.exists(root_path):
             if os.path.isdir(root_path):
                 console.print(Rule("[bold green]RECURSIVE SCAN INITIATED[/bold green]", style="green"))
-                console.print(f"[dim]Scanning:[/dim] [cyan]{root_path}[/cyan]")
+                console.print(f"[dim]Scanning:[/dim] [cyan]{escape(str(root_path))}[/cyan]")
                 only = _resolver_only(meta, root_path)
                 if only is None:
                     return

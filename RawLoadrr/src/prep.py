@@ -6,7 +6,10 @@ from src.id_resolver import (resolve as _resolve_ids,
                              save_override as _save_override,
                              save_kind as _save_kind,
                              load_kind as _load_kind,
-                             report_pending as _report_pending)
+                             report_pending as _report_pending,
+                             path_ids as _path_ids,
+                             verify_path_ids as _verify_path_ids,
+                             prefer_path_id as _prefer_path_id)
 from src.discparse import DiscParse
 from src.exceptions import ManualDateException, WeirdSystem, XEMNotFound
 from src.trackers.PTP import PTP
@@ -73,6 +76,7 @@ try:
     from pathlib import Path
     from pymediainfo import MediaInfo
     from rich.prompt import Prompt, Confirm
+    from rich.markup import escape
     from rich.progress import Progress, TextColumn, BarColumn, TimeRemainingColumn
     from rich.traceback import install, Traceback
     from requests.exceptions import HTTPError
@@ -2862,10 +2866,34 @@ class Prep():
                           f"falling back to TMDB search.")
             return await self.get_tmdb_id(filename, year, meta, category)
 
+        # Ids escritos en la ruta («[tmdb-79200] [tt34672616]», «Serie
+        # 2020-364928»): solo cuentan si TMDB devuelve un título que casa con
+        # el nombre, y solo sustituyen al resolver cuando éste NO llegó a
+        # «high» con ese mismo id. Si coinciden, todo sigue como estaba.
+        try:
+            _fl = meta.get('filelist') or []
+            _pid = _path_ids(_fl[0] if _fl else meta.get('path', ''),
+                             meta.get('path', ''))
+            if _pid:
+                _plog = lambda m: log.info(f"[id_resolver] {m}")
+                _alt = _prefer_path_id(
+                    res, _verify_path_ids(_pid, [filename], year, category,
+                                          self.config, log=_plog), log=_plog)
+                if _alt:
+                    console.print(f"[bold green]✓ ID de la ruta[/bold green] "
+                                  f"([cyan]{escape(_alt['path_claim'])}[/cyan]) "
+                                  f"en lugar de {res['confidence']} "
+                                  f"tmdb={res['tmdb']}")
+                    res = _alt
+        except Exception as e:
+            log.info(f"[id_resolver] path ids ignored: {e}")
+
         if res['confidence'] == 'high' and (res['tmdb'] or res['imdb']):
             self._apply_resolved(meta, res)
             if res.get('source') == 'override':
                 src = "saved override"
+            elif res.get('source') == 'path':
+                src = "id in path, verified on TMDB"
             else:
                 src = f"{res['votes'] or res['mal_votes']} providers agree"
             console.print(

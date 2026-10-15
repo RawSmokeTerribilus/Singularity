@@ -31,6 +31,7 @@ from core.status_manager import update_status
 from src.console import console
 from src.placeholders import es_placeholder, falta_por_preguntar
 from rich.prompt import Prompt, Confirm
+from rich.markup import escape
 from rich.panel import Panel
 from rich.table import Table
 from rich.rule import Rule
@@ -829,7 +830,7 @@ class Rawncher:
         console.print()
         console.print(
             Panel(
-                f"[bold yellow]{cmd_str}[/bold yellow]",
+                f"[bold yellow]{escape(cmd_str)}[/bold yellow]",
                 title="[bold]Comando a ejecutar[/bold]",
                 border_style="yellow",
             )
@@ -877,7 +878,7 @@ class Rawncher:
         console.print()
         console.print(
             Panel(
-                f"[bold yellow]{cmd_str}[/bold yellow]",
+                f"[bold yellow]{escape(cmd_str)}[/bold yellow]",
                 title="[bold]Comando a ejecutar[/bold]",
                 border_style="yellow",
             )
