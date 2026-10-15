@@ -1494,6 +1494,7 @@ class Rawncher:
                 "sin_clave": "la API pide clave y aún no hay API key",
                 "clave_mala": "la API rechaza la API key",
                 "caido": "no se pudo conectar",
+                "cloudflare": "Cloudflare frena la petición (desafío anti-bots; reintenta en un rato o configura Tor)",
                 "no": "no contesta como un UNIT3D",
             }[estado]
             console.print(f"  [bold yellow]⚠️  No se pudo confirmar que sea UNIT3D: {motivo} ({escape(detalle)}).[/bold yellow]")

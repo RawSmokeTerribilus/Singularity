@@ -49,6 +49,7 @@ def detectar(base_url, api_key, timeout=15):
     unit3d      la API contesta con la forma de UNIT3D (data/links/meta).
     sin_clave   401 en JSON de Laravel y no había clave: probable UNIT3D.
     clave_mala  401 en JSON de Laravel con clave: la clave no vale.
+    cloudflare  Cloudflare para la petición con su desafío anti-bots.
     no          contesta otra cosa (HTML, 404...).
     caido       no se pudo conectar.
     """
@@ -68,6 +69,8 @@ def detectar(base_url, api_key, timeout=15):
         return 'unit3d', ''
     if r.status_code == 401 and isinstance(j, dict) and 'message' in j:
         return ('clave_mala' if api_key else 'sin_clave'), f"HTTP 401: {j['message']}"
+    if r.status_code in (403, 503) and ('cf-ray' in r.headers or 'Just a moment' in r.text[:2000]):
+        return 'cloudflare', f'HTTP {r.status_code}'
     tipo = r.headers.get('content-type', '?').split(';')[0]
     return 'no', f'HTTP {r.status_code}, {tipo}'
 

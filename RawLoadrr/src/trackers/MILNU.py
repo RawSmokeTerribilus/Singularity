@@ -276,9 +276,11 @@ class MILNU():
                     self.logger.info(f"Dupe search found {len(dupes)} results")
                     break  # Success, exit retry loop
                 except json.JSONDecodeError:
-                    self.logger.error("Failed to decode JSON from response. Response text:")
-                    self.logger.error(response.text)
+                    # Una línea, no la página entera (suele ser el HTML del login).
+                    inicio = ' '.join(response.text[:200].split())
+                    self.logger.error(f"Dupe search: HTTP {response.status_code}, no es JSON: {inicio}")
                     console.print('[bold red]Unable to search for existing torrents on site. Either the site is down or your API key is incorrect')
+                    meta['dupe_busqueda_fallida'] = self.tracker
                     break
 
             except requests.exceptions.Timeout:
@@ -289,10 +291,14 @@ class MILNU():
                 else:
                     console.print('[bold yellow]Timeout: Proceeding without dupe check')
                     self.logger.warning("Skipping dupe check due to repeated timeouts")
-                    
+                    meta['dupe_busqueda_fallida'] = self.tracker
+
             except Exception as e:
                 console.print('[bold red]Unable to search for existing torrents on site. Either the site is down or your API key is incorrect')
-                self.logger.error(f"Dupe search error: {str(e)}")
+                # El texto de una excepción de requests lleva la URL con la api_token.
+                motivo = type(e).__name__ if isinstance(e, requests.exceptions.RequestException) else f"{type(e).__name__}: {e}"
+                self.logger.error(f"Dupe search error: {motivo}")
+                meta['dupe_busqueda_fallida'] = self.tracker
                 break
         
         return dupes

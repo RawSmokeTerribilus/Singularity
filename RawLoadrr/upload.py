@@ -1358,11 +1358,22 @@ def get_confirmation(meta):
     return confirm
 
 def dupe_check(dupes, meta, config, skipped_details, path):
+    # Lo marcan los módulos de la casa cuando la búsqueda falla; pop para que
+    # no se arrastre al siguiente tracker.
+    fallida = meta.pop('dupe_busqueda_fallida', None)
     if meta.get('dupe', False):
         console.print("[yellow]Skipping duplicate check as requested.")
         meta['upload'] = True   
         return meta, False  # False indicates not skipped
     
+    if fallida:
+        # Decisión del operador (15-10-2026): se sube igual, el tracker
+        # rechaza los duplicados. Lo que no se hace es afirmar que no los hay.
+        console.print(f"[bold yellow]⚠️  No se pudo comprobar si hay duplicados en {fallida}: se sube igual "
+                      f"(el tracker rechaza los duplicados).[/bold yellow]")
+        meta['upload'] = True
+        return meta, False
+
     if not dupes:
         console.print("[bold green]✓ No duplicates found[/bold green]")
         meta['upload'] = True   
