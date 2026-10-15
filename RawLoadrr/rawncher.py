@@ -1590,19 +1590,24 @@ class Rawncher:
                 console.print(f"  Faltan {len(faltan)} ids: la API solo enseña los que tienen torrents.")
             console.print(
                 "  La página de subida de la web los tiene todos. Para leerla hace falta tu cookie de sesión:\n"
-                "  [dim]navegador con la sesión iniciada en el tracker → F12 → Red → recarga la página →\n"
-                "  la primera petición → Cabeceras de la petición → «Cookie» → copia el valor entero.\n"
-                "  Solo se usa para esta lectura; no se guarda.[/dim]"
+                f"  [dim]navegador, en una pestaña de [bold]{escape(base_url)}[/bold] con la sesión iniciada → F12 → Red →\n"
+                "  recarga la página → la primera petición → Cabeceras de la petición → «Cookie» →\n"
+                "  copia la cabecera ENTERA: va como «nombre=valor; nombre=valor» (no vale un valor suelto\n"
+                "  de Almacenamiento → Cookies). Solo se usa para esta lectura; no se guarda.[/dim]"
             )
-            if Confirm.ask("  ¿Pegar la cookie?", default=False):
+            intentar = Confirm.ask("  ¿Pegar la cookie?", default=False)
+            while intentar:
                 cookie = Prompt.ask("  Cookie", password=True).strip()
                 web, error = u.ids_desde_web(base_url, cookie) if cookie else (None, "vacía")
                 if web:
                     vistos = web
                     cats, tipos, res, otra, sin_asignar = u.proponer(web)
                     console.print("  [bold green]✓ Lista completa leída de la página de subida.[/bold green]")
-                else:
-                    console.print(f"  [bold yellow]⚠️  No se pudo leer la web: {escape(error)}.[/bold yellow]")
+                    break
+                console.print(f"  [bold yellow]⚠️  No se pudo leer la web: {escape(error)}.[/bold yellow]")
+                # Casi todo el mundo la copia mal la primera vez (prueba rc3:
+                # el valor suelto de la sesión): se deja repetir sin rehacer [3].
+                intentar = Confirm.ask("  ¿Probar otra vez con la cookie?", default=True)
 
         def _pedir_id(etiqueta: str, sugerido: str) -> Optional[str]:
             while True:
