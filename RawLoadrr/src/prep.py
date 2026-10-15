@@ -4524,7 +4524,9 @@ class Prep():
         async with pyimgbox.Gallery(thumb_width=350, square_thumbs=False) as gallery:
             async for submission in gallery.add(image_glob):
                 if not submission['success']:
-                    console.print(f"[red]There was an error uploading to imgbox: [yellow]{submission['error']}[/yellow][/red]")
+                    # Una línea: con un 500 el error trae la página HTML entera.
+                    error = ' '.join(str(submission['error'])[:200].split())
+                    console.print(f"[red]There was an error uploading to imgbox: [yellow]{escape(error)}[/yellow][/red]")
                     return []
                 else:
                     image_dict = {}
@@ -4598,8 +4600,11 @@ class Prep():
                 console.log(f"YEAR: {meta['year']}") 
                 if meta.get('source'):          
                     console.log(f"SOURCE: {meta['source']}")
-            console.log("[cyan]get_name meta:")
-            console.log(meta)
+            # Solo los valores cortos: el meta entero lleva el mediainfo y llenaba
+            # la pantalla en cada subida en debug.
+            console.log("[cyan]get_name meta (valores cortos):")
+            console.log({k: v for k, v in meta.items()
+                         if isinstance(v, (str, int, float, bool, type(None))) and len(str(v)) <= 120})
 
             
         # name_notag = ''

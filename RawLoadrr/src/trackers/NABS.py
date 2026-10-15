@@ -249,12 +249,10 @@ class NABS():
                             self.logger.error(f"HTTP {response.status_code}: {error_heading.text.strip()}")
                         else:
                             console.print(f"[red]Encountered HTTP Error: {response.status_code}[/red]")
-                            console.print(f"[blue]Server Response[/blue]: {response.text}")
-                            self.logger.error(f"HTTP {response.status_code} - Could not parse response, raw text below")
-                            self.logger.error(response.text) # Log raw text if not parsed
+                            self._volcar_respuesta(meta, response)
                     except Exception as parse_error:
                         console.print(f"[red]Failed to parse error response: {parse_error}[/red]")
-                        console.print(f"[blue]Server Response[/blue]: {response.text}")
+                        self._volcar_respuesta(meta, response)
                         self.logger.error(f"Failed to parse error response: {str(parse_error)}")
                     
                     return_value = False # Explicitly return False
@@ -287,6 +285,22 @@ class NABS():
             self.logger.warning(f"Failed to close torrent file: {str(e)}")
 
         return return_value
+
+    def _volcar_respuesta(self, meta, response):
+        """Una línea en pantalla y en el log; la respuesta entera, a un fichero.
+
+        Antes salía la página HTML completa (login, error 500...) en pantalla y
+        en el log, una vez por intento.
+        """
+        inicio = ' '.join(response.text[:300].split())
+        try:
+            ruta = f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}]respuesta_HTTP{response.status_code}.html"
+            with open(ruta, 'w', encoding='utf-8') as f:
+                f.write(response.text)
+        except (OSError, KeyError):
+            ruta = '(no se pudo guardar)'
+        console.print(f"[blue]Server Response[/blue]: {inicio}… [dim](entera en {ruta})[/dim]")
+        self.logger.error(f"HTTP {response.status_code}: {inicio}… (entera en {ruta})")
 
     async def search_existing(self, meta):
         dupes = {}
