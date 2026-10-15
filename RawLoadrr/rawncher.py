@@ -1592,7 +1592,6 @@ class Rawncher:
                 "  La página de subida de la web los tiene todos. Para leerla hace falta tu cookie de sesión:\n"
                 "  [dim]navegador con la sesión iniciada en el tracker → F12 → Red → recarga la página →\n"
                 "  la primera petición → Cabeceras de la petición → «Cookie» → copia el valor entero.\n"
-                "  (Vale también solo el valor de la cookie «…_session», de Almacenamiento → Cookies.)\n"
                 "  Solo se usa para esta lectura; no se guarda.[/dim]"
             )
             if Confirm.ask("  ¿Pegar la cookie?", default=False):
