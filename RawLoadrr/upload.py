@@ -1185,11 +1185,14 @@ async def do_the_thing(base_dir):
         return formatted_text
 
     if total_files > 0:
+        # Un ensayo con --debug no es un fallo: se cuenta aparte.
+        ensayos = sum(1 for _, motivo in skipped_details if str(motivo).endswith("(DEBUG MODE)"))
         console.print()
         console.print(Panel(
             f"Processed [bold bright_magenta]{total_files}[/bold bright_magenta] Unique Uploads\n"
             f"Successful Uploads: [bold green]{successful_uploads}[/bold green]\n"
-            f"Failed Uploads: [bold red]{skipped_files}[/bold red]",
+            + (f"Ensayos (--debug, sin subir): [bold yellow]{ensayos}[/bold yellow]\n" if ensayos else "")
+            + f"Failed Uploads: [bold red]{skipped_files - ensayos}[/bold red]",
             title="[bold]SESSION REPORT[/bold]",
             border_style="bold cyan",
             box=box.HEAVY
