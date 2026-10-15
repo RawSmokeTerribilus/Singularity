@@ -33,7 +33,7 @@ descargar, con **todo lo necesario dentro**:
 
 Baja la carpeta de tu sistema (o solo esos archivos), mételos en una carpeta vacía en tu `HOME`
 y sigue los pasos de abajo. No hace falta clonar el repo entero ni reconstruir la imagen: solo la
-imagen publicada + esos archivos. Las plantillas de config **y los 53 módulos de tracker** se
+imagen publicada + esos archivos. Las plantillas de config **y los módulos de tracker** se
 extraen solos desde la imagen.
 
 ---
@@ -41,6 +41,10 @@ extraen solos desde la imagen.
 ### 🐧 Linux
 
 ```bash
+mkdir -p ~/Singularity && cd ~/Singularity
+for f in docker-compose.yml makefile final-user-install.sh; do
+  curl -fsSLO "https://codeberg.org/RawSmoke/Singularity/raw/branch/main/linux-installer/$f"
+done
 make install   # crea config/ y work_data/, genera plantillas, siembra trackers, instala el lanzador
 make up        # baja la imagen si hace falta y arranca el contenedor
 make attach    # entra a la TUI
@@ -51,7 +55,10 @@ Qué hace `make install`:
 - crea `./config/` y `./work_data/`
 - instala `singularity` y `singularity-shell`
 - genera `.env`, `config.py`, `singularity_config.py` y `mass_config.py`
-- siembra `work_data/trackers` desde la imagen (si no, verías `ModuleNotFoundError: src.trackers.PTP`)
+- siembra `work_data/trackers` desde la imagen (si no, verías `ModuleNotFoundError: src.trackers.PTP`).
+  Cada `make up` los refresca desde la imagen que levanta el compose: los módulos de la suite se
+  actualizan solos (lo sustituido queda en `work_data/trackers_backup/`) y los trackers que hayas
+  creado tú con «Crear nuevo tracker» no se tocan.
 - deja `NOBS` preformado y `config.py` multi-tracker para cualquier UNIT3D serio
 
 **Qué evitar:** no ejecutes los `make` con `sudo` (el script pide permisos solo cuando toca); no

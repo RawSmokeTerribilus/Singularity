@@ -82,7 +82,7 @@ config = {'AUTO': {'delay': 0, 'description_folder': None, 'dupe_similarity': 80
                                  'qbit_user': 'USERNAME',
                                  'torrent_client': 'qbit'},
                      'deluge': {'deluge_pass': 'PASSWORD',
-                                'deluge_port': '8080',
+                                'deluge_port': '58846',
                                 'deluge_url': 'localhost',
                                 'deluge_user': 'USERNAME',
                                 'torrent_client': 'deluge'},
@@ -90,7 +90,7 @@ config = {'AUTO': {'delay': 0, 'description_folder': None, 'dupe_similarity': 80
                               'content_layout': 'Original',
                               'enable_search': True,
                               'qbit_pass': 'PASSWORD',
-                              'qbit_port': '8888',
+                              'qbit_port': '8080',
                               'qbit_url': 'http://127.0.0.1',
                               'qbit_user': 'USERNAME',
                               'torrent_client': 'qbit',
@@ -748,14 +748,14 @@ config = {'AUTO': {'delay': 0, 'description_folder': None, 'dupe_similarity': 80
  # ('USERNAME'/'PASSWORD') y muere con "Connection refused". Verificado
  # ejecutando rawncher.py con las dos plantillas sobre la misma imagen.
  #
- # (El puerto repetido en 'qbit_url' y 'qbit_port' hace que el log escriba
- #  http://127.0.0.1:8888:8888. Es solo cosmético — qbittorrent-api usa el
- #  puerto de la URL e ignora el redundante — y así lleva años en producción,
- #  así que se deja como está.)
+ # La URL va sin puerto y el puerto aparte (8080, el de qBittorrent por
+ # defecto). Con el puerto en los dos sitios la aduana ofrecía el de ejemplo
+ # y el log pegaba url:puerto («http://127.0.0.1:58846:8888», prueba fresca
+ # del 15-10-2026); si la URL trae puerto, ese manda.
  'qbit': {'enable_search': True,
           'qbit_pass': 'PASSWORD',
-          'qbit_port': '8888',
-          'qbit_url': 'http://127.0.0.1:8888',
+          'qbit_port': '8080',
+          'qbit_url': 'http://127.0.0.1',
           'qbit_user': 'YOUR_USERNAME',
           'torrent_storage_dir': '/app/RawLoadrr/qbit_backup'},
  'version': '1.0.7'}

@@ -7,9 +7,10 @@ WORK_TRACKERS := work_data/trackers
 pull:
 	docker compose pull
 
+# El kit no trae Dockerfile: la imagen se baja de Docker Hub con `make pull`.
+# (Aquí había un build con la v3.0.9 a fuego que no podía funcionar.)
 build:
-	docker build -t rawsmoke/singularity-suite:v3.0.9 .
-	docker tag rawsmoke/singularity-suite:v3.0.9 rawsmoke/singularity-suite:latest
+	@echo "El kit usa la imagen publicada: make pull && make up. Construir la imagen es cosa del repo completo."
 
 up: prep
 	docker compose up -d
