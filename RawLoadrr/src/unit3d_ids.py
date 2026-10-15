@@ -111,6 +111,13 @@ def ids_desde_web(base_url, cookie, timeout=20):
     """
     from bs4 import BeautifulSoup
     cookie = re.sub(r'^\s*cookie\s*:\s*', '', cookie or '', flags=re.I).strip()
+    # Solo el VALOR de la cookie de sesión (lo que enseña Almacenamiento ->
+    # Cookies): se le pone el nombre que el propio tracker da a su sesión.
+    # Prueba rc3: se pegó «eyJ…» a secas y nabs mandaba al login.
+    if cookie.startswith('eyJ') and ';' not in cookie:
+        nombre = _nombre_cookie_sesion(base_url, timeout)
+        if nombre:
+            cookie = f'{nombre}={cookie}'
     try:
         r = requests.get(f'{base_url}/torrents/create', timeout=timeout, allow_redirects=False,
                          headers={'User-Agent': UA, 'Cookie': cookie})
@@ -134,6 +141,20 @@ def ids_desde_web(base_url, cookie, timeout=20):
     if not vistos['categories']:
         return None, 'la página no tiene el formulario de subida (¿cookie de otra web?)'
     return vistos, ''
+
+
+def _nombre_cookie_sesion(base_url, timeout=20):
+    """Cómo llama el tracker a su cookie de sesión («<app>_session»).
+
+    Se mira el Set-Cookie de la portada (redirige al login y ya trae la
+    sesión); /login lo corta Cloudflare con un 403 en nabs.
+    """
+    try:
+        r = requests.get(f'{base_url}/', headers={'User-Agent': UA}, timeout=timeout,
+                         allow_redirects=False)
+    except requests.RequestException:
+        return None
+    return next((c.name for c in r.cookies if c.name.endswith('_session')), None)
 
 
 def _diagnostico_cookie(cookie):
@@ -181,8 +202,9 @@ def _clave_tipo(nombre):
         if trozo in n:
             return clave
     # Formatos de libro, audio o juego (EPUB, M4B, ROM...): el nombre tal cual,
-    # que es lo que pone prep en meta['type'].
-    return nombre.strip().upper()
+    # que es lo que pone prep en meta['type'], sin lo que vaya entre paréntesis
+    # («MP3 (audiolibro)» -> MP3).
+    return re.sub(r'\s*\([^)]*\)', '', nombre).strip().upper()
 
 
 def proponer(vistos):
