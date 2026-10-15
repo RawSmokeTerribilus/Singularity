@@ -1967,7 +1967,10 @@ class TrackerIndex:
                 dbg("Scraper: safety limit reached (500 pages)")
                 break
                 
-            url = f"{base}/torrents?uploader={user}&page={page}"
+            # view=list: el scraper lee las filas de la vista de lista, y UNIT3D
+            # solo aplica la vista guardada del usuario (tarjetas, agrupada,
+            # pósters) si la URL no trae «view». En NOBS 16 cuentas usan otra.
+            url = f"{base}/torrents?uploader={user}&page={page}&view=list"
             try:
                 api_limiter.wait()
                 r = sess.get(url, timeout=20)
@@ -2837,7 +2840,7 @@ def _scraper_search_item(config: dict, tmdb_id=None, tvdb_id=None,
     try:
         sess = _session(config)
         search_term = query or ""
-        url = f"{base}/torrents?tmdbId={tmdb_id or ''}&name={search_term}&page=1"
+        url = f"{base}/torrents?tmdbId={tmdb_id or ''}&name={search_term}&page=1&view=list"
         dbg(f"[SCRAPER_FALLBACK] HTTP scrape: {url}")
         api_limiter.wait()
         r = sess.get(url, timeout=15)
