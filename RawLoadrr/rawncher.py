@@ -255,6 +255,18 @@ class Rawncher:
                     "qbit_pass": pwd.strip(),
                     "enable_search": True
                 })
+                # La subida (clients.py) no lee este bloque sino
+                # TORRENT_CLIENTS[default_torrent_client]: en una instalación
+                # nueva se quedaba con los de plantilla (8080, USERNAME) y no
+                # podía añadir el torrent al cliente (prueba fresca rc2). Igual
+                # que torrent_storage_dir más abajo, se escribe en los dos.
+                self.config.setdefault("TORRENT_CLIENTS", {}).setdefault(nombre_cliente, {}).update({
+                    "torrent_client": "qbit",
+                    "qbit_url": host.strip(),
+                    "qbit_port": str(port).strip(),
+                    "qbit_user": user.strip(),
+                    "qbit_pass": pwd.strip(),
+                })
 
                 self._guardar_config()
                 console.print("[bold green]✅ Configuración de qBittorrent persistida con éxito.[/]")

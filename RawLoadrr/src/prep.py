@@ -275,6 +275,10 @@ class Prep():
             console.print('[red]Processing as video')
             meta['is_disc'], videoloc, bdinfo, meta['discs'] = await self.get_disc(meta)        
             
+            # Alias de carpeta para resolve_ids(): solo los rellena la rama de
+            # vídeo suelto, y un disco sin ids llegaba allí con NameError.
+            _parent = _grandparent = _titulo_fichero = ''
+
             # If BD:
             if meta['is_disc'] == "BDMV":
                 video, meta['scene'], meta['imdb'] = self.is_scene(meta['path'], meta.get('imdb', None))
@@ -369,8 +373,16 @@ class Prep():
                     ).get("title") or guess_name
                 except Exception:
                     filename = guess_name
-                _parent = re.sub(r'\s*[-_]?\s*(?<![a-zA-Z])(?:s|season|temporada|saison|staffel|stagione|seizoen|sezon|сезон|시즌|シーズン|季)\s*\d+\s*$', '', ntpath.basename(ntpath.dirname(video)), flags=re.IGNORECASE).strip()
+                _padre_crudo = ntpath.basename(ntpath.dirname(video)).strip()
+                _parent = re.sub(r'\s*[-_]?\s*(?<![a-zA-Z])(?:s|season|temporada|saison|staffel|stagione|seizoen|sezon|сезон|시즌|シーズン|季)\s*\d+\s*$', '', _padre_crudo, flags=re.IGNORECASE).strip()
                 _grandparent = re.sub(r'\s*\(\d{4}\)', '', ntpath.basename(ntpath.dirname(ntpath.dirname(video)))).strip()
+                # El abuelo solo es el título cuando el padre es una carpeta de
+                # temporada («Serie/Temporada 1/ep.mkv»). Si no, es la biblioteca
+                # («CINE-2», «ANIME», «NOBS»): como alias traía basura de tvmaze
+                # («Cunk on Cinema», prueba fresca rc2) y en el caso Logan llegó a
+                # dar un high falso («Cine de Emboscada»).
+                if _parent and _parent == _padre_crudo:
+                    _grandparent = ''
                 if filename and filename.lower() not in _parent.lower() and filename.lower() not in _grandparent.lower():
                     # La carpeta sustituye al título cuando es el MISMO título
                     # mejor puntuado («Mayans M.C.») o cuando guessit no sacó nada
@@ -381,7 +393,16 @@ class Prep():
                     _n = lambda s: re.sub(r"[\W_]+", " ", s.lower()).strip()
                     _p = _n(_plegar(_parent))
                     if not (_n(filename) and _n(filename) in _p and _n(filename) != _p):
+                        # El título del fichero no se tira: va de alias. En la
+                        # prueba rc2 la carpeta era el título original («Balle
+                        # perdue 3») y el fichero el inglés («Last Bullet»), que
+                        # es el que daba high a la primera.
+                        _titulo_fichero = filename
                         filename = _parent if _parent else _grandparent
+                        # Y la carpeta va limpia: «Balle perdue 3 () Spanish» no
+                        # lo encuentra nadie. Con reglas fijas, no con guessit,
+                        # que recorta títulos («The 4400» -> «The»).
+                        filename = self._limpiar_carpeta(filename) or filename
                 untouched_filename = os.path.basename(video)
                 try:
                     meta['search_year'] = guessit(video)['year']
@@ -526,7 +547,7 @@ class Prep():
             if meta.get('tmdb', None) is None and meta.get('imdb', None) is None:
                 meta['category'], meta['tmdb'], meta['imdb'] = self.get_tmdb_imdb_from_mediainfo(mi, meta['category'], meta['is_disc'], meta['tmdb'], meta['imdb'])      
             if meta.get('tmdb', None) is None and meta.get('imdb', None) is None:
-                meta = await self.resolve_ids(meta, filename, aliases=[_parent, _grandparent])
+                meta = await self.resolve_ids(meta, filename, aliases=[_titulo_fichero, _parent, _grandparent])
             elif meta.get('imdb', None) is not None and meta.get('tmdb_manual', None) is None:
                 meta['imdb_id'] = str(meta['imdb']).replace('tt', '')
                 meta = await self.get_tmdb_from_imdb(meta, filename)
@@ -2831,6 +2852,25 @@ class Prep():
             meta['cover_rehosted'] = True
             console.print(f"[green]Portada rehosteada:[/green] [dim]{meta['cover_url']}[/dim]")
 
+    # Palabras que cuelgan al final del nombre de una carpeta y no son título.
+    _COLA_CARPETA = {'spanish', 'castellano', 'espanol', 'español', 'latino', 'english', 'ingles', 'inglés',
+                     'dual', 'multi', 'vose', 'vos', 'esp', 'cast', 'lat', 'subs', 'subtitulado'}
+
+    @classmethod
+    def _limpiar_carpeta(cls, nombre):
+        """«Balle perdue 3 () Spanish» -> «Balle perdue 3».
+
+        Quita corchetes, paréntesis vacíos o con año y las palabras de idioma
+        del final. No toca nada más: los títulos con números o subtítulos
+        («The 4400», «Dead Reckoning Part One») se quedan enteros.
+        """
+        s = re.sub(r"\[[^\]]*\]", " ", nombre or "")
+        s = re.sub(r"\(\s*(?:\d{4})?\s*\)", " ", s)
+        palabras = s.split()
+        while palabras and palabras[-1].strip(".-_").lower() in cls._COLA_CARPETA:
+            palabras.pop()
+        return " ".join(palabras).strip(" .-_")
+
     async def resolve_ids(self, meta, filename, aliases=None):
         """
         Identify the release by cross-referencing several metadata providers
@@ -4603,8 +4643,9 @@ class Prep():
             # Solo los valores cortos: el meta entero lleva el mediainfo y llenaba
             # la pantalla en cada subida en debug.
             console.log("[cyan]get_name meta (valores cortos):")
+            # (Sin type(None): get_name tiene una variable local «type».)
             console.log({k: v for k, v in meta.items()
-                         if isinstance(v, (str, int, float, bool, type(None))) and len(str(v)) <= 120})
+                         if (v is None or isinstance(v, (str, int, float, bool))) and len(str(v)) <= 120})
 
             
         # name_notag = ''
