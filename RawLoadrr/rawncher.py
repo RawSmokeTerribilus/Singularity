@@ -178,10 +178,23 @@ class Rawncher:
             self._logger.warning("ACR: Credenciales qBit por defecto o ausentes. Iniciando interceptación.")
             
             console.print(Panel("[bold yellow]🛠️ CONFIGURACIÓN DE ADUANA: qBittorrent[/]", expand=False))
-            console.print("[dim]Si qBit está en un contenedor Docker, usa la IP del host (ej: [bold]172.17.0.1[/bold]), no 'localhost'.[/dim]")
-            
-            host = Prompt.ask("URL del Cliente", default=qbit_data.get('qbit_url', 'http://172.17.0.1'))
-            port = Prompt.ask("Puerto", default=str(qbit_data.get('qbit_port', '8888')))
+            console.print("[dim]URL de la WebUI de qBit, ej: [bold]http://127.0.0.1[/bold] (con el compose oficial, "
+                          "network_mode: host, es 127.0.0.1). Si Singularity va en red bridge, la IP del host "
+                          "(ej: 172.17.0.1). El puerto puede ir en la URL o aparte.[/dim]")
+
+            # En una instalación fresca los valores de la plantilla no son del
+            # usuario: no se ofrecen como respuesta por defecto (un Enter en
+            # «Puerto» metía el 8888 de ejemplo aunque la URL llevara otro).
+            fresca = qbit_data.get("qbit_user") in (None, "", "YOUR_USERNAME")
+            url_def, port_def = self._url_y_puerto(qbit_data.get('qbit_url', ''),
+                                                   qbit_data.get('qbit_port', ''))
+            host = Prompt.ask("URL del Cliente", default=None if fresca else (url_def or None)) or ""
+            host, port_url = self._url_y_puerto(host, "")
+            if port_url:
+                port = port_url
+                console.print(f"[dim]Puerto tomado de la URL: {port}[/dim]")
+            else:
+                port = Prompt.ask("Puerto", default=None if fresca else (port_def or None)) or ""
             user = Prompt.ask("Usuario qBit", default=qbit_data.get('qbit_user', '').replace('YOUR_USERNAME', ''))
             pwd  = Prompt.ask("Contraseña qBit", password=True)
 
@@ -201,13 +214,15 @@ class Rawncher:
         # --- 3. VALIDACIÓN DE ENLACE (Handshake) ---
         try:
             cfg = self.config["qbit"]
-            base_url = cfg["qbit_url"].rstrip('/')
-            
-            self._logger.info(f"Aduana: Intentando handshake con {base_url}:{cfg['qbit_port']}")
-            
+            # Si la URL ya trae puerto, qbittorrentapi usa ese e ignora port=:
+            # el log tiene que decir el que se usa de verdad.
+            base_url, eff_port = self._url_y_puerto(cfg["qbit_url"], cfg["qbit_port"])
+
+            self._logger.info(f"Aduana: Intentando handshake con {base_url}:{eff_port}")
+
             self.client = qbit_api.Client(
                 host=base_url,
-                port=int(cfg["qbit_port"]),
+                port=int(eff_port),
                 username=cfg["qbit_user"],
                 password=cfg["qbit_pass"],
                 VERIFY_WEBUI_CERTIFICATE=cfg.get("VERIFY_WEBUI_CERTIFICATE", False),
@@ -1212,6 +1227,20 @@ class Rawncher:
     def _reload_config(self) -> None:
         """Recarga la configuración desde el archivo."""
         self.config = self._leer_config() or {}
+
+    @staticmethod
+    def _url_y_puerto(url, port):
+        """Separa «http://host:puerto» en ('http://host', 'puerto').
+
+        El puerto escrito en la URL manda sobre `port` (es lo que hace
+        qbittorrentapi). Sin puerto en la URL se devuelve `port` tal cual.
+        """
+        url = str(url or "").strip().rstrip('/')
+        port = str(port or "").strip()
+        m = re.match(r'^((?:[a-zA-Z][a-zA-Z0-9+.-]*://)?[^/:]+):(\d+)(/.*)?$', url)
+        if m:
+            return m.group(1) + (m.group(3) or ""), m.group(2)
+        return url, port
 
     def _guardar_config(self) -> None:
         """Guarda el diccionario de configuración actual en data/config.py."""
