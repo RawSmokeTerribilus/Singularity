@@ -55,6 +55,19 @@ if GOD_PHRASES:
     console.print = troll_print  # type: ignore[method-assign]
 # ------------------------------------
 
+def _oculto(valor: str) -> str:
+    """Un secreto para enseñarlo: cuántos caracteres y los 4 últimos.
+
+    En una URL (la announce lleva la passkey), el host y los 4 últimos.
+    """
+    if not valor:
+        return "[dim]vacío[/dim]"
+    if valor.startswith(("http://", "https://")):
+        host = valor.split("/")[2] if valor.count("/") >= 2 else ""
+        return f"{valor.split('//')[0]}//{host}/…{valor[-4:]}"
+    return f"…{valor[-4:]} ({len(valor)} caracteres)" if len(valor) > 8 else f"({len(valor)} caracteres)"
+
+
 class Rawncher:
     """Lanzador principal de RawLoadrr"""
 
@@ -129,11 +142,13 @@ class Rawncher:
                     if not obligatoria:
                         msg += "[dim] (Enter para dejarla vacía; no se vuelve a preguntar)[/dim]"
 
-                    new_val = Prompt.ask(msg)
+                    new_val = Prompt.ask(msg, password=True)
 
                     if "DEFAULT" not in self.config:
                         self.config["DEFAULT"] = {}
 
+                    if new_val.strip():
+                        console.print(f"[dim]  recibida: {_oculto(new_val.strip())}[/dim]")
                     # Se escribe clave a clave y en sitio. `_guardar_config()`
                     # regeneraría config.py entero desde pformat() y se llevaría
                     # por delante los comentarios del usuario --en el config de
@@ -1330,18 +1345,14 @@ class Rawncher:
             tbl.add_column("Valor actual")
             tbl.add_column("Estado", justify="center")
 
-            api_display = (
-                f"{api_key[:8]}...{api_key[-4:]}"
-                if api_key and len(api_key) > 12
-                else api_key or "[dim]vacío[/dim]"
-            )
+            api_display = _oculto(api_key)
             tbl.add_row(
                 "api_key",
                 api_display,
                 "[green]✓[/green]" if api_ok else "[red]✗[/red]",
             )
 
-            announce_display = announce_url if announce_url else "[dim]vacío[/dim]"
+            announce_display = _oculto(announce_url)
             tbl.add_row(
                 "announce_url",
                 announce_display,
@@ -1363,7 +1374,8 @@ class Rawncher:
             console.print("[bold yellow]La API key no está configurada o es inválida.[/bold yellow]")
             while True:
                 nueva_key = Prompt.ask(
-                    f"[bold]API key para {tracker}[/bold] [dim](mín. 32 caracteres)[/dim]"
+                    f"[bold]API key para {tracker}[/bold] [dim](mín. 32 caracteres)[/dim]",
+                    password=True,
                 ).strip()
                 if len(nueva_key) < 32:
                     console.print(f"[bold red]❌ Demasiado corta ({len(nueva_key)} caracteres). Mínimo 32.[/bold red]")
@@ -1373,7 +1385,7 @@ class Rawncher:
                     continue
                 break
             if self._escribir_config_tracker(tracker, "api_key", nueva_key):
-                console.print("[bold green]✅ API key guardada.[/bold green]")
+                console.print(f"[bold green]✅ API key guardada:[/bold green] {_oculto(nueva_key)}")
                 self._reload_config()
 
         if not announce_ok:
@@ -1381,7 +1393,8 @@ class Rawncher:
             console.print("[bold yellow]La announce URL no está configurada o es inválida.[/bold yellow]")
             while True:
                 nueva_url = Prompt.ask(
-                    f"[bold]Announce URL para {tracker}[/bold] [dim](https://...)[/dim]"
+                    f"[bold]Announce URL para {tracker}[/bold] [dim](https://..., lleva tu passkey)[/dim]",
+                    password=True,
                 ).strip()
                 if not nueva_url.startswith("https://"):
                     console.print("[bold red]❌ Debe empezar por 'https://'.[/bold red]")
@@ -1391,7 +1404,7 @@ class Rawncher:
                     continue
                 break
             if self._escribir_config_tracker(tracker, "announce_url", nueva_url):
-                console.print("[bold green]✅ Announce URL guardada.[/bold green]")
+                console.print(f"[bold green]✅ Announce URL guardada:[/bold green] {_oculto(nueva_url)}")
                 self._reload_config()
 
         console.print()
@@ -1638,9 +1651,10 @@ class Rawncher:
                 if not val or val.startswith("YOUR_") or val in ["tu_clave_tmdb_aqui", "CAMBIAME"]:
                     console.print(f"\n[bold red]✖ {env_key} no configurada.[/bold red]")
                     msg = f"[bold cyan]▶ Introduce el valor para {env_key}[/bold cyan]" + ("[dim] (Enter para saltar)[/dim]" if "tmdb" not in python_key else "")
-                    new_val = Prompt.ask(msg)
+                    new_val = Prompt.ask(msg, password=True)
                     
                     if new_val.strip():
+                        console.print(f"[dim]  recibida: {_oculto(new_val.strip())}[/dim]")
                         # Sincronización transversal usando el multiplexor
                         self._sync_global_secret(python_key, new_val.strip())
                         # Actualización en caliente de la config en memoria
@@ -1712,6 +1726,7 @@ class Rawncher:
             val = Prompt.ask(
                 "  [bold]API Key[/bold] [dim](deja en blanco para configurar después)[/dim]",
                 default="",
+                password=True,
             ).strip()
             if val and (len(val) < 32 or "API_KEY" in val.upper()):
                 console.print("[bold red]❌ La API Key parece inválida (mínimo 32 caracteres).[/bold red]")
@@ -1722,8 +1737,9 @@ class Rawncher:
         announce_url_inicial = ""
         while True:
             val = Prompt.ask(
-                "  [bold]Announce URL[/bold] [dim](deja en blanco para configurar después)[/dim]",
+                "  [bold]Announce URL[/bold] [dim](deja en blanco para configurar después; lleva tu passkey)[/dim]",
                 default="",
+                password=True,
             ).strip()
             if val and (not val.startswith("https://") and not val.startswith("http://")):
                 console.print("[bold red]❌ La announce URL debe empezar por https:// o http://[/bold red]")
@@ -1747,10 +1763,8 @@ class Rawncher:
             if ids is None:
                 return
 
-        api_display = api_key_inicial[:8] + "..." if api_key_inicial else "[dim]pendiente[/dim]"
-        # La announce lleva la passkey: solo el principio y el final.
-        ann_display = (f"{announce_url_inicial[:len(base_url) + 10]}...{announce_url_inicial[-4:]}"
-                       if announce_url_inicial else "[dim]pendiente[/dim]")
+        api_display = _oculto(api_key_inicial) if api_key_inicial else "[dim]pendiente[/dim]"
+        ann_display = _oculto(announce_url_inicial) if announce_url_inicial else "[dim]pendiente[/dim]"
         archivo = ("[dim]src/trackers/{0}.py (de la suite, no se toca)[/dim]" if solo_config
                    else "[dim]src/trackers/{0}.py (nuevo, plantilla UNIT3D)[/dim]").format(abrev)
         console.print()
@@ -2067,9 +2081,7 @@ class Rawncher:
         tracker_name = session.get("name", "?")
         url = session.get("url", "?")
         api_key = session.get("api_key", "")
-        api_display = (
-            f"{api_key[:8]}..." if api_key and len(api_key) > 8 else api_key or "?"
-        )
+        api_display = _oculto(api_key)
         saved_at = session.get("saved_at", "?")
 
         summary = (
@@ -2094,5 +2106,6 @@ if __name__ == "__main__":
     try:
         Rawncher().run()
     except Exception:
-        console.print_exception(show_locals=True)
+        # Sin show_locals: las variables locales llevan api keys y passkeys.
+        console.print_exception(show_locals=False)
         sys.exit(1)
