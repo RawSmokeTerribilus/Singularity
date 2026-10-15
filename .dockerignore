@@ -27,6 +27,7 @@ Executive_resume.md
 docs/
 mkdocs.yml
 **/*.bkp
+**/*.bak*
 
 # --- SCRIPTS DE CONTROL DEL HOST ---
 .dockerignore
