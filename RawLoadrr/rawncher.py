@@ -183,74 +183,108 @@ class Rawncher:
                 self._reload_config()  # Recargamos para que todo esté fresco
 
         # ── ADUANA: Enlace con Cliente Torrent ────────────────────────────── #
-        console.print(Rule("[bold yellow]⚙  ADUANA — Enlace qBittorrent[/bold yellow]", style="yellow"))
+        # Se respeta el cliente de default_torrent_client. Antes la aduana solo
+        # conocía qBittorrent y, sin él, el lanzador forzaba --no-seed aunque
+        # config.py tuviera Deluge, Transmission, rTorrent o una carpeta watch,
+        # que upload.py (clients.py) sí sabe usar. Prueba fresca 15-10-2026.
+        self.cliente_externo = None
+        nombre_cliente = (self.config.get('DEFAULT', {}) or {}).get('default_torrent_client') or 'qbit'
+        celda_cliente = (self.config.get('TORRENT_CLIENTS', {}) or {}).get(nombre_cliente, {}) or {}
+        tipo_cliente = ('none' if nombre_cliente == 'none'
+                        else str(celda_cliente.get('torrent_client', nombre_cliente)).lower())
 
-        # --- 2. CARGA Y RECON DE CONFIG (qBit) ---
-        qbit_data = self.config.get("qbit", {})
-        
-        # Si las credenciales son las de serie o falta la URL, lanzamos la interfaz Rich
-        if not qbit_data or qbit_data.get("qbit_user") == "YOUR_USERNAME" or not qbit_data.get("qbit_url"):
-            self._logger.warning("ACR: Credenciales qBit por defecto o ausentes. Iniciando interceptación.")
-            
-            console.print(Panel("[bold yellow]🛠️ CONFIGURACIÓN DE ADUANA: qBittorrent[/]", expand=False))
-            console.print("[dim]URL de la WebUI de qBit, ej: [bold]http://127.0.0.1[/bold] (con el compose oficial, "
-                          "network_mode: host, es 127.0.0.1). Si Singularity va en red bridge, la IP del host "
-                          "(ej: 172.17.0.1). El puerto puede ir en la URL o aparte.[/dim]")
+        qbit_fresco = (self.config.get('qbit', {}) or {}).get('qbit_user') in (None, '', 'YOUR_USERNAME')
+        if tipo_cliente == 'qbit' and qbit_fresco:
+            console.print(Rule("[bold yellow]⚙  ADUANA — Cliente torrent[/bold yellow]", style="yellow"))
+            console.print("[dim]Para sembrar lo que subes, Singularity añade cada torrent a tu cliente. Aquí se "
+                          "configura qBittorrent; Deluge, Transmission, rTorrent o una carpeta watch se ponen a "
+                          "mano en data/config.py (TORRENT_CLIENTS, y DEFAULT → default_torrent_client).[/dim]")
+            if not Confirm.ask("¿Usas qBittorrent?", default=True):
+                if self._persistir_clave_default('default_torrent_client', 'none'):
+                    self._reload_config()
+                else:
+                    self.config.setdefault('DEFAULT', {})['default_torrent_client'] = 'none'
+                    console.print("[bold yellow]  ⚠ No se pudo escribir en data/config.py; vale para esta sesión.[/bold yellow]")
+                nombre_cliente = tipo_cliente = 'none'
 
-            # En una instalación fresca los valores de la plantilla no son del
-            # usuario: no se ofrecen como respuesta por defecto (un Enter en
-            # «Puerto» metía el 8888 de ejemplo aunque la URL llevara otro).
-            fresca = qbit_data.get("qbit_user") in (None, "", "YOUR_USERNAME")
-            url_def, port_def = self._url_y_puerto(qbit_data.get('qbit_url', ''),
-                                                   qbit_data.get('qbit_port', ''))
-            host = Prompt.ask("URL del Cliente", default=None if fresca else (url_def or None)) or ""
-            host, port_url = self._url_y_puerto(host, "")
-            if port_url:
-                port = port_url
-                console.print(f"[dim]Puerto tomado de la URL: {port}[/dim]")
-            else:
-                port = Prompt.ask("Puerto", default=None if fresca else (port_def or None)) or ""
-            user = Prompt.ask("Usuario qBit", default=qbit_data.get('qbit_user', '').replace('YOUR_USERNAME', ''))
-            pwd  = Prompt.ask("Contraseña qBit", password=True)
+        if tipo_cliente == 'none':
+            console.print(Panel("[yellow]Sin cliente torrent (default_torrent_client = 'none'): se sube sin sembrar "
+                                "(--no-seed).[/yellow]", title="[bold yellow]ADUANA — Cliente torrent[/]"))
+        elif tipo_cliente != 'qbit':
+            self.cliente_externo = tipo_cliente
+            self._logger.info(f"Aduana: cliente '{nombre_cliente}' ({tipo_cliente}); lo usa upload.py, no se comprueba aquí.")
+            console.print(Panel(f"Cliente configurado: [bold]{nombre_cliente}[/bold] ({tipo_cliente}). upload.py le "
+                                f"añade los torrents; la aduana solo comprueba qBittorrent.",
+                                title="[bold cyan]ADUANA — Cliente torrent[/]"))
+        else:
+            console.print(Rule("[bold yellow]⚙  ADUANA — Enlace qBittorrent[/bold yellow]", style="yellow"))
 
-            if "qbit" not in self.config: self.config["qbit"] = {}
-            self.config["qbit"].update({
-                "qbit_url": host.strip(),
-                "qbit_port": str(port).strip(),
-                "qbit_user": user.strip(),
-                "qbit_pass": pwd.strip(),
-                "enable_search": True
-            })
+            # --- 2. CARGA Y RECON DE CONFIG (qBit) ---
+            qbit_data = self.config.get("qbit", {})
 
-            self._guardar_config()
-            console.print("[bold green]✅ Configuración de qBittorrent persistida con éxito.[/]")
-            self._reload_config()
+            # Si las credenciales son las de serie o falta la URL, lanzamos la interfaz Rich
+            if not qbit_data or qbit_data.get("qbit_user") == "YOUR_USERNAME" or not qbit_data.get("qbit_url"):
+                self._logger.warning("ACR: Credenciales qBit por defecto o ausentes. Iniciando interceptación.")
 
-        # --- 3. VALIDACIÓN DE ENLACE (Handshake) ---
-        try:
-            cfg = self.config["qbit"]
-            # Si la URL ya trae puerto, qbittorrentapi usa ese e ignora port=:
-            # el log tiene que decir el que se usa de verdad.
-            base_url, eff_port = self._url_y_puerto(cfg["qbit_url"], cfg["qbit_port"])
+                console.print(Panel("[bold yellow]🛠️ CONFIGURACIÓN DE ADUANA: qBittorrent[/]", expand=False))
+                console.print("[dim]URL de la WebUI de qBit, ej: [bold]http://127.0.0.1[/bold] (con el compose oficial, "
+                              "network_mode: host, es 127.0.0.1). Si Singularity va en red bridge, la IP del host "
+                              "(ej: 172.17.0.1). El puerto puede ir en la URL o aparte.[/dim]")
 
-            self._logger.info(f"Aduana: Intentando handshake con {base_url}:{eff_port}")
+                # En una instalación fresca los valores de la plantilla no son del
+                # usuario: no se ofrecen como respuesta por defecto (un Enter en
+                # «Puerto» metía el 8888 de ejemplo aunque la URL llevara otro).
+                fresca = qbit_data.get("qbit_user") in (None, "", "YOUR_USERNAME")
+                url_def, port_def = self._url_y_puerto(qbit_data.get('qbit_url', ''),
+                                                       qbit_data.get('qbit_port', ''))
+                host = Prompt.ask("URL del Cliente", default=None if fresca else (url_def or None)) or ""
+                host, port_url = self._url_y_puerto(host, "")
+                if port_url:
+                    port = port_url
+                    console.print(f"[dim]Puerto tomado de la URL: {port}[/dim]")
+                else:
+                    port = Prompt.ask("Puerto", default=None if fresca else (port_def or None)) or ""
+                user = Prompt.ask("Usuario qBit", default=qbit_data.get('qbit_user', '').replace('YOUR_USERNAME', ''))
+                pwd  = Prompt.ask("Contraseña qBit", password=True)
 
-            self.client = qbit_api.Client(
-                host=base_url,
-                port=int(eff_port),
-                username=cfg["qbit_user"],
-                password=cfg["qbit_pass"],
-                VERIFY_WEBUI_CERTIFICATE=cfg.get("VERIFY_WEBUI_CERTIFICATE", False),
-                REQUESTS_ARGS={'timeout': 10}
-            )
-            self.client.auth_log_in()
-            self._logger.info(f"Aduana: Online (v{self.client.app.version}). Conectado a qBittorrent.")
-            
-        except Exception as e:
-            self._logger.error(f"Aduana: Error de enlace qBit ({e}). Modo 'Solo Local' activado.")
-            self.client = None
-            console.print(Panel(f"[yellow]No se pudo conectar a qBittorrent. El script funcionará en [bold]modo solo local[/bold], guardando los torrents en una carpeta 'watch'.\nCausa: [dim]{e}[/dim]", 
-                                title="[bold yellow]⚠️ Conexión qBit fallida[/]"))
+                if "qbit" not in self.config: self.config["qbit"] = {}
+                self.config["qbit"].update({
+                    "qbit_url": host.strip(),
+                    "qbit_port": str(port).strip(),
+                    "qbit_user": user.strip(),
+                    "qbit_pass": pwd.strip(),
+                    "enable_search": True
+                })
+
+                self._guardar_config()
+                console.print("[bold green]✅ Configuración de qBittorrent persistida con éxito.[/]")
+                self._reload_config()
+
+            # --- 3. VALIDACIÓN DE ENLACE (Handshake) ---
+            try:
+                cfg = self.config["qbit"]
+                # Si la URL ya trae puerto, qbittorrentapi usa ese e ignora port=:
+                # el log tiene que decir el que se usa de verdad.
+                base_url, eff_port = self._url_y_puerto(cfg["qbit_url"], cfg["qbit_port"])
+
+                self._logger.info(f"Aduana: Intentando handshake con {base_url}:{eff_port}")
+
+                self.client = qbit_api.Client(
+                    host=base_url,
+                    port=int(eff_port),
+                    username=cfg["qbit_user"],
+                    password=cfg["qbit_pass"],
+                    VERIFY_WEBUI_CERTIFICATE=cfg.get("VERIFY_WEBUI_CERTIFICATE", False),
+                    REQUESTS_ARGS={'timeout': 10}
+                )
+                self.client.auth_log_in()
+                self._logger.info(f"Aduana: Online ({self.client.app.version}). Conectado a qBittorrent.")
+
+            except Exception as e:
+                self._logger.error(f"Aduana: Error de enlace qBit ({e}). Modo 'Solo Local' activado.")
+                self.client = None
+                console.print(Panel(f"[yellow]No se pudo conectar a qBittorrent. El script funcionará en [bold]modo solo local[/bold], guardando los torrents en una carpeta 'watch'.\nCausa: [dim]{e}[/dim]", 
+                                    title="[bold yellow]⚠️ Conexión qBit fallida[/]"))
 
         # ── ADUANA: BT_backup / torrent_storage_dir ───────────────────────── #
         # CSI v3.4 (cosmetic fix 2026-05-23): the upload-side `clients.py`
@@ -273,7 +307,8 @@ class Rawncher:
         # actually exists on disk. Mismatch between the two also forces the
         # prompt so we resync them.
         candidate = upload_path or legacy_path
-        needs_prompt = (
+        # Sin cliente no hay BT_backup que reutilizar: no se pregunta.
+        needs_prompt = tipo_cliente != 'none' and (
             not candidate
             or not Path(candidate).exists()
             or (legacy_path and upload_path and legacy_path != upload_path)
@@ -318,6 +353,10 @@ class Rawncher:
         self.watch_folder.mkdir(parents=True, exist_ok=True)
 
     # <--- AQUÍ TERMINA EL __INIT__ (Alineado con el def de arriba)
+    def _sin_cliente(self) -> bool:
+        """Ni qBit conectado ni otro cliente configurado: toca --no-seed."""
+        return self.client is None and not getattr(self, 'cliente_externo', None)
+
     def disparar(self, torrent_path):
         """Lógica de ejecución: API o Local"""
         path_obj = Path(torrent_path)
@@ -416,7 +455,10 @@ class Rawncher:
             "  [bold cyan][6][/bold cyan]  Cargar sesión guardada\n"
             "  [bold cyan][0][/bold cyan]  Salir\n"
         )
-        qbit_status = "[bold green]qBit: Online ✅[/bold green]" if self.client else "[bold red]qBit: Offline ❌[/bold red]"
+        if self.cliente_externo:
+            qbit_status = f"[bold cyan]Cliente: {self.cliente_externo} (upload.py)[/bold cyan]"
+        else:
+            qbit_status = "[bold green]qBit: Online ✅[/bold green]" if self.client else "[bold red]qBit: Offline ❌[/bold red]"
         console.print(
             Panel(
                 menu_text,
@@ -848,7 +890,7 @@ class Rawncher:
 
         # LÓGICA DE CONTINGENCIA: Si el cliente está caído, no intentes añadir el torrent.
         # El .torrent generado se quedará en su carpeta tmp/<uuid>/
-        if self.client is None and '--no-seed' not in cmd:
+        if self._sin_cliente() and '--no-seed' not in cmd:
             cmd.append('--no-seed')
             console.print("[bold yellow]⚠️  INFO: Cliente torrent no disponible. Se activará --no-seed automáticamente.[/bold yellow]")
 
@@ -896,7 +938,7 @@ class Rawncher:
         cmd = ["python3", "auto-upload.py", "--list", str(ruta.resolve()), "--tracker", tracker]
 
         # LÓGICA DE CONTINGENCIA
-        if self.client is None and '--no-seed' not in cmd:
+        if self._sin_cliente() and '--no-seed' not in cmd:
             cmd.append('--no-seed')
             console.print("[bold yellow]⚠️  INFO: Cliente torrent no disponible. Se activará --no-seed automáticamente.[/bold yellow]")
 
@@ -1008,7 +1050,7 @@ class Rawncher:
                             style="yellow"))
         cmd = ["python3", "auto-upload.py", "--list", str(tmp_list),
                "--tracker", tracker]
-        if self.client is None:
+        if self._sin_cliente():
             cmd.append('--no-seed')
         if Confirm.ask("[bold]¿Subir los releases resueltos ahora?[/bold]",
                        default=True):
@@ -1085,7 +1127,7 @@ class Rawncher:
             cmd = ["python3", "auto-upload.py", "--list", str(lista), "--tracker", tracker]
 
             # LÓGICA DE CONTINGENCIA
-            if self.client is None and '--no-seed' not in cmd:
+            if self._sin_cliente() and '--no-seed' not in cmd:
                 cmd.append('--no-seed')
 
             cmd_str = " ".join(cmd)
@@ -1102,7 +1144,7 @@ class Rawncher:
                 )
             )
             if Confirm.ask("[bold]¿Ejecutar?[/bold]", default=True):
-                if self.client is None:
+                if self._sin_cliente():
                     console.print("[bold yellow]⚠️  INFO: Cliente torrent no disponible. Se activará --no-seed automáticamente.[/bold yellow]")
                 self._ejecutar_comando(cmd)
                 console.print()
@@ -1647,8 +1689,14 @@ class Rawncher:
             for python_key, env_key in master_keys.items():
                 val = default_config.get(python_key, "")
                 
-                # Heurística mejorada para detectar cualquier placeholder
-                if not val or val.startswith("YOUR_") or val in ["tu_clave_tmdb_aqui", "CAMBIAME"]:
+                # Mismo criterio que la aduana de arranque (src/placeholders.py):
+                # una opcional dejada en blanco es una respuesta, no un hueco.
+                # Antes [3] volvía a pedir PTPIMG/LENSDUMP en cada uso.
+                if "tmdb" in python_key:
+                    hay_hueco = es_placeholder(val, env_key, python_key)
+                else:
+                    hay_hueco = falta_por_preguntar(default_config, python_key, env_key, python_key)
+                if hay_hueco:
                     console.print(f"\n[bold red]✖ {env_key} no configurada.[/bold red]")
                     msg = f"[bold cyan]▶ Introduce el valor para {env_key}[/bold cyan]" + ("[dim] (Enter para saltar)[/dim]" if "tmdb" not in python_key else "")
                     new_val = Prompt.ask(msg, password=True)
@@ -1661,6 +1709,9 @@ class Rawncher:
                         if "DEFAULT" not in self.config:
                             self.config["DEFAULT"] = {}
                         self.config["DEFAULT"][python_key] = new_val.strip()
+                    elif "tmdb" not in python_key:
+                        # Como en el arranque: se guarda vacía y deja de preguntarse.
+                        self._persistir_clave_default(python_key, "")
         # ----------------------------------------------------
         nombre_completo = Prompt.ask(
             "[bold]Nombre completo del tracker[/bold] [dim](ej: MilNueve)[/dim]"
