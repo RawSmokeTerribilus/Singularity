@@ -2243,6 +2243,106 @@ class Prep():
     _FIRMAS_ENCODE = ('x264', 'x265', 'lavf', 'handbrake', 'svt-av1', 'svt av1',
                       'libaom', 'aomenc', 'ffmpeg', 'nvenc', 'vaapi', 'qsv')
 
+    # Firmas de un recodificado HECHO EN CASA (Tdarr, HandBrake, ffmpeg...). x264
+    # no está: los WEB-DL H.264 de Netflix traen ajustes de x264 de serie.
+    _FIRMAS_WEB_LOCAL = ('x265', 'lavc', 'vaapi', 'nvenc', 'qsv', 'handbrake', 'svt-av1',
+                         'svt av1', 'libaom', 'aomenc', 'ffmpeg')
+
+    @staticmethod
+    def _pistas_mi(mi):
+        try:
+            tracks = mi['media']['track']
+        except (KeyError, TypeError):
+            return {}, {}, [], []
+        de = lambda t: [x for x in tracks if x.get('@type') == t]
+        return (next(iter(de('General')), {}), next(iter(de('Video')), {}), de('Audio'), de('Text'))
+
+    def _recodificado_web(self, mi):
+        """¿Un fichero de origen web está recodificado? -> WEBRip, si no WEB-DL.
+
+        WEB-DL es el flujo del servicio sin tocar (como mucho remux); WEBRip,
+        cualquier codificación o recodificación desde fuente web, incluidos
+        los encodes de un WEB-DL (guía de subida de TorrentBD, web-dl-101).
+        Pruebas: firma de un encoder de consumo en la pista de vídeo o
+        HandBrake como aplicación; y HEVC <=1080p sin HDR, que los servicios
+        no sirven (dan 1080p SDR en H.264) y que es lo que deja Tdarr cuando
+        un mkvmerge posterior borra la etiqueta del encoder por hardware.
+        """
+        g, v, _, _ = self._pistas_mi(mi)
+        if not v:
+            return False
+        firma = ' '.join(str(v.get(k, '')) for k in ('Encoded_Library_Name', 'Encoded_Library')).lower()
+        if any(f in firma for f in self._FIRMAS_WEB_LOCAL):
+            return True
+        if 'handbrake' in str(g.get('Encoded_Application', '')).lower():
+            return True
+        if 'x264' in firma:
+            return False
+        try:
+            alto = int(v.get('Height') or 0)
+        except (TypeError, ValueError):
+            alto = 0
+        hdr = ' '.join(str(v.get(k, '')) for k in ('HDR_Format', 'HDR_Format_Compatibility')).strip()
+        return v.get('Format') == 'HEVC' and 0 < alto <= 1080 and not hdr
+
+    _SERVICIOS = re.compile(r'\b(amzn|amazon|nf|netflix|dsnp|disney\+?|hmax|hbo ?max|atvp|apple ?tv|pcok|'
+                            r'peacock|hulu|movistar|mtsp|skyshowtime|rakuten|filmin|atresplayer|rtve)\b', re.I)
+
+    def _origen_por_mediainfo(self, mi):
+        """('BluRay'|'Web'|'DVD'|'HDTV'|None, razones) cuando el nombre no lo dice.
+
+        Lo que miraría un admin: subtítulos PGS, audio sin pérdida, DTS, DV
+        perfil 7 o VC-1/MPEG-2 en HD apuntan a disco; E-AC3, DV perfil 5,
+        subtítulos solo de texto o un servicio en las etiquetas, a web.
+        Antes, sin pista en el nombre, todo era «BluRay».
+        """
+        g, v, a, s = self._pistas_mi(mi)
+        if not v:
+            return None, ['sin mediainfo']
+        disco, web, razones = 0, 0, []
+        try:
+            alto = int(v.get('Height') or 0)
+        except (TypeError, ValueError):
+            alto = 0
+        vf = str(v.get('Format', ''))
+        hdr = ' '.join(str(v.get(k, '')) for k in ('HDR_Format', 'HDR_Format_Profile')).lower()
+        textos = ' '.join(str(g.get(k, '')) for k in ('Title', 'Movie', 'OriginalSourceMedium')) + ' ' + json.dumps(g.get('extra') or {})
+        if alto and alto <= 576 and (vf == 'MPEG Video' or v.get('Standard') in ('PAL', 'NTSC')):
+            return 'DVD', ['576/480 en MPEG-2 o PAL/NTSC']
+        escaneo = str(v.get('ScanType', '')).lower()
+        if ('interlaced' in escaneo or 'mbaff' in escaneo) and vf in ('MPEG Video', 'AVC') \
+                and not any(t.get('Format') == 'PGS' for t in s):
+            return 'HDTV', ['vídeo entrelazado']
+        if re.search(r'blu-?ray|bdmv|uhd ?bd', textos, re.I):
+            disco += 3; razones.append('etiqueta Blu-ray')
+        if self._SERVICIOS.search(textos):
+            web += 3; razones.append('servicio de streaming en las etiquetas')
+        if any(t.get('Format') == 'PGS' for t in s):
+            disco += 2; razones.append('subtítulos PGS')
+        elif s and all(t.get('Format') in ('UTF-8', 'WebVTT', 'TTML', 'Timed Text') for t in s):
+            web += 1; razones.append('subtítulos solo de texto')
+        sin_perdida = [t for t in a if t.get('Format') in ('MLP FBA', 'PCM', 'FLAC')
+                       or 'truehd' in str(t.get('Format_Commercial_IfAny', '')).lower()
+                       or 'master audio' in str(t.get('Format_Commercial_IfAny', '')).lower()
+                       or 'xll' in str(t.get('Format_AdditionalFeatures', '')).lower()]
+        if sin_perdida:
+            disco += 2; razones.append(f"audio sin pérdida ({sin_perdida[0].get('Format')})")
+        elif any('dts' in str(t.get('Format', '')).lower() for t in a):
+            disco += 1; razones.append('DTS')
+        if any(t.get('Format') == 'E-AC-3' for t in a):
+            web += 2; razones.append('E-AC3')
+        if 'profile 5' in hdr or 'dvhe.05' in hdr:
+            web += 2; razones.append('Dolby Vision perfil 5')
+        if 'profile 7' in hdr or 'dvhe.07' in hdr:
+            disco += 2; razones.append('Dolby Vision perfil 7')
+        if vf in ('VC-1', 'MPEG Video') and alto >= 720:
+            disco += 2; razones.append(f'{vf} en HD')
+        if disco >= web + 1:
+            return 'BluRay', razones
+        if web >= disco + 1:
+            return 'Web', razones
+        return None, razones or ['sin señales']
+
     def _remux_desmentido(self, mi, resolution):
         """
         ¿Mediainfo desmiente el «remux» que dice el nombre del fichero?
@@ -2320,14 +2420,33 @@ class Prep():
             dice_remux = False
         if dice_remux:
             type = "REMUX"
-        elif any(word in filename for word in [" web ", ".web.", "web-dl"]):
-            type = "WEBDL"
         elif "webrip" in filename:
             type = "WEBRIP"
+        # «WEBDL», sin guion, es como nombran Sonarr y Radarr: no se reconocía y
+        # el fichero acababa de ENCODE -> WEBRIP en get_source.
+        elif any(word in filename for word in [" web ", ".web.", "web-dl", "webdl", "web dl"]):
+            # El nombre dice de dónde viene, no si se ha tocado: un WEB-DL
+            # recodificado (Tdarr) es un WEBRip.
+            if self._recodificado_web(mi):
+                log.info(f"[get_type] '{os.path.basename(video)}' es de origen web pero está recodificado: WEBRIP")
+                type = "WEBRIP"
+            else:
+                type = "WEBDL"
         # elif scene:
             # type = "ENCODE"
         elif "hdtv" in filename:
             type = "HDTV"
+        elif "sdtv" in filename:
+            # «SDTV» es lo que pone Radarr/Sonarr cuando no sabe la calidad. Si
+            # el mediainfo dice otra cosa, manda él: «Shaolin Soccer SDTV DTS-HD
+            # MA» con subtítulos PGS es un encode de Blu-ray, no tele.
+            origen, _ = self._origen_por_mediainfo(mi)
+            if origen == 'Web':
+                type = "WEBRIP" if self._recodificado_web(mi) else "WEBDL"
+            elif origen in ('BluRay', 'DVD'):
+                type = "ENCODE"
+            else:
+                type = "HDTV"
         elif is_disc is not None:
             type = "DISC"
         else:
@@ -3684,7 +3803,21 @@ class Prep():
                 try:
                     source = guessit(path)['source']
                 except:
-                    source = "BluRay"
+                    # Ni el nombre ni la ruta lo dicen: antes era «BluRay» a
+                    # ciegas. Se deduce del mediainfo, como haría un admin.
+                    source, razones = self._origen_por_mediainfo(meta.get('mediainfo'))
+                    if source:
+                        console.print(f"[cyan]Origen deducido del mediainfo: {source} ({', '.join(razones)})[/cyan]")
+                    elif meta.get('unattended'):
+                        console.print("[bold yellow]⚠ No se sabe el origen (ni nombre, ni ruta, ni mediainfo): "
+                                      "se sube sin origen en el nombre.[/bold yellow]")
+                        source = ""
+                    else:
+                        console.print(f"[bold yellow]No se sabe el origen ({', '.join(razones)}).[/bold yellow]")
+                        source = Prompt.ask("¿Origen?", choices=["BluRay", "Web", "DVD", "HDTV"], default="Web")
+            if 'sdtv' in os.path.basename(video).lower() and type != "HDTV":
+                # get_type ya decidió que no es tele (ver «sdtv» allí).
+                source = self._origen_por_mediainfo(meta.get('mediainfo'))[0] or source
             if meta.get('manual_source', None):
                 source = meta['manual_source']
             if source in ("Blu-ray", "Ultra HD Blu-ray", "BluRay", "BR") or is_disc == "BDMV":
@@ -3720,7 +3853,9 @@ class Prep():
                     source = system
             if source in ("Web", "WEB"):
                 if type == "ENCODE":
-                    type = "WEBRIP"
+                    type = "WEBRIP" if self._recodificado_web(meta.get('mediainfo')) else "WEBDL"
+            if source == "HDTV" and type == "ENCODE":
+                type = "HDTV"
             if source in ("HD-DVD", "HD DVD", "HDDVD"):
                 if is_disc == "HDDVD":
                     source = "HD DVD"
