@@ -697,8 +697,14 @@ def _elegir_grabacion(cands, local, log):
     return g
 
 
-def resolve_audiobook(title, author=None, region="es", asin_hint=None, log=None, local=None):
+def resolve_audiobook(title, author=None, region="es", asin_hint=None, log=None, local=None,
+                      audnexus_region=None):
+    """`region` es la tienda de Audible donde se busca; `audnexus_region`, la
+    región con la que el TRACKER pedirá la ficha. Un ASIN solo vale si Audnexus
+    lo conoce en esa región: si no, el tracker no hará ficha nunca."""
     log = log or (lambda m: None)
+    _buscar_region = region
+    region = (audnexus_region or region or "es").lower()
 
     hint = (asin_hint or "").strip().upper()
     if hint:
@@ -716,7 +722,7 @@ def resolve_audiobook(title, author=None, region="es", asin_hint=None, log=None,
     consultado = title
 
     for variante in query_variants(title, author):
-        products = _audible_search(variante, author, region, log)
+        products = _audible_search(variante, author, _buscar_region, log)
         if not products:
             continue
 
@@ -853,7 +859,10 @@ def _verdict(confidence, score, record, reason, asin=None):
         "confidence": confidence,
         "score": round(float(score), 3),
         "isbn13": (record or {}).get("isbn13", "") if record else "",
-        "asin": asin or (record or {}).get("asin", "") if record else "",
+        # Sin ficha de Audnexus no hay ASIN que dar. Antes, por precedencia,
+        # `asin or (...) if record else ""` devolvía el ASIN igualmente y un
+        # veredicto «none» acababa ofrecido como «Best guess».
+        "asin": (asin or record.get("asin", "")) if record else "",
         "record": record,
         "reason": reason,
     }

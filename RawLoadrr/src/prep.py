@@ -24,6 +24,10 @@ from src import gameinfo
 from src import library
 from src.book_resolver import (resolve_book as _resolve_book,
                               resolve_audiobook as _resolve_audiobook)
+
+# Región con la que el tracker pide la ficha de un audiolibro a Audnexus (en
+# NOBS, AudibleClient::defaultRegion()). Un ASIN se valida en ESTA región.
+TRACKER_AUDNEXUS_REGION = 'es'
 from src.igdb_resolver import resolve_game as _resolve_game
 
 
@@ -2718,12 +2722,25 @@ class Prep():
                     if meta.get(k):
                         local.setdefault(k, meta[k])
 
+                # El ASIN de las etiquetas (o de --asin) es una PISTA: solo se
+                # sube si Audnexus lo confirma. Antes se quedaba en meta aunque
+                # el resolver lo descartara, y viajaba hasta en las «lecturas
+                # libres» que dicen «sin ASIN» (NOBS #8698, #9400, #10584…).
+                pista_asin = meta.get('asin')
+                meta['asin'] = None
                 res = _resolve_audiobook(
                     title, author,
                     region=(self.config['DEFAULT'].get('audible_region') or 'es'),
-                    asin_hint=meta.get('asin'),
+                    asin_hint=pista_asin,
                     log=lambda m: log.info(f"[book_resolver] {m}"),
-                    local=local)
+                    local=local,
+                    # La región con la que el tracker pide la ficha: en NOBS,
+                    # AudibleClient::defaultRegion() = es. Validar en otra deja
+                    # ASIN buenos sin ficha (#11892, solo en la tienda de EE. UU.).
+                    audnexus_region=TRACKER_AUDNEXUS_REGION)
+                if pista_asin and res.get('asin') != str(pista_asin).strip().upper():
+                    log.info(f"[book_resolver] ASIN de las etiquetas {pista_asin} descartado "
+                             f"(Audnexus no lo conoce en {TRACKER_AUDNEXUS_REGION})")
             else:
                 # Lo que el fichero sabe de sí mismo viaja al resolver: es lo
                 # que desempata entre ediciones sin preguntarle a nadie.
@@ -2751,6 +2768,8 @@ class Prep():
         if res['confidence'] == 'high' and found:
             meta['asin' if is_audio else 'isbn'] = found
             self._merge_book_record(meta, res.get('record'))
+            if is_audio:
+                self._sin_isbn_si_hay_asin(meta)
             console.print(f"[green]{label} {found} — {res['reason']}")
 
             return meta
@@ -2799,6 +2818,8 @@ class Prep():
         if Confirm.ask(f"¿Uso este {label}?", default=False):
             meta['asin' if is_audio else 'isbn'] = found
             self._merge_book_record(meta, rec)
+            if is_audio:
+                self._sin_isbn_si_hay_asin(meta)
             _save_override(self._override_key(meta),
                            {'asin' if is_audio else 'isbn': found, 'title': rec.get('title', title)})
         else:
@@ -2860,6 +2881,10 @@ class Prep():
         self._merge_book_record(meta, rec)
         meta['lectura_libre'] = True
         meta['isbn13_obra'] = obra.get('isbn13') or ''
+        # Lectura libre = sin ASIN, y el ISBN que se manda es el de la OBRA,
+        # no uno de las etiquetas del fichero.
+        meta['asin'] = None
+        meta['isbn'] = meta['isbn13'] = None
 
         console.print(
             f"[green]Lectura libre:[/green] la grabación no está en Audible, "
@@ -2867,6 +2892,14 @@ class Prep():
             f"[dim]Se sube con portada y sinopsis del libro y sin ASIN.[/dim]")
 
         return True
+
+    @staticmethod
+    def _sin_isbn_si_hay_asin(meta):
+        """Un audiolibro con ASIN válido no lleva ISBN (decisión del operador,
+        16-10-2026): la ficha sale del ASIN, y un ISBN de las etiquetas suele
+        ser el del libro en papel o el e-book."""
+        meta['isbn'] = meta['isbn13'] = None
+        meta['isbn13_obra'] = ''
 
     def _report_book_pending(self, meta, title, label, res):
         rec = res.get('record') or {}
