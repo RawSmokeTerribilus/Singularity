@@ -10,14 +10,18 @@ Singularity Core no es “RawLoadrr con una interfaz web”. Es el stack complet
 
 ## 📖 Wiki oficial
 
-[![Wiki](https://img.shields.io/badge/Wiki-Singularity-blueviolet?style=for-the-badge)](https://rawsmoke.codeberg.page/Singularity/)
+[![Wiki](https://img.shields.io/badge/Wiki-Singularity-blueviolet?style=for-the-badge)](https://rawsmoketerribilus.github.io/Singularity/)
+
+**¿Empiezas?** Lee la [**Guía de usuario**](https://rawsmoketerribilus.github.io/Singularity/guia-usuario/): instalar, configurar y
+subir tu primer torrent, y qué hace cada paso.
 
 Puertas rápidas:
-- [![Setup](https://img.shields.io/badge/Setup-Despliegue-1f6feb?style=flat-square)](https://rawsmoke.codeberg.page/Singularity/setup/)
-- [![Índice](https://img.shields.io/badge/Docs-Índice-1f6feb?style=flat-square)](https://rawsmoke.codeberg.page/Singularity/)
-- [![Notas técnicas](https://img.shields.io/badge/Docs-Notas_técnicas-1f6feb?style=flat-square)](https://rawsmoke.codeberg.page/Singularity/technical_notes/)
-- [![Mass Edition](https://img.shields.io/badge/UNIT3D-Mass_Edition-1f6feb?style=flat-square)](https://rawsmoke.codeberg.page/Singularity/unit3d_mass_edition/)
-- [![RawLoadrr Wiki](https://img.shields.io/badge/RawLoadrr-Wiki-1f6feb?style=flat-square)](https://rawsmoke.codeberg.page/Singularity/rawloadrr_wiki/Home/)
+- [![Guía de usuario](https://img.shields.io/badge/Guía-de_usuario-2ea043?style=flat-square)](https://rawsmoketerribilus.github.io/Singularity/guia-usuario/)
+- [![Setup](https://img.shields.io/badge/Setup-Despliegue-1f6feb?style=flat-square)](https://rawsmoketerribilus.github.io/Singularity/setup/)
+- [![Índice](https://img.shields.io/badge/Docs-Índice-1f6feb?style=flat-square)](https://rawsmoketerribilus.github.io/Singularity/)
+- [![Notas técnicas](https://img.shields.io/badge/Docs-Notas_técnicas-1f6feb?style=flat-square)](https://rawsmoketerribilus.github.io/Singularity/technical_notes/)
+- [![Mass Edition](https://img.shields.io/badge/UNIT3D-Mass_Edition-1f6feb?style=flat-square)](https://rawsmoketerribilus.github.io/Singularity/unit3d_mass_edition/)
+- [![RawLoadrr Wiki](https://img.shields.io/badge/RawLoadrr-Wiki-1f6feb?style=flat-square)](https://rawsmoketerribilus.github.io/Singularity/rawloadrr_wiki/Home/)
 
 ---
 
@@ -43,7 +47,7 @@ extraen solos desde la imagen.
 ```bash
 mkdir -p ~/Singularity && cd ~/Singularity
 for f in docker-compose.yml makefile final-user-install.sh; do
-  curl -fsSLO "https://codeberg.org/RawSmoke/Singularity/raw/branch/main/linux-installer/$f"
+  curl -fsSLO "https://raw.githubusercontent.com/RawSmokeTerribilus/Singularity/main/linux-installer/$f"
 done
 make install   # crea config/ y work_data/, genera plantillas, siembra trackers, instala el lanzador
 make up        # baja la imagen si hace falta y arranca el contenedor
@@ -247,11 +251,11 @@ seguirá siendo lento. Solo sirve para que el stack al menos arranque y se deje 
 
 Este README queda en modo operativo.
 
-[![Setup](https://img.shields.io/badge/Setup-Despliegue-1f6feb?style=flat-square)](https://rawsmoke.codeberg.page/Singularity/setup/)
-[![Índice](https://img.shields.io/badge/Docs-Índice-1f6feb?style=flat-square)](https://rawsmoke.codeberg.page/Singularity/)
-[![Notas técnicas](https://img.shields.io/badge/Docs-Notas_técnicas-1f6feb?style=flat-square)](https://rawsmoke.codeberg.page/Singularity/technical_notes/)
-[![Mass Edition](https://img.shields.io/badge/UNIT3D-Mass_Edition-1f6feb?style=flat-square)](https://rawsmoke.codeberg.page/Singularity/unit3d_mass_edition/)
-[![RawLoadrr Wiki](https://img.shields.io/badge/RawLoadrr-Wiki-1f6feb?style=flat-square)](https://rawsmoke.codeberg.page/Singularity/rawloadrr_wiki/Home/)
+[![Setup](https://img.shields.io/badge/Setup-Despliegue-1f6feb?style=flat-square)](https://rawsmoketerribilus.github.io/Singularity/setup/)
+[![Índice](https://img.shields.io/badge/Docs-Índice-1f6feb?style=flat-square)](https://rawsmoketerribilus.github.io/Singularity/)
+[![Notas técnicas](https://img.shields.io/badge/Docs-Notas_técnicas-1f6feb?style=flat-square)](https://rawsmoketerribilus.github.io/Singularity/technical_notes/)
+[![Mass Edition](https://img.shields.io/badge/UNIT3D-Mass_Edition-1f6feb?style=flat-square)](https://rawsmoketerribilus.github.io/Singularity/unit3d_mass_edition/)
+[![RawLoadrr Wiki](https://img.shields.io/badge/RawLoadrr-Wiki-1f6feb?style=flat-square)](https://rawsmoketerribilus.github.io/Singularity/rawloadrr_wiki/Home/)
 
 Instalar sin inventar: arriba.
 Entender las tripas: esos botones.
