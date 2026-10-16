@@ -840,8 +840,11 @@ async def do_the_thing(base_dir):
                             download_url_from_tracker = upload_success.get('data')
                             
                             if download_url_from_tracker and download_url_from_tracker.startswith('http'):
-                                console.print(f"[bold yellow]Download URL Detectado: {download_url_from_tracker}. Descargando versión oficial del tracker...")
-                                tracker_class.logger.info(f"Downloading regenerated torrent from: {download_url_from_tracker}")
+                                # /torrent/download/<id>.<rsskey>: la rsskey es un secreto
+                                # (con ella se descarga como el usuario); se enseña el id.
+                                url_visible = re.sub(r'(/download/\d+)\.[0-9a-fA-F]+', r'\1.…', download_url_from_tracker)
+                                console.print(f"[bold yellow]Download URL Detectado: {url_visible}. Descargando versión oficial del tracker...")
+                                tracker_class.logger.info(f"Downloading regenerated torrent from: {url_visible}")
                                 
                                 # Ruta del archivo torrent local que vamos a sobreescritura
                                 torrent_path_to_overwrite = f"{meta['base_dir']}/tmp/{meta['uuid']}/[{tracker}]{meta['clean_name']}.torrent"
