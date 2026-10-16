@@ -1,0 +1,350 @@
+[center][size=22][b]Integración de Singularity con el Ecosistema Arr[/b][/size][/center]
+
+[center][url=https://github.com/RawSmokeTerribilus/Singularity][b]📦 Repositorio en GitHub[/b][/url] | [url=https://rawsmoketerribilus.github.io/Singularity/][b]📖 Wiki Completa[/b][/url][/center]
+
+[hr]
+
+Bienvenido a la sección más práctica de esta wiki. Aquí vamos a ver cómo encaja [b]Singularity[/b] en un flujo de trabajo real junto a Tdarr, Radarr, Sonarr y qBittorrent. El objetivo es sencillo: que tu biblioteca esté limpia, verificada, en el codec correcto y compartida en el tracker de forma consistente y sin intervención manual constante.
+
+Esta guía está pensada para usuarios que tienen su stack Arr integrado y para aquellos que no han querido subirse a ese barco y necesitan una herramienta sencilla que gestione las tareas de verificación y subida por ellos.
+
+[hr]
+
+[size=17][b]El Flujo Maestro[/b][/size]
+
+El siguiente diagrama muestra cómo fluye el contenido desde una petición de descarga hasta que acaba publicado y catalogado en el tracker. Singularity actúa en las etapas intermedias y finales, haciendo el trabajo pesado que los Arrs no pueden ni deben hacer.
+
+[center][img width=600]https://i.ibb.co/FkZJQXkG/FLujo-a-RR-Singularity.png[/img][/center]
+
+El flujo se divide en seis etapas clave, numeradas de [b]S1 a S5[/b] más una etapa auxiliar S6. Ninguna de ellas es automática en el sentido de que se dispare sola sin tu intervención: Singularity es una herramienta de invocación manual. Escribes [code]singularity[/code] en la terminal, eliges qué quieres hacer, y el programa se encarga del resto hasta el final, generando informes si algo falla.
+
+[hr]
+
+[size=17][b]Dos pipelines, una suite[/b][/size]
+
+Antes de entrar en detalle con cada etapa, conviene entender la arquitectura del programa para no perderse.
+
+[b]MKVerything tiene dos modos de operación[/b]:
+
+MKVerything es una utilidad que engloba los programas que tanto nos gustan y tanto usamos como Makemkv, MKVtoolnix, Ffmpeg, Zimg, Vapoursynth, etc. Su función es aplicar lógicas de proceso, automatizando el análisis, extracción y reparación de medios. No trabaja a nivel de tracker, es una herramienta local perfecta para revisar bibliotecas y directorios de descarga.
+
+[list]
+[*][b]God Mode[/b] (opción [b][5][/b] en el launcher): pipeline completo con análisis frame a frame, decodificación real del contenido, limpieza profunda de metadatos, subtítulos y adjuntos. Es lento, es exhaustivo, y es el que debe pasar al menos una vez por cada archivo de tu biblioteca.
+
+[*][b]Goddess Mode[/b] (opción [b][6][/b] en el launcher): chequeo estructural rápido sin decodificación. Detecta problemas de contenedor, cabeceras rotas y formatos incorrectos, pero no analiza el interior del stream. Es el modo del día a día en bibliotecas ya saneadas.
+[/list]
+
+Estos dos modos son la base de los [b]dos pipelines SINGULARIDAD[/b] del menú principal. A diferencia de los modos de MKVerything, estos pipelines sí trabajan a nivel de tracker: su objetivo es compartir la biblioteca publicándola de forma desatendida, acorde a la configuración establecida.
+
+[list]
+[*]Opción [b][5] SINGULARIDAD (God Mode)[/b]: ejecuta el flujo completo de S1 a S5 utilizando el God Mode de MKVerything en la Fase 1. Tarda más, pero es el más seguro.
+
+[*]Opción [b][6] SINGULARIDAD (Goddess Mode)[/b]: ejecuta el mismo flujo pero con el Goddess Mode en la Fase 1. Para bibliotecas ya trabajadas donde confías en el estado del contenido.
+[/list]
+
+La clave está en [b]cuándo usar cada pipeline[/b]:
+
+[list]
+[*][b]S1 y S2[/b] (sanear archivos) → se usa directamente [b]MKVerything[/b] desde opción [b][1][/b]. No se toca nada del tracker, no se sube nada. Solo verificación local.
+
+[*][b]S3 a S5[/b] (triaje, subida y tracker) → se usa [b]pipeline SINGULARIDAD[/b] desde opción [b][5][/b] o [b][6][/b], que engloba internamente las fases de MKVerything.
+[/list]
+
+[hr]
+
+[size=17][b]S1: Pre-Ingesta con MKVerything[/b][/size]
+
+[center][img width=500]https://i.ibb.co/Tq1dW7np/S1.png[/img][/center]
+
+Esta etapa ocurre [b]después de que qBittorrent termina de descargar[/b] y [b]antes de que Radarr o Sonarr importen el archivo[/b] a tu biblioteca definitiva.
+
+El problema que resuelve es simple: los Arrs confían ciegamente en que el archivo que reciben es correcto. Si ese archivo está corrupto, tiene metadatos basura, subtítulos incrustados de forma incorrecta, adjuntos innecesarios, o era en realidad un MPEG4 disfrazado de MKV, lo van a importar tal cual y el problema quedará enterrado en tu biblioteca.
+
+MKVerything intercepta ese archivo antes de que eso ocurra.
+
+[size=14][b]Cómo lanzarlo[/b][/size]
+
+[list]
+[*]Escribe [code]singularity[/code] en cualquier terminal.
+[*]En el menú principal, elige [code][1] MKVerything (Auditoría y Spam)[/code].
+[*]Dentro del submenú, selecciona [code][1.1] Lanzador (todos los modos)[/code].
+[/list]
+
+[pre]
+  [1.1]  Lanzador (todos los modos)
+  [1.2]  Ajustes / Dependencias
+  [1.3]  Testeo rápido de herramientas
+  [b]    Atrás
+[/pre]
+
+(Este menú aparece dentro del submenú de MKVerything)
+
+[list]
+[*]El launcher de MKVerything se abrirá con su propio menú:
+[/list]
+
+[pre]
+   [1] ⚖️  AUDITORÍA DE CAMPO
+   [2] 🚑 Rescatar MKVs Rotos
+   [3] 🎞️  Convertir Legacy (AVI/MP4)
+   [4] 📦 Extraer ISOs (MakeMKV)
+
+   [5] ⚡ GOD MODE
+   [6] 🌸 GODDESS MODE
+[/pre]
+
+(Selecciona [b][5][/b] GOD MODE e introduce la ruta de tu carpeta de descargas)
+
+[size=14][b]Qué hace el God Mode de MKVerything[/b][/size]
+
+[list]
+[*][b]Fase 1[/b]: Extrae ISOs con MakeMKV haciendo un remux 1:1 (sin pérdidas). Si no hay ISOs, obviamente, prosigue al siguiente paso.
+
+[*][b]Fase 2[/b]: Pasa todos los archivos de vídeo por el rescatador universal en modo estricto: análisis frame a frame con VapourSynth + L-SMASH (incluyendo contenedores rotos que FFmpeg solo no puede abrir), limpieza de subtítulos problemáticos, eliminación de metadatos basura y adjuntos innecesarios, recodificación de formatos heredados (AVI, MP4, DIVX) a MKV verificado. Al finalizar genera un informe con lo que procesó, lo que se saltó, y lo que falló.
+[/list]
+
+Una vez terminado, tus Arrs recibirán archivos limpios, consistentes y listos para ser indexados.
+
+[quote][b]¿Cuándo usar Goddess Mode?[/b] En bibliotecas ya saneadas donde solo quieres hacer una revisión rápida antes de importar. En una biblioteca de 8 TB en buen estado, el God Mode puede tardar una semana; el Goddess Mode lo resuelve en horas. En la vida útil de un archivo, el God Mode debería pasar al menos una vez. Después, el Goddess Mode es suficiente para el día a día.[/quote]
+
+[hr]
+
+[size=17][b]S2: Rescate de Archivos Fallidos por Tdarr[/b][/size]
+
+[center][img width=500]https://i.ibb.co/4h75G0b/S2.png[/img][/center]
+
+[b]Tdarr[/b] es un transcodificador automático muy popular. Literalmente puedes reducir el tamaño de tu biblioteca a la mitad. El problema que tiene es que cuando se topa con codecs tipo mpge4 o MKVs que tienen adjuntos problemáticos, simplemente los manda a la lista de error de transcode. Ocurre lo mismo con los health-check que hace, si encuentra un error, lo manda a su lista correspondiente. Esos archivos tarde o temprano van a crear un problema, ya sea en un televisor o en el proceso de subida (determinados codecs como .avi no pasan por Rawloadrr). Herramientas como MKVerything pueden automatizar la recuperación y transcodificación de esas listas de archivos rotos evitando al usuario tener que recurrir a procesos manuales tediosos que implicarían configuraciones avanzadas de hardware y el uso de múltiples programas individuales. Esto no siempre interesa, pero es realmente útil para archivos antiguos o que no puedes conseguir de la fuente original.
+
+Esta etapa es [b]opcional y personal[/b]: puedes decidir buscar otra fuente para ese contenido o, si el archivo tiene valor y vale la pena rescatarlo, pasarlo por el quirófano de MKVerything.
+
+[size=14][b]Por qué el God Mode y no la opción de rescate simple[/b][/size]
+
+La opción [code][2] Rescatar MKVs Rotos[/code] del launcher de MKVerything verifica e intenta reparar el archivo. Pero los archivos que Tdarr escupe como error suelen necesitar el pipeline completo: limpieza de metadatos, reempaquetado, recodificación de streams heredados, y validación posterior. Por eso, la recomendación es usar el [b]God Mode[/b].
+
+[size=14][b]Cómo proceder[/b][/size]
+
+[b]Paso 1[/b]: En la interfaz de Tdarr, ve a la sección de errores y usa la opción de exportar como CSV.
+
+[b]Paso 2[/b]: Abre el CSV y copia la columna de rutas absolutas a un archivo de texto plano ([code].txt[/code]), una ruta por línea. Guárdalo donde quieras.
+
+[b]Paso 3[/b]: En Singularity, ve a [code][1] MKVerything → [1.1] Lanzador[/code].
+
+[b]Paso 4[/b]: En el launcher de MKVerything, elige la opción [code][5] GOD MODE[/code] e introduce la ruta de la carpeta donde están los archivos fallados.
+
+[quote]Si los archivos están dispersos en distintas ubicaciones (no comparten carpeta raíz), usa la opción [code][2] Rescatar MKVs Rotos[/code] en su lugar: acepta directamente la ruta al [code].txt[/code] con las rutas absolutas. Para casos ordinarios de rescate puntual esta opción es perfectamente válida. Para los archivos que Tdarr devuelve como error, el God Mode completo es lo recomendable.[/quote]
+
+[quote]MKVerything solo trabaja sobre archivos de vídeo, ignorando cualquier otro tipo de archivo. Lanzar el God Mode sobre un punto de montaje de un disco no es un problema, el programa revisará todo recursivamente y solo trabajará sobre los archivos que precisen ser reparados.[/quote]
+
+[b]Paso 5[/b]: El programa procesa los archivos de forma desatendida y genera un informe al finalizar. A partir de ahí, esos archivos están listos para pasar a S3.
+
+[hr]
+
+[size=17][b]S3: Triaje de Codec — Separar lo Terminado de lo Pendiente[/b][/size]
+
+[center][img width=500]https://i.ibb.co/tPc1VNnR/S3.png[/img][/center]
+
+Esta etapa responde a una necesidad real cuando usas Tdarr de forma activa: [b]no querrás subir al tracker archivos que Tdarr va a recodificar próximamente[/b], porque cuando lo haga tendrás que rehacer el torrent.
+
+El triaje [b]no es de calidad de imagen[/b]: es de [b]codec[/b]. Separa lo que ya es HEVC (H.265, terminado) de lo que sigue siendo H264 o cualquier formato legacy. La lógica es: si ya está toda la carpeta en HEVC, Tdarr no le va a tocar más. Si aún tiene algo en H264, espera a que Tdarr termine con él antes de compartirlo.
+
+[size=14][b]Cómo lanzarlo de forma independiente[/b][/size]
+
+[pre]
+  [4.1]  Ingestor de Tags
+  [4.2]  Comparador de Torrents
+  [4.3]  Triaje MKV (HEVC vs H264)
+  [4.4]  Chaos Maker (⚠ solo pruebas)
+  [4.5]  CSI: Check, Search, Identify
+[/pre]
+
+(Cuando selecciones [b][4.3][/b], introduce el directorio a analizar)
+
+[size=14][b]Qué genera[/b][/size]
+
+El script recorre el directorio recursivamente. Por cada carpeta con archivos MKV, consulta el codec con [code]mediainfo[/code] y clasifica:
+
+[list]
+[*][code]todo-hevc-DD-MM-YY.txt[/code]: Lista de carpetas donde [b]todos[/b] los MKVs son HEVC. Listos para subir.
+
+[*][code]sigue-h264-DD-MM-YY.txt[/code]: Lista de carpetas que contienen H264 u otros formatos legacy. Aún en proceso.
+[/list]
+
+Estas listas son las que el pipeline SINGULARIDAD (fases 3 y siguientes) usa para alimentar RawLoadrr. También puedes usarlas directamente en RawLoadrr si prefieres lanzar la subida de forma independiente.
+
+[quote]Si tu biblioteca ya está completamente en HEVC (Tdarr ha terminado y MKVerything ha limpiado los formatos heredados), esta etapa es casi un trámite. Pero es un paso necesario en cualquier flujo automatizado: no ahorramos en seguridad.[/quote]
+
+[hr]
+
+[size=17][b]El Pipeline SINGULARIDAD: De S1 a S5 de un Tirón[/b][/size]
+
+Una vez que tu contenido está saneado (S1/S2 completados), puedes lanzar el pipeline completo SINGULARIDAD desde el menú principal. Este pipeline abarca desde la verificación del archivo hasta la subida y el mantenimiento del tracker.
+
+En el menú principal, elige:
+[list]
+[*][code][5] SINGULARIDAD (God Mode - Full Check)[/code] para análisis exhaustivo.
+[*][code][6] SINGULARIDAD (Goddess Mode - Fast Check)[/code] para análisis rápido en bibliotecas ya trabajadas.
+[/list]
+
+El programa te pedirá:
+
+[list]
+[*][b]Ruta raíz de tu biblioteca[/b] de medios.
+[*][b]Carpeta de salida para ISOs[/b] extraídas (por defecto, la misma).
+[*][b]Identificador del tracker[/b] (ej: [code]MILNU[/code]).
+[*][b]Qué lista usar para la subida[/b]: solo HEVC ([code]todo-hevc-*.txt[/code]), solo H264/Legacy ([code]sigue-h264-*.txt[/code]), una lista personalizada tuya, o todo lo que encuentre. Ojo aquí, he dicho lista porque estamos hablando de listas pero si le tiras la ruta de un disco o de un archivo individual... resuelve igual.
+[*][b]Si quieres activar el Orquestador UNIT3D[/b] al final (y en ese caso, el rango de IDs a procesar). Por supuesto, solo funciona en aquellos torrents donde tengas permisos de edición o si eres admin en el tracker. Ésta es una herramienta desarrollada para owners y admins o para uploaders que han tenido un problema en sus subidas.
+[/list]
+
+Una vez confirmada la configuración, el pipeline corre solo hasta el final y muestra un [b]Reporte de Daños[/b] con el estado de cada fase.
+
+[hr]
+
+[size=17][b]S4: Sincronización de Datos Locales — RawLoadrr[/b][/size]
+
+[center][img width=500]https://i.ibb.co/mFrtGXCL/S4.png[/img][/center]
+
+RawLoadrr es el módulo que se ocupa de [b]crear los archivos [code].torrent[/code] y registrarlos[/b] tanto en qBittorrent como en el tracker. Es el puente entre tu biblioteca local y el mundo exterior.
+
+[size=14][b]Cómo lanzarlo de forma independiente[/b][/size]
+
+En el menú principal, selecciona [code][2] RawLoadrr (Subidas automáticas)[/code]. Esto lanza el [b]Rawncher[/b], el gestor interactivo de RawLoadrr.
+
+[pre]
+  [1]  Usar tracker existente
+  [2]  Configurar tracker existente
+  [3]  Crear nuevo tracker
+  [4]  Modo debug (sin subida real)
+  [5]  Listar sesiones guardadas
+  [6]  Cargar sesión guardada
+  [0]  Salir
+[/pre]
+
+(Selecciona [b][1][/b] Usar tracker existente para comenzar)
+
+[size=14][b]Flujo de subida y composición de la descripción[/b][/size]
+
+[code][1] Usar tracker existente[/code] es la opción principal. El Rawncher te mostrará la lista de trackers configurados (con indicación visual de cuáles tienen API key y cuáles no). Seleccionas el tracker destino y el programa:
+
+[list]
+[*]Analiza el directorio o lista de carpetas que le indiques.
+[*]Extrae metadatos del contenido (resolución, codec, audio, subs) mediante [code]mediainfo[/code].
+[*]Consulta TMDB/TVDB para obtener título normalizado, año, géneros y sinopsis.
+[*][b]Genera capturas de pantalla[/b] con VapourSynth + L-SMASH (para abrir correctamente incluso contenedores con índices problemáticos) y zimg para la decodificación matemática de calidad, incluyendo HDR. No uses capturas del VLC: las capturas de pantalla hechas así son fieles al contenido real del stream y se ven correctamente en cualquier display. El número de capturas, su tamaño y el tipo de muestreo de frames son configurables en [code]config.py[/code].
+[*]Sube las capturas al host de imágenes configurado (ImgBB, PTScreens, Imgbox, etc.) con fallback automático si uno falla.
+[*][b]Compone la descripción[/b] en BBCode: inserta las imágenes con el tamaño configurado, añade la firma y el banner que hayas definido para ese tracker (o el global si no hay uno específico). Tú no escribes la descripción: la suite la genera automáticamente según tu configuración.
+[*]Crea el archivo [code].torrent[/code] y lo envía a qBittorrent vía API (o lo guarda en la carpeta de watch si qBit no está disponible).
+[*]Publica el torrent en el tracker con la descripción completa.
+[/list]
+
+Si la conexión con qBittorrent falla, RawLoadrr entra automáticamente en [b]modo solo local[/b]: guarda los [code].torrent[/code] en una carpeta [code]qbit_backup[/code] para que los añadas manualmente después. La subida al tracker se hace igualmente.
+
+[quote][code][4] Modo debug[/code]: Ejecuta todo el proceso excepto la subida real. Ideal para verificar que la configuración es correcta antes de lanzar una sesión masiva.[/quote]
+
+[hr]
+
+[size=17][b]S5: Actualizador de Páginas del Tracker — Orquestrador UNIT3D[/b][/size]
+
+[center][img width=500]https://i.ibb.co/KjyK5Hmq/S5.png[/img][/center]
+
+Esta etapa se ocupa del [b]mantenimiento y enriquecimiento de las páginas de torrents ya publicados[/b] en el tracker. Si tienes decenas o cientos de subidas con descripciones desactualizadas, imágenes rotas o metadatos incorrectos, el Orquestrador las actualiza en masa de forma desatendida.
+
+[size=14][b]Cómo lanzarlo de forma independiente[/b][/size]
+
+En el menú principal, selecciona [code][3] UNIT3D Ed. (Edita en el Tracker)[/code].
+
+El programa te pedirá:
+
+[list]
+[*][b]El banner BBCode[/b] que quieres añadir a las descripciones (o pulsar Enter para usar el configurado por defecto en [code].env[/code]).
+[*][b]El ID del primer torrent[/b] a editar (el número que aparece en la URL del tracker: [code]tracker.com/torrents/14[/code]).
+[*][b]El ID del último torrent[/b] a editar (se procesarán todos los IDs intermedios). Si solo quieres actualizar uno, pon la misma ID en ambos campos.
+[*]Confirmar si quieres lanzar la secuencia completa.
+[/list]
+
+[size=14][b]Los cuatro scripts que se ejecutan en secuencia[/b][/size]
+
+[b][code]01_scraper.py[/code][/b] — Cosecha de IDs
+Recorre las páginas de las subidas en el tracker y extrae todos los IDs de los torrents. Los guarda en [code]ids.txt[/code].
+
+[b][code]02_indexer.py[/code][/b] — Construcción del Índice
+Lee los IDs recopilados y, para cada torrent, consulta la API del tracker para obtener los datos actuales (nombre, descripción, imágenes). Construye el archivo [code]mapeo_maestro.json[/code].
+
+[b][code]03_mass_updater.py[/code][/b] — Actualización Masiva
+Lee el [code]mapeo_maestro.json[/code] y actualiza cada página del tracker. Incluye manejo de rate limiting y logging completo de cada acción.
+
+[b][code]04_image_resurrector.py[/code][/b] — Resurrección de Imágenes
+Detecta imágenes rotas en las descripciones (URLs que ya no responden) y las resube automáticamente a los hosts de imágenes configurados.
+
+[quote]Estos cuatro scripts también se pueden lanzar como la [b]Fase 4[/b] del pipeline SINGULARIDAD si activas la opción durante la configuración. La diferencia es que en ese caso, los IDs se toman del rango configurado en [code].env[/code].[/quote]
+
+[hr]
+
+[size=17][b]S6: Scraper de Contenido Faltante — RawLoadrr con Tor[/b][/size]
+
+[center][img width=500]https://i.ibb.co/nsnc45zr/S6.png[/img][/center]
+
+Esta es la etapa más útil a largo plazo. Quién no ha estado sentado frente a la pantalla buceando por la lista de peticiones investigando qué puede aportar a sus compis... Es algo noble y es lo que vinimos a hacer pero hemos de reconocer que, en realidad, es un dolor de cabeza. El script CSI hace eso por ti, genera unas listas en función de si está en el tracker de forma parcial (series), falta realmente o ya está en la comunidad. Al terminar te ofrecerá qué listas quieres cargar en Rawloadrr. 
+
+Es importante decir que la suite NO va a cargar automáticamente la lista de dudas que genera, es necesario que el usuario elimine las dos primeras líneas, que no son rutas, donde el script avisa de que se ha encontrado contenido online similar. Acto seguido puedes volver a lanzar Rawloadrr y cargar la lista. Esto es una medida de seguridad para evitar duplicar contenido en calidades menores a la ya existente.
+
+Generalmente el contenido que cae en esa lista son películas ya en el tracker pero de las cuales tienes otra calidad o series que tienen alguna temporada faltante en el tracker (ej.: el tracker tiene xx-S01 y tienes xx-S02, tu S02 terminará en la lista de DUPE POTENCIAL). 
+
+Algunas de las características que hacen éste scraper especial son: [b]Tor, detección de bloqueos y conexión dual (API-HTTPS) para respetar normas e infraestructura[/b].
+
+RawLoadrr puede enrutar sus peticiones de API externas a través del proxy SOCKS5 de Tor ([code]127.0.0.1:9050[/code]) cuando detecta que Tor está activo en el sistema. Esto permite:
+
+[list]
+[*]Acceder a fuentes de metadatos con restricciones geográficas.
+[*]Realizar scraping de contenido sin exponer la IP del servidor.
+[*]Mantener el anonimato en operaciones de indexación masiva.
+[*]Evitar los bloqueos del mongolo de Tebas
+[*]Evitar bloqueos de ISP
+[/list]
+
+Tor está incluido en el contenedor Docker. Hay una lógica en el menú interactivo que te pedirá permiso para activarlo (en el contenedor, no instala en tu sistema) y enrutará el tráfico de singularity exclusivamente a través del proxy.
+
+[quote]Esta funcionalidad es avanzada y no es necesaria para la mayoría de los usuarios. Está ahí para casos específicos donde el anonimato o el acceso alternativo son necesarios.[/quote]
+
+[hr]
+
+[size=17][b]El Radar de Operaciones — Dashboard[/b][/size]
+
+Mientras cualquier proceso de Singularity está en marcha, hay un dashboard web accesible en [code]http://localhost:8002[/code] (o la IP de tu servidor si accedes en remoto).
+
+Se lanza automáticamente en segundo plano cada vez que abres el menú principal de Singularity. Si ya está corriendo de una sesión anterior, lo detecta y no abre un proceso duplicado.
+
+El dashboard muestra en tiempo real:
+
+[list]
+[*][b]Estado de cada módulo[/b]: CORE, MKVerything, RawLoadrr, UNIT3D, Pipeline.
+[*][b]Tarea actual[/b] en cada módulo.
+[*][b]Barra de progreso[/b] cuando el proceso reporta avance porcentual.
+[*][b]Detalles ampliados[/b] (acordeón) con el log de consola del proceso, métricas y timestamps.
+[*][b]Tiempo transcurrido[/b] desde el inicio de cada operación.
+[/list]
+
+El dashboard se actualiza automáticamente cada 5 segundos y es especialmente útil en procesos largos para saber qué está pasando sin necesidad de tener la terminal abierta.
+
+[quote][b]Sobre el botón de reset[/b]: No encontrarás un botón de "resetear estado" en el dashboard. Por seguridad, el reset del dashboard se hace desde el TUI: [code][7] Mantenimiento & Limpieza → [4] Resetear Dashboard[/code].[/quote]
+
+[hr]
+
+[size=17][b]¿Puedo confiar esta herramienta con mi biblioteca?[/b][/size]
+
+Es una pregunta legítima. Estás hablando de darle acceso a un programa a potencialmente terabytes de contenido que has acumulado durante años.
+
+[b]MKVerything tiene una escalera de resiliencia[/b]: antes de tocar un archivo, lo analiza. Antes de recodificar, verifica. Antes de eliminar el original, confirma que el resultado es válido. Los fallbacks son múltiples y progresivos. Nada se borra sin verificación previa. VapourSynth + L-SMASH-Works se incluye precisamente para poder abrir y analizar correctamente los contenedores más dañados que FFmpeg solo rechazaría.
+
+[b]RawLoadrr valida antes de subir[/b]: la Aduana de verificación al arrancar no es cosmética. Comprueba credenciales, conexión con qBittorrent, integridad de la configuración. Si algo no está bien, te lo dice antes de hacer nada. El modo debug existe precisamente para que puedas ver exactamente qué haría el programa sin que haga nada real. Las capturas se generan con VapourSynth para garantizar fidelidad, y la descripción BBCode se compone de forma determinista según tu configuración.
+
+[b]El Orquestador UNIT3D respeta al tracker[/b]: incluye manejo de rate limiting, pausas adaptativas con jitter configurable ([code]DELAY_MIN[/code] / [code]DELAY_MAX[/code]), y logging exhaustivo. No bombardea el servidor. Si recibe un error 429, para y espera. Si recibe un error de Cloudflare, lo registra y sigue con el siguiente.
+
+[b]Los logs son tus aliados[/b]: cada módulo escribe su propio log con timestamp, nivel de severidad y detalle de lo que hizo. El directorio [code]work_data/logs/[/code] acumula todo el historial de operaciones. Los reportes de CSI van a [code]work_data/reports/[/code].
+
+[b]El dashboard te da visibilidad[/b]: en ningún momento el programa trabaja en la oscuridad. Siempre puedes ver qué está haciendo, en qué archivo está, y qué porcentaje lleva. Estés o no delante del ordenador.
+
+La herramienta es potente y accede a tu hardware y tus archivos. Pero está diseñada con la misma filosofía que un buen administrador de sistemas: [b]audita primero, actúa después, registra todo[/b].
+
+[hr]
+
+[center][url=https://github.com/RawSmokeTerribilus/Singularity][b]📦 Repositorio en GitHub[/b][/url] | [url=https://rawsmoketerribilus.github.io/Singularity/][b]📖 Wiki Completa[/b][/url][/center]
