@@ -2257,7 +2257,7 @@ class Prep():
         de = lambda t: [x for x in tracks if x.get('@type') == t]
         return (next(iter(de('General')), {}), next(iter(de('Video')), {}), de('Audio'), de('Text'))
 
-    def _recodificado_web(self, mi):
+    def _recodificado_web(self, mi, nombre=''):
         """¿Un fichero de origen web está recodificado? -> WEBRip, si no WEB-DL.
 
         WEB-DL es el flujo del servicio sin tocar (como mucho remux); WEBRip,
@@ -2278,6 +2278,11 @@ class Prep():
             return True
         if 'x264' in firma:
             return False
+        # Con el servicio en el nombre (NF, AMZN...) es una release de scene:
+        # Netflix y Amazon sí sirven HEVC 1080p SDR, sin firma de x265
+        # (medido en NOBS: «Peaky Blinders 1080p NF WEB-DL H.265» a 2 Mb/s).
+        if self._SERVICIOS.search(nombre or '') or self._SERVICIOS.search(str(g.get('Title', ''))):
+            return False
         try:
             alto = int(v.get('Height') or 0)
         except (TypeError, ValueError):
@@ -2286,7 +2291,7 @@ class Prep():
         return v.get('Format') == 'HEVC' and 0 < alto <= 1080 and not hdr
 
     _SERVICIOS = re.compile(r'\b(amzn|amazon|nf|netflix|dsnp|disney\+?|hmax|hbo ?max|atvp|apple ?tv|pcok|'
-                            r'peacock|hulu|movistar|mtsp|skyshowtime|rakuten|filmin|atresplayer|rtve)\b', re.I)
+                            r'peacock|hulu|movistar|mtsp|skst|skyshowtime|rakuten|filmin|atresplayer|rtve|max(?=[ ._-]web))\b', re.I)
 
     def _origen_por_mediainfo(self, mi):
         """('BluRay'|'Web'|'DVD'|'HDTV'|None, razones) cuando el nombre no lo dice.
@@ -2427,7 +2432,7 @@ class Prep():
         elif any(word in filename for word in [" web ", ".web.", "web-dl", "webdl", "web dl"]):
             # El nombre dice de dónde viene, no si se ha tocado: un WEB-DL
             # recodificado (Tdarr) es un WEBRip.
-            if self._recodificado_web(mi):
+            if self._recodificado_web(mi, os.path.basename(video)):
                 log.info(f"[get_type] '{os.path.basename(video)}' es de origen web pero está recodificado: WEBRIP")
                 type = "WEBRIP"
             else:
@@ -2442,7 +2447,7 @@ class Prep():
             # MA» con subtítulos PGS es un encode de Blu-ray, no tele.
             origen, _ = self._origen_por_mediainfo(mi)
             if origen == 'Web':
-                type = "WEBRIP" if self._recodificado_web(mi) else "WEBDL"
+                type = "WEBRIP" if self._recodificado_web(mi, os.path.basename(video)) else "WEBDL"
             elif origen in ('BluRay', 'DVD'):
                 type = "ENCODE"
             else:
@@ -3853,7 +3858,7 @@ class Prep():
                     source = system
             if source in ("Web", "WEB"):
                 if type == "ENCODE":
-                    type = "WEBRIP" if self._recodificado_web(meta.get('mediainfo')) else "WEBDL"
+                    type = "WEBRIP" if self._recodificado_web(meta.get('mediainfo'), os.path.basename(video)) else "WEBDL"
             if source == "HDTV" and type == "ENCODE":
                 type = "HDTV"
             if source in ("HD-DVD", "HD DVD", "HDDVD"):
