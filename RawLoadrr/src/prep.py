@@ -3416,8 +3416,17 @@ class Prep():
             if each['id'] == 16:
                 animation = True
         if response['original_language'] == 'ja' and animation:
-            romaji, mal_id, eng_title, season_year, episodes = self.get_romaji(tmdb_name, meta.get('mal', None))
-            alt_name = f" AKA {romaji}"
+            anio = str(response.get('first_air_date') or response.get('release_date') or '')[:4]
+            romaji, mal_id, eng_title, season_year, episodes = self.get_romaji(tmdb_name, meta.get('mal', None), anio)
+            if meta.get('mal') in (None, 0, '0'):
+                # Con el Client ID del usuario, MAL confirma o corrige lo de
+                # AniList por el AÑO: «Captain Tsubasa» (1983) acababa en Road
+                # to 2002 (2001) porque los dos se llaman igual en algún idioma.
+                verificado = self._mal_por_anio(tmdb_name, anio)
+                if verificado and verificado[0] != mal_id:
+                    mal_id, romaji = verificado[0], verificado[1] or romaji
+            _n = lambda x: re.sub(r'[^0-9a-z]+', '', str(x or '').lower())
+            alt_name = f" AKA {romaji}" if romaji and _n(romaji) != _n(tmdb_name) else alt_name
             
             anime = True
             # mal = AnimeSearch(romaji)
@@ -3430,7 +3439,26 @@ class Prep():
             mal_id = meta.get('mal', 0)
         return mal_id, alt_name, anime
 
-    def get_romaji(self, tmdb_name, mal):
+    def _mal_por_anio(self, titulo, anio):
+        """(mal_id, romaji) del resultado de MAL del MISMO año con título equivalente, o None.
+
+        Solo con el Client ID del usuario (DEFAULT -> mal_client_id); sin él
+        no se consulta MAL (decisión del operador, 15-10-2026).
+        """
+        try:
+            from src.id_resolver import _mal_search, _mal_client_id
+        except ImportError:
+            return None
+        cliente = _mal_client_id(self.config.get('DEFAULT', {}))
+        if not cliente or not str(anio).isdigit():
+            return None
+        norma = lambda x: re.sub(r'[^0-9a-z]+', '', str(x or '').lower())
+        for c in _mal_search(titulo, cliente, lambda m: log.info(f"[mal] {m}")):
+            if c.get('year') == int(anio) and c.get('mal') and norma(titulo) in (norma(c.get('title')), norma(c.get('alt_title'))):
+                return int(c['mal']), c.get('alt_title') or c.get('title')
+        return None
+
+    def get_romaji(self, tmdb_name, mal, year=None):
         if mal is None:
             mal = 0
             tmdb_name = tmdb_name.replace('-', "").replace("The Movie", "")
@@ -3503,14 +3531,19 @@ class Prep():
                     if title is not None:
                         title = re.sub(u'[\u3000-\u303f\u3040-\u309f\u30a0-\u30ff\uff00-\uff9f\u4e00-\u9faf\u3400-\u4dbf]+ (?=[A-Za-z ]+–)', "", title.lower().replace(' ', ''), re.U)
                         diff = SequenceMatcher(None, title, search_name).ratio()
-                        if diff >= difference:
+                        # Mismo año que TMDB: suma. Y a igualdad se queda el
+                        # primero (antes «>=» se quedaba el último: Road to
+                        # 2002 le ganaba a la Captain Tsubasa de 1983).
+                        if year and str(anime.get('seasonYear') or '') == str(year):
+                            diff += 0.05
+                        if diff > difference:
                             result = anime
                             difference = diff
 
             romaji = result['title'].get('romaji', result['title'].get('english', ""))
             mal_id = result.get('idMal', 0)
             eng_title = result['title'].get('english', result['title'].get('romaji', ""))
-            season_year = result.get('season_year', "")
+            season_year = result.get('seasonYear') or ""
             episodes = result.get('episodes', 0)
         else:
             romaji = eng_title = season_year  = ""
@@ -4997,7 +5030,7 @@ class Prep():
                     anime_title = parent_name if parent_name else grandparent_name
                 parsed['anime_title'] = anime_title
                 # romaji, mal_id, eng_title, seasonYear, anilist_episodes = self.get_romaji(guessit(parsed['anime_title'], {"excludes" : ["country", "language"]})['title'])
-                romaji, mal_id, eng_title, seasonYear, anilist_episodes = self.get_romaji(parsed['anime_title'], meta.get('mal', None))
+                romaji, mal_id, eng_title, seasonYear, anilist_episodes = self.get_romaji(parsed['anime_title'], meta.get('mal', None), parsed.get('anime_year'))
                 if mal_id:
                     meta['mal_id'] = mal_id
                 if meta.get('tmdb_manual', None) is None:
