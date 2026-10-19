@@ -624,6 +624,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#quitar-el-spam-de-tus-ficheros-mkverything" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Quitar el spam de tus ficheros: MKVerything
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#que-te-falta-por-subir-csi" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1676,6 +1687,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#quitar-el-spam-de-tus-ficheros-mkverything" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Quitar el spam de tus ficheros: MKVerything
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#que-te-falta-por-subir-csi" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1743,6 +1765,8 @@ está el <a href="../wiki_integracion_singularity_arr/">Manual completo</a>.</p>
 </code></pre></div>
 <p><code>make up</code> descarga la imagen nueva y <strong>actualiza los módulos de tracker</strong> de la suite. Lo que sustituye queda guardado en
 <code>work_data/trackers_backup/</code>. Los trackers que hayas creado tú no se tocan.</p>
+<p>Igual con la <strong>lista de firmas spam</strong> de MKVerything (<code>work_data/firmas_spam/</code>): la de la suite se actualiza sola y lo
+sustituido va a <code>work_data/firmas_spam_backup/</code>; la tuya, <code>firmas_spam.usuario.txt</code>, no se toca nunca.</p>
 <h2 id="la-primera-vez-la-aduana">La primera vez: la aduana</h2>
 <p>Al entrar en RawLoadrr (<code>2</code> en el menú), Singularity revisa lo que le falta y te lo pide <strong>una sola vez</strong>:</p>
 <ol>
@@ -1794,6 +1818,27 @@ opciones → <code>ok</code>.</p>
 <li><strong>Subida y siembra.</strong> Publica, descarga el <code>.torrent</code> oficial del tracker y lo añade a tu cliente apuntando a tus ficheros.</li>
 </ol>
 <p>Al final sale un resumen con las subidas hechas, los ensayos y los fallos de toda la tanda.</p>
+<h2 id="quitar-el-spam-de-tus-ficheros-mkverything">Quitar el spam de tus ficheros: MKVerything</h2>
+<p>Muchos MKV traen la firma de quien los ripeó o subió: «wolfmax4k.com» como título, «[www.newpct1.com]» en el nombre de las
+pistas, un subtítulo forzado que solo dice «Ripeado y subido por…». MKVerything lo quita en cualquiera de sus flujos
+(auditoría, rescate, conversión, extracción de ISOs, God/Goddess y el modo Singularidad): al empezar te pregunta una vez
+si quieres limpiar. Por defecto, no.</p>
+<ul>
+<li><strong>No toca tu fichero.</strong> Hace una copia limpia, que se queda con el nombre original, y el sucio pasa a
+  <code>&lt;nombre&gt;.con-spam</code>. Por eso <strong>ocupa el doble</strong> hasta que borres los sucios: la lista sale al final y queda en
+  <code>work_data/logs/mkverything/con-spam-pendientes-&lt;fecha&gt;.txt</code>.</li>
+<li><strong>Si ya estás sembrando ese fichero en otro tracker, di que no</strong>: la copia limpia cambia los bytes y ese torrent dejaría
+  de verificar.</li>
+<li>La copia se comprueba antes de colocarla (misma duración, mismas pistas, ni una firma). Si algo no cuadra, el original
+  se queda como estaba.</li>
+<li>La auditoría (<code>1</code>) solo mira: deja el detalle en <code>firmas-spam-&lt;fecha&gt;.txt</code> y al final te ofrece limpiar.</li>
+<li>De paso pasa a <strong>SRT</strong> los subtítulos <strong>WebVTT</strong> (Tdarr no los traga), con su idioma, nombre y banderas, sin tocar el
+  vídeo ni el audio. Si un fichero se rescata, sus WebVTT vuelven del original como SRT.</li>
+</ul>
+<p>Qué cuenta como firma: el <strong>ego del que ripeó o subió</strong> (créditos, webs, grupos, trackers). Lo técnico (códec, audio,
+fuente, plataforma) no, ni palabras como «por» o «by». Si ves una firma que no se va, añádela a
+<code>work_data/firmas_spam/firmas_spam.usuario.txt</code>: vale en la siguiente pasada, sin reiniciar. Para probar tu lista contra
+un fichero: <code>singularity-shell</code> y <code>python3 MKVerything/modules/firmas.py "/ruta/al/video.mkv"</code>.</p>
 <h2 id="que-te-falta-por-subir-csi">Qué te falta por subir: CSI</h2>
 <p>En el menú: <strong>4 Extras → 4.5 CSI</strong>. Cruza tu biblioteca (Sonarr/Radarr o una carpeta), tu qBittorrent y el tracker, y
 genera listas de lo que no está subido, lo que está subido pero falta en tu cliente y los posibles duplicados.</p>
@@ -1824,6 +1869,10 @@ la prueba antes de guardarla; vale el valor de la cookie de sesión o la cabecer
 <tr>
 <td>CSI o UNIT3D Ed. piden la cookie</td>
 <td>La sesión ha caducado: cópiala de nuevo del navegador.</td>
+</tr>
+<tr>
+<td>«La lista de firmas no está montada»</td>
+<td>Tu <code>docker-compose.yml</code> es anterior a la 3.1.6: añade a <code>volumes</code> la línea <code>- ./work_data/firmas_spam:/app/MKVerything/data</code> y <code>make up</code>.</td>
 </tr>
 <tr>
 <td>Un error del tracker al subir</td>
