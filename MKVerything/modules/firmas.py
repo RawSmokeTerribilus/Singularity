@@ -177,6 +177,11 @@ def texto_lista(lista):
     for ruta, n in lista.fuentes:
         estado = "no existe" if n is None else f"{n} cadenas"
         lineas.append(f"   📄 {ruta}  ({estado})")
+    if lista.fuentes and lista.fuentes[0][1] is None:
+        # Volumen montado pero vacío: un compose nuevo con el makefile o el
+        # instalador de antes de la 3.1.6, que no reparten la lista.
+        lineas.append("   ❌ Falta la lista de firmas de la suite: así no se limpiará casi nada.\n"
+                      "      Baja de nuevo el kit (makefile y final-user-install.sh) y ejecuta  make up")
     for e in lista.errores:
         lineas.append(f"   ⚠️  Línea ignorada, no es una expresión válida: {e}")
     aviso = aviso_montaje()

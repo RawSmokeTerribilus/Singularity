@@ -63,7 +63,14 @@ Qué hace `make install`:
   Cada `make up` los refresca desde la imagen que levanta el compose: los módulos de la suite se
   actualizan solos (lo sustituido queda en `work_data/trackers_backup/`) y los trackers que hayas
   creado tú con «Crear nuevo tracker» no se tocan.
+- siembra `work_data/firmas_spam` con la lista de firmas spam de MKVerything, con el mismo trato: la
+  de la suite (`firmas_spam.txt`) se refresca en cada `make up` y la tuya (`firmas_spam.usuario.txt`)
+  no se toca nunca.
 - deja `NOBS` preformado y `config.py` multi-tracker para cualquier UNIT3D serio
+
+**Si ya lo tenías instalado (antes de la 3.1.6):** vuelve a bajar los tres ficheros del kit con el
+mismo `curl` de arriba (tu `config/` y tu `work_data/` no se tocan) y `make up`. El compose y el
+makefile nuevos traen el volumen y el reparto de la lista de firmas.
 
 **Qué evitar:** no ejecutes los `make` con `sudo` (el script pide permisos solo cuando toca); no
 muevas `config/` ni `work_data/` tras instalar; no bajes `RawLoadrr/` suelto — esto es un tanque,
