@@ -245,17 +245,18 @@ clip.set_output()
             if self.execute_strategy(level=3, input_file=ruta_origen, output_file=ruta_destino_temp):
                 self._log(f"   ✅ ÉXITO en Nivel 3 para '{nombre_archivo}'.")
                 if os.path.exists(vpy_script_path): os.remove(vpy_script_path)
-                lwi_file = Path(ruta_origen).with_suffix('.lwi')
-                if lwi_file.exists():
-                    try: os.remove(lwi_file)
-                    except OSError: pass
+                # lsmas escribe el índice como X.mkv.lwi (no X.lwi)
+                for lwi_file in (Path(ruta_origen).with_suffix('.lwi'), Path(str(ruta_origen) + '.lwi')):
+                    if lwi_file.exists():
+                        try: os.remove(lwi_file)
+                        except OSError: pass
                 return ruta_destino_temp, True
 
             if os.path.exists(vpy_script_path): os.remove(vpy_script_path)
-            lwi_file = Path(ruta_origen).with_suffix('.lwi')
-            if lwi_file.exists():
-                try: os.remove(lwi_file)
-                except OSError: pass
+            for lwi_file in (Path(ruta_origen).with_suffix('.lwi'), Path(str(ruta_origen) + '.lwi')):
+                if lwi_file.exists():
+                    try: os.remove(lwi_file)
+                    except OSError: pass
         else:
             self._log("   ⚠️ VapourSynth o vspipe no están disponibles. Saltando Nivel 3.")
 

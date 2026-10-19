@@ -207,7 +207,7 @@ def main():
                 print(f"❌ Rotos/Legacy: {C_RED}{rotos}{C_RESET}")
                 print(f"⚠️  Sospechosos:  {C_YELLOW}{sospechosos}{C_RESET}  (<1MB — revisar manualmente)")
                 print(f"🏷️  Spam:         {spam}")
-                print(f"🧹 Con firmas:   {len(con_firmas)}" + (f"  (detalle: {archivo_firmas})" if con_firmas else ""))
+                print(f"🧹 Firmas/VTT:   {len(con_firmas)}" + (f"  (detalle: {archivo_firmas})" if con_firmas else ""))
                 print(f"----------------------------")
                 update_status("MKVERYTHING", "Auditoría", "COMPLETED", progress=100,
                               details=f"Sanos: {sanos}, Rotos: {rotos}, Sospechosos: {sospechosos}")
@@ -226,7 +226,7 @@ def main():
                     print(f"\n{C_GREEN}💎 Librería impecable. No se han detectado errores.{C_RESET}")
 
                 if con_firmas:
-                    print(f"\n🧹 {len(con_firmas)} archivo(s) llevan firmas spam (detalle: {archivo_firmas}).")
+                    print(f"\n🧹 {len(con_firmas)} archivo(s) llevan firmas spam o subtítulos WebVTT (detalle: {archivo_firmas}).")
                     if firmas.preguntar():
                         reg = firmas.Registro()
                         lista_firmas = firmas.cargar_lista()

@@ -14,6 +14,8 @@ Qué se mira, todo desde la cabecera (sin leer el vídeo):
   - etiquetas globales y de pista (las estadísticas de mkvmerge no);
   - nombre y descripción de los adjuntos (las fuentes de los ASS se quedan).
 Los capítulos no se miran: en el barrido del 19-10-2026 ninguno llevaba firma.
+De paso, los subtítulos WebVTT se pasan a SRT (mkvextract + ffmpeg sobre el
+.vtt suelto: el ffmpeg 5.1 de la imagen no los lee dentro de un MKV).
 
 Nunca se edita en sitio un fichero que ya existía: puede estar sembrándose y
 un cambio de bytes rompe el torrent. Se escribe una copia limpia, que se queda
@@ -29,6 +31,7 @@ import os
 import re
 import shutil
 import subprocess
+import tempfile
 import time
 import xml.etree.ElementTree as ET
 
@@ -195,6 +198,7 @@ TEXTO_PREGUNTA = (
     "   Nota: esto genera un DUPLICADO por cada archivo limpiado; revisa tu espacio en disco.\n"
     "   El limpio se queda con el nombre original y el sucio pasa a «<nombre>.con-spam»;\n"
     "   al final tendrás la lista de sucios para borrarlos.\n"
+    "   De paso pasa a SRT los subtítulos WebVTT (Tdarr no los traga), sin tocar el vídeo.\n"
     "   Si estás sembrando estos archivos en otro sitio, contesta que NO: el limpio cambia\n"
     "   los bytes y ese torrent dejaría de verificar."
 )
@@ -248,6 +252,11 @@ def _es_sub_texto(t):
     """Los subtítulos de texto, los mismos que el rescatador conserva."""
     cid = (t.get("properties", {}).get("codec_id") or "").upper()
     return t.get("type") == "subtitles" and cid.startswith("S_TEXT/") and "WEBVTT" not in cid
+
+
+def _es_vtt(t):
+    cid = (t.get("properties", {}).get("codec_id") or "").upper()
+    return t.get("type") == "subtitles" and "WEBVTT" in cid
 
 
 def inspeccionar(ruta, lista=None):
@@ -322,10 +331,21 @@ def inspeccionar(ruta, lista=None):
             donde = f"etiqueta {nombre}"
         hallazgos.append({"sitio": donde, "texto": valor, "firma": f})
 
+    con_firma = bool(hallazgos)
+    # WebVTT: Tdarr no lo traga y el ffmpeg de la imagen (5.1) no lo lee dentro
+    # de un MKV (el rescate lo perdería). Se pasa a SRT en el mismo viaje.
+    plan["vtt_a_srt"] = []
+    for t in j.get("tracks", []):
+        if _es_vtt(t) and t["id"] not in plan["quitar_subs"]:
+            p = t.get("properties", {})
+            plan["vtt_a_srt"].append(t["id"])
+            hallazgos.append({"sitio": f"subtítulo {t['id']} WebVTT",
+                              "texto": p.get("track_name") or p.get("language") or "", "firma": "pasar a SRT"})
+
     sucio = bool(hallazgos)
-    # Aprovechando el viaje: si el fichero se limpia por otra cosa, el título
+    # Aprovechando el viaje: si el fichero se limpia por una firma, el título
     # se va igualmente (la norma es MKV sin título).
-    if sucio and titulo:
+    if con_firma and titulo:
         plan["titulo"] = True
     return {"ruta": ruta, "sucio": sucio, "hallazgos": hallazgos, "avisos": avisos, "plan": plan, "j": j}
 
@@ -345,25 +365,119 @@ def describir(info, maximo=3):
 # LIMPIEZA
 # =========================================================================
 
-def _args(info, salida):
+def _args_srt(t, srt, nombre):
+    """Opciones de un SRT que sustituye a un WebVTT: idioma, nombre y banderas
+    de la pista original."""
+    p = t.get("properties", {})
+    a = []
+    if p.get("language"):
+        a += ["--language", f"0:{p['language']}"]
+    if nombre:
+        a += ["--track-name", f"0:{nombre}"]
+    a += ["--default-track-flag", f"0:{1 if p.get('default_track') else 0}",
+          "--forced-display-flag", f"0:{1 if p.get('forced_track') else 0}",
+          "--sub-charset", "0:UTF-8", srt]
+    return a
+
+
+def _args(info, salida, srts=None, srts_origen=None):
     """mkvmerge que reescribe el fichero sin las firmas. Vídeo, audio y
     subtítulos se copian tal cual: solo cambian los metadatos (y las pistas o
-    adjuntos-anuncio, que se quedan fuera)."""
+    adjuntos-anuncio, que se quedan fuera). `srts` = {id WebVTT: .srt} entran
+    en el sitio de su WebVTT; `srts_origen` = [(pista del original, .srt,
+    nombre)] van al final."""
     plan = info["plan"]
+    srts = srts or {}
     args = ["mkvmerge", "-o", salida]
     if plan["titulo"]:
         args += ["--title", ""]
     for tid, nuevo in plan["pistas"].items():
-        args += ["--track-name", f"{tid}:{nuevo}"]
-    if plan["quitar_subs"]:
-        args += ["--subtitle-tracks", "!" + ",".join(str(i) for i in plan["quitar_subs"])]
+        if tid not in srts:
+            args += ["--track-name", f"{tid}:{nuevo}"]
+    fuera = list(plan["quitar_subs"]) + list(srts)
+    if fuera:
+        args += ["--subtitle-tracks", "!" + ",".join(str(i) for i in fuera)]
     if plan["quitar_adjuntos"]:
         args += ["--attachments", "!" + ",".join(str(i) for i in plan["quitar_adjuntos"])]
     if plan["sin_global_tags"]:
         args.append("--no-global-tags")
     if plan["sin_track_tags"]:
         args.append("--no-track-tags")
-    return args + [info["ruta"]]
+    args.append(info["ruta"])
+    if not (srts or srts_origen):
+        return args
+    orden, n = [], 1
+    for t in info["j"].get("tracks", []):
+        if t["id"] in plan["quitar_subs"]:
+            continue
+        if t["id"] in srts:
+            args += _args_srt(t, srts[t["id"]], plan["pistas"].get(t["id"], t.get("properties", {}).get("track_name")))
+            orden.append(f"{n}:0")
+            n += 1
+        else:
+            orden.append(f"0:{t['id']}")
+    for t, srt, nombre in srts_origen or []:
+        args += _args_srt(t, srt, nombre)
+        orden.append(f"{n}:0")
+        n += 1
+    return args + ["--track-order", ",".join(orden)]
+
+
+def _vtt_a_srt(ruta, tids, carpeta, prefijo):
+    """Saca los WebVTT con mkvextract y los pasa a SRT con ffmpeg (que sí lee
+    un .vtt suelto). Devuelve ({id: .srt o None si está vacío}, error)."""
+    vtts = {tid: os.path.join(carpeta, f"{prefijo}{tid}.vtt") for tid in tids}
+    try:
+        r = subprocess.run(["mkvextract", ruta, "tracks"] + [f"{tid}:{v}" for tid, v in vtts.items()],
+                           capture_output=True, text=True, encoding="utf-8", errors="replace")
+    except OSError as e:
+        return {}, f"mkvextract: {e}"
+    if r.returncode not in (0, 1):
+        return {}, "mkvextract no pudo sacar los WebVTT"
+    out = {}
+    for tid, v in vtts.items():
+        srt = v[:-4] + ".srt"
+        try:
+            r = subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", v, "-c:s", "srt", srt],
+                               capture_output=True, text=True, errors="replace")
+        except OSError as e:
+            return {}, f"ffmpeg: {e}"
+        if r.returncode != 0 or not os.path.isfile(srt):
+            # Sin eventos ffmpeg no escribe nada: la pista no tenía texto.
+            if os.path.isfile(v) and "-->" not in open(v, encoding="utf-8", errors="replace").read():
+                out[tid] = None
+                continue
+            return {}, f"no se pudo pasar a SRT el WebVTT {tid}"
+        out[tid] = srt if os.path.getsize(srt) else None
+    return out, None
+
+
+def _remux(info, salida):
+    """mkvmerge con el plan. Los WebVTT se pasan antes a SRT en una carpeta
+    temporal; uno sin texto se quita, como un anuncio."""
+    plan = info["plan"]
+    vtt = plan.get("vtt_a_srt") or []
+    origen = plan.get("vtt_origen")
+    if not vtt and not origen:
+        return _mkvmerge(_args(info, salida))
+    with tempfile.TemporaryDirectory(prefix="mkve-vtt-") as carpeta:
+        srts, error = _vtt_a_srt(info["ruta"], vtt, carpeta, "a") if vtt else ({}, None)
+        if error:
+            return error
+        for tid in [t for t, s in srts.items() if s is None]:
+            del srts[tid]
+            plan["quitar_subs"].append(tid)
+        srts_origen = []
+        if origen:
+            tids = [t["id"] for t in origen["pistas"]]
+            hechos, error = _vtt_a_srt(origen["ruta"], tids, carpeta, "o")
+            if error:
+                return error
+            for t in origen["pistas"]:
+                if hechos.get(t["id"]):
+                    srts_origen.append((t, hechos[t["id"]], origen["nombres"].get(t["id"])))
+            plan["vtt_origen_n"] = len(srts_origen)
+        return _mkvmerge(_args(info, salida, srts, srts_origen))
 
 
 def _contar(j, tipo):
@@ -385,7 +499,8 @@ def _verificar(info, salida, lista):
     for tipo in ("video", "audio"):
         if _contar(antes, tipo) != _contar(despues, tipo):
             return f"pistas de {tipo}: {_contar(antes, tipo)} → {_contar(despues, tipo)}"
-    subs = _contar(antes, "subtitles") - len(info["plan"]["quitar_subs"])
+    subs = (_contar(antes, "subtitles") - len(info["plan"]["quitar_subs"])
+            + info["plan"].get("vtt_origen_n", 0))
     if _contar(despues, "subtitles") != subs:
         return f"subtítulos: esperaba {subs}, hay {_contar(despues, 'subtitles')}"
     adj = len(antes.get("attachments", [])) - len(info["plan"]["quitar_adjuntos"])
@@ -448,7 +563,7 @@ def limpiar_con_copia(ruta, lista=None, info=None, registro=None):
                           f"y quedan {libre / 1024**3:.1f} GB libres"}
 
     _borrar(tmp)  # restos de una pasada que se cortó
-    error = _mkvmerge(_args(info, tmp)) or _verificar(info, tmp, lista)
+    error = _remux(info, tmp) or _verificar(info, tmp, lista)
     if error:
         _borrar(tmp)
         return {"estado": "fallo", "motivo": error, "info": info}
@@ -534,11 +649,24 @@ def limpiar_nuevo(ruta, lista=None, origen=None):
         elif candidatos and textos:
             info["hallazgos"].append({"sitio": "subtítulo con firma", "texto": "no localizado en la salida",
                                       "firma": "revisar a mano"})
+        # El rescate pierde los WebVTT (el ffmpeg 5.1 no los lee): vuelven del
+        # original como SRT, al final.
+        if not any(_es_vtt(t) for t in info["j"].get("tracks", [])):
+            io = inspeccionar(origen, lista)
+            vtts = [t for t in io.get("j", {}).get("tracks", []) if t["id"] in io.get("plan", {}).get("vtt_a_srt", [])]
+            if vtts:
+                nombres = {t["id"]: io["plan"]["pistas"].get(t["id"], t.get("properties", {}).get("track_name"))
+                           for t in vtts}
+                info["plan"]["vtt_origen"] = {"ruta": origen, "pistas": vtts, "nombres": nombres}
+                info["hallazgos"].append({"sitio": f"{len(vtts)} subtítulo/s WebVTT del original",
+                                          "texto": ", ".join(t.get("properties", {}).get("language") or "?" for t in vtts),
+                                          "firma": "recuperar como SRT"})
+                info["sucio"] = True
     if not info["sucio"]:
         return {"estado": "nada", "motivo": "sin firmas", "info": info}
     tmp = ruta + EXT_TMP
     _borrar(tmp)
-    error = _mkvmerge(_args(info, tmp)) or _verificar(info, tmp, lista)
+    error = _remux(info, tmp) or _verificar(info, tmp, lista)
     if error:
         _borrar(tmp)
         return {"estado": "fallo", "motivo": error, "info": info}
