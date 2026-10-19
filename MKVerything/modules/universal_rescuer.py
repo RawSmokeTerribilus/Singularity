@@ -13,6 +13,7 @@ except ImportError:
 
 from .verifier import Verifier, GOOD_CODECS, PORTABLE_SUB_CODECS
 from .hardware_agent import HardwareAgent
+from . import firmas
 
 _MKVE_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 _LOGS_DIR = os.path.join(_MKVE_ROOT, "logs")
@@ -280,14 +281,25 @@ clip.set_output()
 
         return None, False
 
-    def procesar_lista(self, entrada, modo_estricto=False, fast_scan=False):
+    def procesar_lista(self, entrada, modo_estricto=False, fast_scan=False, limpiar_spam=False, registro=None):
         """
         :param modo_estricto: Si True, procesa solo archivos que necesiten intervención.
                               Si False, procesa todos los formatos de video encontrados.
         :param fast_scan: Goddess Mode (True) = triage structural + timestamps.
                           God Mode (False) = triage con decode completo.
+        :param limpiar_spam: quitar las firmas spam (modules/firmas.py). Los sanos
+                             se limpian con copia (el sucio queda en .con-spam);
+                             lo rescatado, en sitio antes de colocarlo.
+        :param registro: firmas.Registro compartido entre llamadas (Singularity
+                         llama una vez por fichero); sin él, se crea uno y el
+                         resumen sale al final de esta lista.
         """
-        stats = {"processed": 0, "saved_bytes": 0, "skipped": [], "failed": [], "suspicious": []}
+        stats = {"processed": 0, "saved_bytes": 0, "skipped": [], "failed": [], "suspicious": [],
+                 "limpiados": 0, "con_spam": []}
+        lista_firmas = firmas.cargar_lista() if limpiar_spam else None
+        registro_propio = limpiar_spam and registro is None
+        if registro_propio:
+            registro = firmas.Registro()
         rutas = []
         if isinstance(entrada, list):
             rutas = entrada
@@ -335,6 +347,9 @@ clip.set_output()
             if action == "SKIP":
                 print("✅ SANO. Saltando.")
                 stats["skipped"].append(ruta_origen)
+                if limpiar_spam:
+                    res = firmas.limpiar_con_copia(ruta_origen, lista_firmas, registro=registro)
+                    self._anotar_spam(res, ruta_origen, registro, stats)
                 continue
 
             # TRANSCODE (no es h264/h265.mkv) o RESCUE (h264/h265.mkv roto) → misma escalera
@@ -366,6 +381,12 @@ clip.set_output()
                 else:
                     print("✅ ESTABLE.")
 
+            if veredicto["valid"] and limpiar_spam:
+                # Recién salido del horno: nadie lo siembra, se limpia en sitio.
+                # Si la limpieza falla, el rescate sigue valiendo.
+                res = firmas.limpiar_nuevo(ruta_nuevo, lista_firmas, origen=ruta_origen)
+                self._anotar_spam(res, ruta_origen, registro, stats)
+
             if veredicto["valid"]:
                 try:
                     nuevo_nombre_final = os.path.splitext(ruta_origen)[0] + ".mkv"
@@ -391,5 +412,18 @@ clip.set_output()
         if stats["suspicious"]:
             print(f"\n⚠️  {len(stats['suspicious'])} archivo(s) sospechosos (<1MB) — revisar manualmente:")
             for s in stats["suspicious"]: print(f"   → {s}")
+        if registro_propio:
+            print("\n" + registro.resumen())
         return stats
+
+    def _anotar_spam(self, res, ruta, registro, stats):
+        """Una línea en pantalla y en el log por fichero con firmas."""
+        registro.contar(res)
+        linea = firmas.linea_resultado(res, ruta)
+        if linea:
+            self._log(linea)
+        if res["estado"] == "limpio":
+            stats["limpiados"] += 1
+            if res.get("sucio"):
+                stats["con_spam"].append(res["sucio"])
 

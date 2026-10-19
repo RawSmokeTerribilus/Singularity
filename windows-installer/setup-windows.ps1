@@ -36,6 +36,7 @@ $Dirs = @(
     "$WorkDir\tmp\qbit_backup",
     "$WorkDir\tmp\TEMP_RESCUE",
     "$WorkDir\trackers",
+    "$WorkDir\firmas_spam",
     "$WorkDir\cookies",
     "$WorkDir\qbit_backup",
     "$WorkDir\tor\data",
@@ -83,8 +84,9 @@ foreach ($Json in $JsonFiles) {
 # de tracker horneados. Un contenedor desechable los saca; nada se embebe aqui.
 $needConfig = -not (Test-Path -LiteralPath "$ConfigDir\config.py")
 $needTrackers = (Get-ChildItem -LiteralPath "$WorkDir\trackers" -ErrorAction SilentlyContinue | Measure-Object).Count -eq 0
+$needFirmas = (Get-ChildItem -LiteralPath "$WorkDir\firmas_spam" -ErrorAction SilentlyContinue | Measure-Object).Count -eq 0
 
-if ($needConfig -or $needTrackers) {
+if ($needConfig -or $needTrackers -or $needFirmas) {
     # IMPORTANTE: redirigir stderr (2>&1 / 2>$null) en TODAS las llamadas nativas a docker.
     # docker escribe el progreso a stderr; con $ErrorActionPreference='Stop', Windows
     # PowerShell 5.1 (el que lanza install-windows.bat) lo convierte en NativeCommandError
@@ -120,6 +122,12 @@ if ($needConfig -or $needTrackers) {
         if ($needTrackers) {
             Write-Host "Infundiendo trackers desde la imagen..." -ForegroundColor Cyan
             docker cp "${Cid}:/app/RawLoadrr/src/trackers/." "$WorkDir\trackers" 2>&1 | Out-Null
+        }
+
+        # 3c. LISTA DE FIRMAS SPAM de MKVerything (firmas_spam.usuario.txt es la del usuario)
+        if ($needFirmas) {
+            Write-Host "Copiando la lista de firmas spam desde la imagen..." -ForegroundColor Cyan
+            docker cp "${Cid}:/app/MKVerything/data/." "$WorkDir\firmas_spam" 2>&1 | Out-Null
         }
     }
     finally {

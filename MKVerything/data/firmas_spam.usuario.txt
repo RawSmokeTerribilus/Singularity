@@ -1,0 +1,29 @@
+# =============================================================================
+#  firmas_spam.usuario.txt — TUS firmas spam (MKVerything)
+# =============================================================================
+#  Este fichero es tuyo: la suite lo crea una vez y no lo vuelve a tocar, ni al
+#  actualizar. Se suma a firmas_spam.txt (la lista de la suite, que se refresca
+#  sola con `make up`). Los cambios valen en la siguiente pasada, sin reiniciar.
+#
+#  Formato (el mismo que firmas_spam.txt):
+#    [firmas]    una cadena por línea; se busca en cualquier parte, sin
+#                distinguir mayúsculas. Para palabras cortas o patrones usa
+#                «re:» + expresión regular, p. ej.  re:\bmigrupo\d*\b
+#    [tecnicos]  textos que NO son firma aunque la lista los cace (anula un
+#                falso positivo). Se quitan antes de buscar firmas.
+#    [opciones]  clave = valor; aquí mandan sobre las de la suite.
+#
+#  Para comprobar tu lista contra un fichero concreto, dentro del contenedor:
+#    python3 MKVerything/modules/firmas.py "/ruta/al/video.mkv"
+# =============================================================================
+
+[firmas]
+# miwebdedescargas
+# re:\bmigrupo\d*\b
+
+[tecnicos]
+# Un título de verdad que la lista confunde con firma
+# Stand by Me
+
+[opciones]
+# titulo = siempre

@@ -128,10 +128,82 @@ PY
     if [ -n "$tmp" ]; then rm -rf "$tmp"; fi
 }
 
+# La lista de firmas spam de MKVerything sigue el mismo trato que los trackers:
+# work_data/firmas_spam es un volumen, así que una imagen nueva no la toca. El
+# fichero de la suite (firmas_spam.txt y demás) se refresca aquí en cada
+# instalación y en cada `make prep`; lo sustituido va a
+# work_data/firmas_spam_backup/. El del usuario (firmas_spam.usuario.txt) se
+# crea una vez y no se vuelve a tocar.
+refresh_firmas_spam() {
+    local dst="$WORK_DIR/firmas_spam" src="$BASE_DIR/MKVerything/data" tmp="" img cid
+    mkdir -p "$dst"
+    if [ -z "$(ls -A "$src" 2>/dev/null)" ]; then
+        img=$(docker compose config --images 2>/dev/null | grep '^rawsmoke/singularity-suite' | head -n1 || true)
+        [ -n "$img" ] || img=$(grep -oE 'rawsmoke/singularity-suite:[^"'"'"'[:space:]]+' docker-compose.yml 2>/dev/null | head -n1 || true)
+        img=${img:-rawsmoke/singularity-suite:latest}
+        tmp=$(mktemp -d)
+        if { docker image inspect "$img" >/dev/null 2>&1 || docker pull "$img" >/dev/null; } \
+            && cid=$(docker create "$img") \
+            && docker cp "$cid:/app/MKVerything/data/." "$tmp"/ 2>/dev/null; then
+            docker rm "$cid" >/dev/null
+            src="$tmp"
+        else
+            if [ -n "${cid:-}" ]; then docker rm "$cid" >/dev/null 2>&1 || true; fi
+            rm -rf "$tmp"
+            # Una imagen anterior a la lista no la trae: no es un error.
+            echo "🧹 Firmas spam: la imagen $img no trae lista; se queda lo que hay."
+            return 0
+        fi
+    fi
+    python3 - "$src" "$dst" "$WORK_DIR/firmas_spam_backup" <<'PY'
+import shutil, sys, time
+from pathlib import Path
+src, dst, bk_root = map(Path, sys.argv[1:4])
+USUARIO = 'firmas_spam.usuario.txt'
+sello = time.strftime('%Y%m%d_%H%M%S')
+bk, i = bk_root / sello, 1
+while bk.exists():
+    i += 1
+    bk = bk_root / f'{sello}-{i}'
+nuevos, cambiados = [], []
+for f in sorted(src.iterdir()):
+    if not f.is_file() or '.bak' in f.name:
+        continue
+    d = dst / f.name
+    if f.name == USUARIO:
+        if not d.exists():
+            shutil.copy2(f, d)
+            print(f'🧹 Creado {d}: añade ahí tus firmas (no se toca al actualizar).')
+        continue
+    datos = f.read_bytes()
+    if not d.exists():
+        shutil.copy2(f, d)
+        nuevos.append(f.name)
+    elif d.read_bytes() != datos:
+        bk.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(d, bk / d.name)
+        d.write_bytes(datos)  # en sitio: conserva dueño y permisos
+        cambiados.append(f.name)
+if nuevos or cambiados:
+    print(f'🧹 Firmas spam: {len(cambiados)} actualizados, {len(nuevos)} nuevos.')
+    for n in cambiados:
+        print(f'   ↻ {n}')
+    if cambiados:
+        print(f'   Lo sustituido, en {bk}')
+else:
+    print('🧹 Firmas spam al día.')
+PY
+    if [ -n "$tmp" ]; then rm -rf "$tmp"; fi
+}
+
 # `make prep` solo necesita esto; lo demás (plantillas, /usr/local/bin con
 # sudo) es de la instalación.
 if [ "${1:-}" = "--solo-trackers" ]; then
     refresh_trackers
+    exit 0
+fi
+if [ "${1:-}" = "--solo-firmas" ]; then
+    refresh_firmas_spam
     exit 0
 fi
 
@@ -164,6 +236,7 @@ copy_if_missing "$BASE_DIR/config/mass_config.py.example" "$CONFIG_DIR/mass_conf
 generate_embedded_defaults_if_missing
 
 refresh_trackers
+refresh_firmas_spam
 
 for required in     "$CONFIG_DIR/.env"     "$CONFIG_DIR/singularity_config.py"     "$CONFIG_DIR/config.py"     "$CONFIG_DIR/mass_config.py"
 do

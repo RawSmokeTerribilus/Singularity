@@ -1,0 +1,137 @@
+# firmas_spam_casos.txt — casos de prueba de la lista de firmas (sacados de una
+# biblioteca real). Cada cambio en firmas_spam.txt tiene que seguir pasándolos:
+#     python3 MKVerything/modules/firmas.py --prueba
+# Formato, separado por TABULADOR:
+#   si	<texto>                 → tiene firma
+#   no	<texto>                 → no la tiene
+#   recorte	<nombre de pista>	<cómo debe quedar>   (vacío = se borra el nombre)
+
+# --- Títulos de contenedor con firma ---
+si	wolfmax4k.com
+si	by_pedroro
+si	okmk3
+si	Por: Bryan_122
+si	By: Bryan_122
+si	Por: Hera_77
+si	[CMGS]
+si	CONNOR2-C04
+si	Montado por yamil
+si	Hellsing - 02.[1080p WEB-DL] [ESP-JAP] [SANDISKO]
+si	Ninja Kamui 1x01.1080p.WEB-DL.Castellano.Japones.bySANDISKO
+si	[SANDISKO][www.latabernadelcangrejo.eu]
+si	The Flash S01E01 RAiDON
+si	By_d22 - eXvagos.org
+si	www.DESCARGASMIX.com
+si	SEAL Team - Temporada 1 [HDTV 720p][Cap.101][AC3 5.1 Castellano][www.PCTmix.com]
+si	Gotham720p_101_WWW.NEWPCT1.COM
+si	IntoTheBadlands720p_101_descargas2
+si	Cobra.Kai.S01E01.1080p.NF.WEB-DL.DD5.1.x264-user007
+si	The.Last.Kingdom.1x01.Episodio.1.1080p.NF.WEB-DL.DDP5.1.x264-Bryan_122
+si	Intergalactic.1x01.Episodio.1.m1080p.HMAX.WEB-DL.DD5.1.H.264-eth@n
+si	mthr.lnd.slm.1x01.m1080p.es
+si	Ultraman S01E01 1080p NF WEB-DL DD+5.1 x264 - TSeD @Jordan
+si	Sandman 1x01 by magamen40
+si	Quantum.Leap.2022.S02E01.1080p.AMZN.WEB.Rip.[jose1912]
+si	movieddl.me_Game.of.Thrones.S07E02
+si	Ripeo Por: SlaveHD
+si	Uploaded by T.I.T.O.
+si	Sanctuary 1x01 Revelaciones parte 1 Mhd 720p [tatuoso]
+si	El Chapo 1x01 Episodio 1 (KaNyO)
+si	Ahsoka.S01E02.Part.Two.1080p.CartmanGold
+si	The.Grand-ish.Tour.S01E01.1080p.AMZN.WEB-DL.DDP.5.1.H264-Castellano.TTR · TTR
+si	Dark Matter.S01E01.WEB-DL-720p.AC3.DUAL.GrupoV3
+si	Ourika (2024.) S01E01 - Episode 1 [Txv2]
+si	Berlin .1. T1 E1.WEB-DL1080p.Xh264-ivi25
+
+# --- Nombres de pista con firma ---
+si	[www.newpct1.com]
+si	Castellano_WWW.NEWPCT1.COM
+si	Subtitulos Castellano [www.newpct.com][toni32]
+si	By Daverm9
+si	BDrip By 晨曦@CXRAW
+si	[EvoShare] Dragon Ball Z [BOX]
+si	Ripeado y compartido por: hipolismata
+si	Catalán (AC3 | 2.0Ch | 192 kbps) [Capturado por alphacen, limpiado y sincronizado por Tret]
+si	@ComunidadCastellana
+si	Ripeado y Subido por Toni32,para newpct1.com
+
+# --- Trackers y webs nuevas ---
+si	Serie.S01E01.1080p.WEB-DL.H.264-NOBS
+si	Peli 2024 [MILNU]
+si	El hombre equivocado 2024 1080p WEB-DL-HDZ
+si	wolftorrent.net
+si	Montado por yamil
+si	Subtítulos en Español de España hechos por Tret
+si	Peli 2024 1080p Whisky135
+
+si	Renegade.Nell.1x01.No.Me.Llames.Nelly.1080p.DSNP.WEB-DL.DDP5.1.H.264-Vylon
+si	Gotham.1x01.El.adivino.ciego.m1080p.WEB.DL.tenshou
+si	Better.Call.Saul.S01E01.1080p.WEB-DL.DD5.1.H.264-RARBG
+si	Asi se hizo la Tierra 1x01 Krakatoa [BRrip-XviD-AC3][esp-eng] By Eugen
+si	Airbender: El Ultimo Guerrero por MiCho
+si	-Montaje Por -Andres.sito1
+si	Powered By Jorgeche
+
+# --- No son firma (nombres técnicos, episodios, títulos reales) ---
+no	Presidente por accidente (S01E01): En directo
+no	A por el whisky
+no	Sin City: Una dama por la que matar (2014)
+no	Puñales por la espalda: El misterio de Glass Onion (2022)
+no	Dexter [S01.E01] - Queda Por Ver
+no	¿Por qué estamos aquí?
+no	Ash vs Evil Dead.S01E01.Delirio.2015.AMZN WEBRIP-1080p.AC3.DUAL.SUB
+no	Star.Trek.Enterprise.1x01.Horizon.[720p.HDiTunes.x264.Dual]
+no	AMZN
+no	1080p NF WEB-DL DD+ 5.1 H.264
+no	Castellano AC3 5.1
+no	BDRip
+no	WEBRip
+no	Encode
+no	Sanctuary 1x01 Mhd 720p
+no	Stand by Me
+no	Por siempre
+no	Raised By Wolves S01E01
+no	Buscando a Nemo
+no	Back.to.the.Future.1985.1080p.BluRay.x264
+no	Kill.Me.Softly.2002
+no	Subido de tono
+no	Peli.2024.1080p.AMZN.WEB-DL.DDP5.1.H.264
+no	Castellano
+no	Inglés [Forzados]
+no	Castellano [Forzados Planos]
+no	Ingles SDH [Completos Planos]
+no	Castellano DD+ 5.1 @ 640 kb/s
+no	Castellano DD+ 5.1 @ 640 kbps
+no	384 kbps AC3 5.1 (Castellano)
+no	Español latino
+no	Español @AC3 5.1 - 640kbps
+no	Dolby @ 320Kbps
+no	1x01 (16:9) h264 8bits MPEG-4  25FPS  AVC (High@L4.1) YUV 4:2:0
+no	European Spanish (Forced)
+no	simple_aac_recording1
+no	Bola de Dragon Z
+no	Star Trek LNG Temp. 1 Cap. 1
+no	Episodio 1
+no	Capítulo 3
+no	Fariña.S01E01.1080p.NF.WEB-DL.DD+5.1.x264
+no	Bit by a dead bee
+no	Piece by Piece
+no	Nuevo amanecer
+no	Description
+no	Tripulación
+no	Evolución
+no	Bluray
+no	x264
+
+# --- Recorte de nombres de pista ---
+recorte	AC3 5.1 Castellano [www.newpct.com][toni32]	AC3 5.1 Castellano
+recorte	Subtitulos Castellano [www.newpct.com][toni32]	Subtitulos Castellano
+recorte	Castellano_WWW.NEWPCT1.COM	Castellano
+recorte	Forzados [www.newpct1.com]	Forzados
+recorte	Catalán (AC3 | 2.0Ch | 192 kbps) [Capturado por alphacen, limpiado y sincronizado por Tret]	Catalán (AC3 | 2.0Ch | 192 kbps)
+recorte	[www.newpct1.com]
+recorte	By Daverm9
+recorte	By_d22 - eXvagos.org
+recorte	BDrip By 晨曦@CXRAW
+recorte	SEAL Team - Temporada 1 [HDTV 720p][Cap.101][AC3 5.1 Castellano][www.PCTmix.com]
+recorte	[EvoShare] Dragon Ball Z [BOX]

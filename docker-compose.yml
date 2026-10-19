@@ -80,6 +80,8 @@ services:
       - ./work_data/logs:/app/logs
       - ./work_data/reports:/app/MKVerything/docs
       - ./work_data/trackers:/app/RawLoadrr/src/trackers
+      # Lista de firmas spam de MKVerything (la refresca `make up`; la tuya: firmas_spam.usuario.txt)
+      - ./work_data/firmas_spam:/app/MKVerything/data
       - ./work_data/reports:/app/work_data/reports
       
       # --- 3. PERSISTENCIA DE MÓDULOS ---

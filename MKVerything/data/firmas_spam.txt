@@ -1,0 +1,158 @@
+# =============================================================================
+#  firmas_spam.txt — Lista de firmas spam de la SUITE (MKVerything)
+# =============================================================================
+#  Este fichero es de la suite: se REFRESCA solo en cada `make up` / `make prep`
+#  (lo anterior se guarda en work_data/firmas_spam_backup/). No lo edites aquí:
+#  tus cadenas van en  firmas_spam.usuario.txt  (misma carpeta), que la suite
+#  no toca nunca. Las dos listas se suman en cada pasada, sin reiniciar nada.
+#
+#  Qué es firma: un SUJETO, el ego del que ripeó o subió el fichero (créditos,
+#  webs, grupos, uploaders, trackers). Qué NO lo es: lo técnico, lo que forma
+#  parte de un nombre bien puesto (códec, audio, fuente, servicio, resolución,
+#  HDR, idiomas), ni las palabras corrientes como «por» o «by», que tarde o
+#  temprano salen en un título de verdad.
+#
+#  Qué se mira en cada MKV: título del contenedor, nombre de cada pista,
+#  etiquetas (tags) y nombre/descripción de los adjuntos (las fuentes de los
+#  subtítulos nunca se quitan). Una pista de subtítulos con firma en el nombre
+#  y muy pocos eventos es un anuncio («Ripeado y subido por…») y se quita entera.
+#
+#  Formato:
+#    secciones  firmas, tecnicos y opciones, cada una con su nombre entre
+#               corchetes en una línea sola.
+#    firmas     una entrada por línea. Texto normal = se busca tal cual en
+#               cualquier parte, sin distinguir mayúsculas («sandisko» caza
+#               también «bySANDISKO»). Para palabras cortas o patrones usa
+#               «re:» + expresión regular de Python (p. ej. re:\bmigrupo\d*\b).
+#    tecnicos   protecciones: texto técnico que comparte símbolo con una firma
+#               (la @ de «DD+ 5.1 @ 640 kbps»). Se quita antes de buscar firmas.
+#               También sirve para anular un falso positivo.
+#    opciones   clave = valor.
+#  Las líneas que empiezan por # son comentarios.
+#
+#  Comprobar la lista contra los casos de prueba (firmas_spam_casos.txt):
+#    python3 MKVerything/modules/firmas.py --prueba
+# =============================================================================
+
+[opciones]
+# Título interno del MKV: «firma» = solo se quita si lleva firma (un nombre de
+# episodio o de release sin firma se queda). «siempre» = cualquier título fuera.
+titulo = firma
+# Espacio libre que debe quedar en el disco tras crear la copia limpia (GB).
+margen_gb = 2
+# Una pista de subtítulos con firma en el nombre y como mucho estos eventos
+# se considera un anuncio y se quita entera (si tiene más, solo se le limpia
+# el nombre).
+anuncio_max_eventos = 3
+
+[firmas]
+# --- Créditos del ripeo o de la subida ---
+re:\b(ripead[oa]s?|ripeo|ripped|encoded|uploaded)\b
+# Verbos corrientes: solo con su «por/by» detrás («Subido por X», «hechos por X»)
+re:\b(subid[oa]s?|montad[oa]s?|capturad[oa]s?|comprimid[oa]s?|compartid[oa]s?|hech[oa]s|traducid[oa]s?|sincronizad[oa]s?|montaje|powered)\s*(y\s+\w+\s+)?(por|by)\b
+
+# --- Webs ---
+re:www\.
+# Dominio suelto («wolfmax4k.com», «eXvagos.org»); los TLD cortos (.to, .me,
+# .es…) no, que salen en títulos con puntos («Back.to.the.Future»)
+re:[\w-]{3,}\.(com|net|org|info|biz|eu|cc|xyz|club|site|online|top|art|one)(?![\w.])
+# Usuario de red social o de tracker: «@Jordan», «eth@n» (la @ técnica está en tecnicos)
+re:@
+newpct
+pctnew
+pctmix
+pctreload
+descargas
+descargaya
+atomixhq
+atomohd
+torrentrapid
+wolfmax
+wolftorrent
+exvagos
+movieddl
+latabernadelcangrejo
+evoshare
+# Títulos ofuscados de una web de descargas (mthr.lnd.slm.1x01.m1080p.es)
+re:\.m?\d{3,4}p\.es$
+
+# --- Trackers (su etiqueta no va dentro del fichero) ---
+re:\bnobs\b
+re:\bmilnu(eve)?\b
+re:\bhdz(ero)?\b
+re:\bttr\b
+
+# --- Grupos y uploaders vistos en bibliotecas reales ---
+sandisko
+cxraw
+pedroro
+re:\bokmk\d*\b
+re:\[cmgs\]
+re:\bconnor\d+-c\d+\b
+raidon
+magamen
+daverm
+slavehd
+hipolismata
+emuwarez
+toonshub
+elzeta
+batusizoe
+pityuno
+tatuoso
+kanyo
+cartmangold
+hdteam
+eth@n
+re:\byamil\b
+re:\bbryan_\d+
+re:\bhera_\d+
+re:\btoni\d+\b
+re:\bjose\d{3,}\b
+re:-user\d+\b
+re:\btxv\d+\b
+re:\bgrupov\d*\b
+re:\bivi\d+\b
+re:\btsed\b
+re:\bwhisky\d+
+re:\btret\b
+re:\bsphd\b
+re:\bben\.the\.men\b
+re:\bbtm\b
+re:\bt\.i\.t\.o\.?
+vylon
+tenshou
+rarbg
+redbits
+enanno
+xevious
+prodigyo
+jorgeche
+tigole
+llepo
+djisidro
+grupohds
+sharerip
+mokesky
+re:\bmicho\b
+re:-d3g\b
+re:\bphenom\b
+re:\bfly\d*rs\b
+re:\bgeot\b
+re:\btmd\b
+re:\benric\d+
+re:-yg\b
+re:\blmain\b
+re:-bloom\b
+re:\bjeimi\b
+re:\beugen\b
+re:\(laxa\)
+re:\[pxl\]
+re:\[\.?hdg\]
+™
+
+[tecnicos]
+# Bitrate o códec tras una @: «Castellano DD+ 5.1 @ 640 kbps», «Español @AC3 5.1»
+re:@\s*(\d|ac-?3|e-?ac-?3|dd\+?|dts|aac|he-?aac|truehd|flac|opus|mp3|pcm|atmos)
+# Perfil y nivel del códec: «AVC (High@L4.1)»
+re:@L\d

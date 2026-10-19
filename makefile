@@ -48,6 +48,8 @@ prep:
 	@# Antes solo sembraba si estaba vacío y los arreglos de los módulos no
 	@# llegaban nunca; la lógica (refrescar + fusionar registro) vive en el instalador.
 	@bash final-user-install.sh --solo-trackers
+	@# La lista de firmas spam de MKVerything, igual que los trackers.
+	@bash final-user-install.sh --solo-firmas
 	@mkdir -p config
 	@if [ ! -f config/.env ] && [ -f config/.env.example ]; then cp config/.env.example config/.env; echo "🧩 Creado config/.env desde plantilla NOBS"; fi
 	@if [ ! -f config/.env ] && [ -f .env.example ]; then cp .env.example config/.env; echo "🧩 Creado config/.env desde .env.example"; fi

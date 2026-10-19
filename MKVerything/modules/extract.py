@@ -6,6 +6,7 @@ import argparse
 import sys
 import random
 from .verifier import Verifier
+from . import firmas
 
 _MKVE_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 _LOGS_DIR = os.path.join(_MKVE_ROOT, "logs")
@@ -43,10 +44,11 @@ class IsoExtractor:
         with open(self.log_file, "a", encoding="utf-8") as f:
             f.write(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] {msg}\n")
 
-    def extraer_iso(self, ruta_iso, carpeta_destino):
+    def extraer_iso(self, ruta_iso, carpeta_destino, limpiar_spam=False):
         """
         Usa makemkvcon para extraer TODOS los títulos de una ISO a una carpeta temporal.
-        Luego filtra y renombra.
+        Luego filtra y renombra. Con `limpiar_spam`, el MKV extraído sale sin firmas
+        (modules/firmas.py): es nuevo, se limpia en sitio antes de moverlo.
         """
         nombre_iso = os.path.splitext(os.path.basename(ruta_iso))[0]
         temp_dir = os.path.join(carpeta_destino, "TEMP_EXTRACT", nombre_iso)
@@ -87,6 +89,12 @@ class IsoExtractor:
         # 4. VERIFICACIÓN (ISO vs MKV)
         print("   ⚖️  Verificando integridad (Pistas Audio/Subs)...")
         veredicto = self.verifier.check_iso_extraction(ruta_iso, main_mkv)
+
+        if veredicto["valid"] and limpiar_spam:
+            res = firmas.limpiar_nuevo(main_mkv)
+            linea = firmas.linea_resultado(res, main_mkv)
+            if linea:
+                self._log(linea)
 
         if veredicto["valid"]:
             # Mover a destino final

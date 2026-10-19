@@ -1157,6 +1157,8 @@ def _singularity_summary(results: dict, elapsed_total: float):
                 f"ISOs {s.get('isos_ok', 0)}ok/{s.get('isos_fail', 0)}fallos  "
                 f"conv={s.get('processed', 0)}  ahorro={mb}MB"
             )
+            if s.get("limpiados"):
+                parts.append(f"spam limpio={s['limpiados']}")
         if "count" in r:
             parts.append(f"{r['count']} carpetas con HEVC")
         if "hevc_list" in r:
@@ -1278,6 +1280,17 @@ def singularity_mode(fast_scan=False):
     if run_unit3d == "s":
         _me_check_essential_config(_me_load_config())
 
+    # Limpieza de firmas spam en la Fase 1 (MKVerything/modules/firmas.py)
+    from modules import firmas as _firmas
+    from rich.markup import escape as _escape
+    console.print()
+    console.print(Panel(
+        _escape(f"{_firmas.TEXTO_PREGUNTA}\n\n   Listas de firmas:\n{_firmas.texto_lista(_firmas.cargar_lista())}"),
+        title="[bold cyan]Limpieza de spam (Fase 1)[/bold cyan]",
+        border_style="cyan",
+    ))
+    limpiar_spam = Prompt.ask("¿Limpiamos el spam en la Fase 1?", choices=["s", "n"], default="n") == "s"
+
     cfg_table = Table(box=None, show_header=False)
     cfg_table.add_column(style="cyan", no_wrap=True)
     cfg_table.add_column(style="white")
@@ -1292,6 +1305,7 @@ def singularity_mode(fast_scan=False):
     cfg_table.add_row("Tracker", tracker)
     cfg_table.add_row("Lista Fase 3", _list_mode_labels[list_mode])
     cfg_table.add_row("UNIT3D", "Sí" if run_unit3d == "s" else "No")
+    cfg_table.add_row("Limpieza de spam", "Sí (el sucio queda como .con-spam)" if limpiar_spam else "No")
     if run_unit3d == "s":
         cfg_table.add_row("IDs UNIT3D", f"{unit3d_start} → {unit3d_end}")
 
@@ -1322,7 +1336,9 @@ def singularity_mode(fast_scan=False):
             "isos_ok": 0, "isos_fail": 0,
             "processed": 0, "saved_bytes": 0,
             "failed": 0, "skipped": 0,
+            "limpiados": 0,
         }
+        registro_spam = _firmas.Registro() if limpiar_spam else None
 
         isos = list(media_root.rglob("*.iso"))
         if isos:
@@ -1330,7 +1346,7 @@ def singularity_mode(fast_scan=False):
             extractor = IsoExtractor()
             for iso in isos:
                 console.print(f"  → {iso.name}")
-                ok = extractor.extraer_iso(str(iso), str(iso_output))
+                ok = extractor.extraer_iso(str(iso), str(iso_output), limpiar_spam=limpiar_spam)
                 if ok:
                     god_stats["isos_ok"] += 1
                 else:
@@ -1349,14 +1365,19 @@ def singularity_mode(fast_scan=False):
             rescuer = UniversalRescuer()
             for vpath in all_video_files:
                 is_mkv = vpath.lower().endswith('.mkv')
-                res = rescuer.procesar_lista([vpath], modo_estricto=is_mkv, fast_scan=fast_scan)
+                res = rescuer.procesar_lista([vpath], modo_estricto=is_mkv, fast_scan=fast_scan,
+                                             limpiar_spam=limpiar_spam, registro=registro_spam)
                 if res:
+                    god_stats["limpiados"] += res.get("limpiados", 0)
                     god_stats["processed"] += res.get("processed", 0)
                     god_stats["saved_bytes"] += res.get("saved_bytes", 0)
                     god_stats["failed"] += len(res.get("failed", []))
                     god_stats["skipped"] += len(res.get("skipped", []))
         else:
             console.print("[dim]  (No he encontrado vídeos para toquetear)[/dim]")
+
+        if registro_spam:
+            console.print(_escape(registro_spam.resumen()))
 
         phase_results["fase1"] = {
             "status": "OK",

@@ -139,7 +139,7 @@ def main():
                 sys.exit()
 
             elif opcion == "1":
-                from modules import verifier
+                from modules import verifier, firmas
                 v = verifier.Verifier()
 
                 path_target = input("\n📂 Carpeta o Punto de Montaje a auditar: ").strip().replace("'","").replace('"','')
@@ -153,6 +153,9 @@ def main():
                 os.makedirs(logs_dir, exist_ok=True)
                 archivo_bajas       = os.path.join(logs_dir, f"videos-rotos-{fecha_str}.txt")
                 archivo_sospechosos = os.path.join(logs_dir, f"videos-sospechosos-{fecha_str}.txt")
+                archivo_firmas      = os.path.join(logs_dir, f"firmas-spam-{fecha_str}.txt")
+                lista_firmas = firmas.cargar_lista()
+                con_firmas = []
 
                 print(f"\n🔍 {C_CYAN}Iniciando inventario...{C_RESET}")
                 archivos = scan_files(path_target, ['.mkv', '.avi', '.mp4', '.mov', '.wmv'])
@@ -189,11 +192,22 @@ def main():
                     if not spam_info['clean']:
                         spam += 1
 
+                    # Firmas spam (modules/firmas.py): solo se mira, aquí no se toca nada
+                    if f.lower().endswith('.mkv'):
+                        fi = firmas.inspeccionar(f, lista_firmas)
+                        if fi.get('sucio'):
+                            con_firmas.append(f)
+                        if fi.get('hallazgos') or fi.get('avisos'):
+                            with open(archivo_firmas, "a", encoding="utf-8") as out:
+                                for h in fi.get('hallazgos', []) + fi.get('avisos', []):
+                                    out.write(f"{f}\t{h['sitio']}\t{h['texto']}\t{h['firma']}\n")
+
                 print(f"\n\n{C_YELLOW}--- RESUMEN DE AUDITORÍA ---{C_RESET}")
                 print(f"✅ Sanos:        {sanos}")
                 print(f"❌ Rotos/Legacy: {C_RED}{rotos}{C_RESET}")
                 print(f"⚠️  Sospechosos:  {C_YELLOW}{sospechosos}{C_RESET}  (<1MB — revisar manualmente)")
                 print(f"🏷️  Spam:         {spam}")
+                print(f"🧹 Con firmas:   {len(con_firmas)}" + (f"  (detalle: {archivo_firmas})" if con_firmas else ""))
                 print(f"----------------------------")
                 update_status("MKVERYTHING", "Auditoría", "COMPLETED", progress=100,
                               details=f"Sanos: {sanos}, Rotos: {rotos}, Sospechosos: {sospechosos}")
@@ -211,16 +225,33 @@ def main():
                 else:
                     print(f"\n{C_GREEN}💎 Librería impecable. No se han detectado errores.{C_RESET}")
 
+                if con_firmas:
+                    print(f"\n🧹 {len(con_firmas)} archivo(s) llevan firmas spam (detalle: {archivo_firmas}).")
+                    if firmas.preguntar():
+                        reg = firmas.Registro()
+                        lista_firmas = firmas.cargar_lista()
+                        for i, f in enumerate(con_firmas):
+                            if not os.path.exists(f):
+                                continue
+                            print(f"[{i+1}/{len(con_firmas)}] {os.path.basename(f)[:60]}")
+                            res = firmas.limpiar_con_copia(f, lista_firmas, registro=reg)
+                            reg.contar(res)
+                            linea = firmas.linea_resultado(res, f)
+                            if linea:
+                                print(linea)
+                        print("\n" + reg.resumen())
+
                 input("\n✅ Pulsa Enter para volver...")
                 continue
 
             elif opcion == "2":
-                from modules import universal_rescuer
+                from modules import universal_rescuer, firmas
                 print("\n📂 Arrastra Video, Carpeta o TXT (Solo se procesarán MKVs ROTOS):")
                 path = input("👉 Ruta: ").strip().replace("'","").replace('"','')
+                limpiar = firmas.preguntar()
                 update_status("MKVERYTHING", "Rescate MKV", "PROCESSING", details=f"Analizando: {os.path.basename(path)}")
                 rescuer = universal_rescuer.UniversalRescuer()
-                rescuer.procesar_lista(path, modo_estricto=True)
+                rescuer.procesar_lista(path, modo_estricto=True, limpiar_spam=limpiar)
                 update_status("MKVERYTHING", "Rescate MKV", "COMPLETED")
                 input("\n✅ Pulsa Enter para volver...")
                 continue
@@ -234,9 +265,11 @@ def main():
                     print(f"\n🦕 Encontrados {len(legacy_files)} archivos antiguos.")
                     confirm = input("¿Convertirlos a MKV H.264 Verificados? (s/n): ")
                     if confirm.lower() == 's':
+                        from modules import firmas
+                        limpiar = firmas.preguntar()
                         update_status("MKVERYTHING", "Conversión Legacy", "PROCESSING", details=f"Encontrados: {len(legacy_files)} archivos")
                         rescuer = universal_rescuer.UniversalRescuer()
-                        rescuer.procesar_lista(legacy_files, modo_estricto=False)
+                        rescuer.procesar_lista(legacy_files, modo_estricto=False, limpiar_spam=limpiar)
                         update_status("MKVERYTHING", "Conversión Legacy", "COMPLETED")
                 input("\n✅ Pulsa Enter para volver...")
                 continue
@@ -246,25 +279,27 @@ def main():
                 in_path = input("\n📂 Carpeta o ISO Origen: ").strip().replace("'","").replace('"','')
                 out_path = input("📂 Carpeta Destino (Enter para misma): ").strip().replace("'","").replace('"','')
                 if not out_path: out_path = in_path if os.path.isdir(in_path) else os.path.dirname(in_path)
+                from modules import firmas
+                limpiar = firmas.preguntar()
                 
                 update_status("MKVERYTHING", "Extracción ISO", "PROCESSING", details=f"Origen: {os.path.basename(in_path)}")
                 ext = extract.IsoExtractor()
                 if os.path.isfile(in_path):
-                    ext.extraer_iso(in_path, out_path)
+                    ext.extraer_iso(in_path, out_path, limpiar_spam=limpiar)
                 elif os.path.isdir(in_path):
                     isos = scan_files(in_path, ['.iso'])
                     print(f"   💿 Encontradas {len(isos)} ISOs.")
                     for i, iso in enumerate(isos): 
                         prog = int((i / len(isos)) * 100)
                         update_status("MKVERYTHING", "Extracción ISO", "PROCESSING", progress=prog, details=f"Extrayendo: {os.path.basename(iso)}")
-                        ext.extraer_iso(iso, out_path)
+                        ext.extraer_iso(iso, out_path, limpiar_spam=limpiar)
                 
                 update_status("MKVERYTHING", "Extracción ISO", "COMPLETED", progress=100)
                 input("\n✅ Pulsa Enter para volver...")
                 continue
 
             elif opcion in ["5", "6"]:
-                from modules import extract, universal_rescuer, verifier
+                from modules import extract, universal_rescuer, verifier, firmas
 
                 is_goddess = (opcion == "6")
                 COLOR_MODE = C_MAGENTA if is_goddess else C_RED
@@ -297,6 +332,7 @@ def main():
                 root_path = input(f"\n{C_BOLD}📂 Ruta Raíz para el escaneo:{C_RESET} ").strip().replace("'","").replace('"','')
                 out_iso_path = input(f"{C_BOLD}📂 Salida ISOs (Enter = origen):{C_RESET} ").strip().replace("'","").replace('"','')
                 if not out_iso_path: out_iso_path = root_path
+                limpiar = firmas.preguntar()
 
                 # --- FASE 1: EXTRACCIÓN DE ISOs ---
                 print(f"\n{COLOR_MODE}--- FASE 1: EXTRACCIÓN DE ISOs (MakeMKV) ---{C_RESET}")
@@ -307,7 +343,7 @@ def main():
                     for iso in isos:
                         anim = FakeProgress(f"Destripando {os.path.basename(iso)}")
                         anim.start()
-                        extractor.extraer_iso(iso, out_iso_path)
+                        extractor.extraer_iso(iso, out_iso_path, limpiar_spam=limpiar)
                         anim.stop(); anim.join()
                         print(f"    ✅ {os.path.basename(iso)} procesada.")
                 else:
@@ -319,7 +355,7 @@ def main():
                 
                 # Aquí está la clave: pasamos fast_scan=is_goddess
                 # Si es 6, fast_scan=True y el verifier usará el check_health rápido.
-                stats = rescuer.procesar_lista(root_path, modo_estricto=True, fast_scan=is_goddess)
+                stats = rescuer.procesar_lista(root_path, modo_estricto=True, fast_scan=is_goddess, limpiar_spam=limpiar)
 
                 print(f"\n{C_GREEN}✅ Purga finalizada.{C_RESET}")
                 if stats:
